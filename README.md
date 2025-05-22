@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dark Distro - TikTok Cloud Phone Control Center
 
-## Getting Started
+A Next.js 14 web application for managing TikTok cloud phone farms with GeeLark, SOAX proxies, and DaisySMS integration.
 
-First, run the development server:
+## Architecture
 
+- **Frontend**: Next.js 14 (App Router) with TypeScript
+- **Styling**: Tailwind CSS (grayscale theme)
+- **Database**: Supabase (PostgreSQL)
+- **Storage**: Supabase Storage
+- **Authentication**: Supabase Auth
+- **Deployment**: Vercel
+
+## Features
+
+### Profile Management
+- Create and manage GeeLark Android phone profiles
+- Automated warm-up sequences
+- Proxy assignment and rotation
+- Real-time device status monitoring
+
+### Proxy Management
+- SOAX sticky pool integration for warm-up
+- Dedicated SIM proxies for posting
+- Health monitoring and automatic rotation
+- IP whitelisting support
+
+### SMS Verification
+- DaisySMS integration for OTP codes
+- Automatic polling for verification codes
+- Support for up to 20 concurrent rentals
+- 72-hour rental periods
+
+### Content Distribution
+- Automatic asset detection from Supabase Storage
+- Batch posting campaigns
+- Task queue management
+- Success/failure tracking
+
+### Monitoring & Logs
+- Comprehensive logging system
+- Real-time error tracking
+- Export functionality
+- Component-level filtering
+
+## Setup
+
+1. Clone the repository
+2. Copy `.env.example` to `.env.local` and fill in your credentials
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Run database migrations in Supabase
+5. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Environment Variables
+
+See `.env.example` for required environment variables:
+- Supabase credentials
+- GeeLark API keys
+- SOAX proxy credentials
+- DaisySMS API key
+
+## API Integrations
+
+### GeeLark
+- Profile creation and management
+- Automation task execution
+- Device status monitoring
+- Proxy configuration
+
+### SOAX
+- Sticky session proxies
+- Dedicated SIM proxies
+- IP rotation (where supported)
+- Health checking
+
+### DaisySMS
+- Phone number rental
+- OTP code retrieval
+- Rental management
+
+## Database Schema
+
+The application uses the following main tables:
+- `accounts` - TikTok accounts and profiles
+- `phones` - GeeLark device information
+- `proxies` - Proxy configurations
+- `sms_rentals` - Phone number rentals
+- `posts` - Content distribution queue
+- `tasks` - GeeLark automation tasks
+- `logs` - System activity logs
+
+## Cron Jobs
+
+Configured in `vercel.json`:
+- Task status polling: Every 2 minutes
+- Nightly proxy rotation: Daily at 00:30
+
+## Deployment
+
+Deploy to Vercel:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+vercel
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Configure environment variables in Vercel dashboard.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Create Profiles**: Start by creating new GeeLark profiles
+2. **Warm-up**: Run warm-up automation on new profiles
+3. **Assign Proxies**: Assign dedicated proxies to warmed-up accounts
+4. **Upload Content**: Upload videos to Supabase Storage
+5. **Launch Campaigns**: Distribute content to active profiles
 
-## Learn More
+## Security
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Row Level Security (RLS) enabled on all tables
+- Service role key used only for server-side operations
+- Authentication required for all routes
+- Sensitive data stored as environment variables

@@ -1,0 +1,141 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { geelarkApi } from '@/lib/geelark-api'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+
+export async function GET(request: NextRequest) {
+  try {
+    // Fetch all running tasks
+    const { data: runningTasks, error } = await supabaseAdmin
+      .from('tasks')
+      .select('*')
+      .eq('status', 'running')
+
+    if (error) throw error
+
+    const results = await Promise.allSettled(
+      runningTasks.map(async (task) => {
+        if (!task.geelark_task_id) return
+
+        const taskStatus = await geelarkApi.getTaskStatus(task.geelark_task_id)
+
+        // Update task status
+        if (taskStatus.status !== 'running') {
+          await supabaseAdmin
+            .from('tasks')
+            .update({
+              status: taskStatus.status === 'completed' ? 'completed' : 'failed',
+              ended_at: new Date().toISOString(),
+              message: taskStatus.result?.message || null,
+              meta: { ...task.meta, result: taskStatus.result }
+            })
+            .eq('id', task.id)
+
+          // Handle warmup completion
+          if (task.type === 'warmup' && taskStatus.status === 'completed') {
+            await supabaseAdmin
+              .from('accounts')
+              .update({
+                warmup_done: true,
+                warmup_progress: 100,
+                status: 'active'
+              })
+              .eq('id', task.account_id)
+
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'task-poller',
+              account_id: task.account_id,
+              message: 'Warm-up completed',
+              meta: { task_id: task.geelark_task_id }
+            })
+          }
+
+          // Handle post completion
+          if (task.type === 'post' && taskStatus.status === 'completed') {
+            const tiktokPostId = taskStatus.result?.post_id || null
+
+            await supabaseAdmin
+              .from('posts')
+              .update({
+                status: 'posted',
+                tiktok_post_id: tiktokPostId,
+                posted_at: new Date().toISOString()
+              })
+              .eq('geelark_task_id', task.geelark_task_id)
+
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'task-poller',
+              account_id: task.account_id,
+              message: 'Post published successfully',
+              meta: { 
+                task_id: task.geelark_task_id,
+                tiktok_post_id: tiktokPostId
+              }
+            })
+          }
+
+          // Handle failures
+          if (taskStatus.status === 'failed') {
+            if (task.type === 'post') {
+              await supabaseAdmin
+                .from('posts')
+                .update({
+                  status: 'failed',
+                  error: taskStatus.result?.error || 'Unknown error'
+                })
+                .eq('geelark_task_id', task.geelark_task_id)
+            }
+
+            await supabaseAdmin.from('logs').insert({
+              level: 'error',
+              component: 'task-poller',
+              account_id: task.account_id,
+              message: `${task.type} task failed`,
+              meta: { 
+                task_id: task.geelark_task_id,
+                error: taskStatus.result?.error
+              }
+            })
+
+            // Increment error count on account
+            await supabaseAdmin.rpc('increment', {
+              table_name: 'accounts',
+              row_id: task.account_id,
+              column_name: 'error_count'
+            })
+          }
+        }
+
+        return { task_id: task.id, status: taskStatus.status }
+      })
+    )
+
+    const updated = results.filter(r => r.status === 'fulfilled').length
+
+    return NextResponse.json({
+      success: true,
+      checked: runningTasks.length,
+      updated
+    })
+  } catch (error) {
+    console.error('Task status check error:', error)
+    
+    await supabaseAdmin.from('logs').insert({
+      level: 'error',
+      component: 'task-poller',
+      message: 'Failed to check task statuses',
+      meta: { error: String(error) }
+    })
+
+    return NextResponse.json(
+      { error: 'Failed to check task statuses' },
+      { status: 500 }
+    )
+  }
+}
+
+// This endpoint can be called by a cron job
+export async function POST(request: NextRequest) {
+  return GET(request)
+}

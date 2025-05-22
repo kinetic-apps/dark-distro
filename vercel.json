@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/geelark/task-status",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/proxies/rotate-all",
+      "schedule": "30 0 * * *"
+    }
+  ]
+}
