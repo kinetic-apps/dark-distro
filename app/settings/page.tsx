@@ -49,21 +49,65 @@ export default function SettingsPage() {
     total_accounts: 0,
     total_proxies: 0,
     total_rentals: 0,
-    recent_errors: 0
+    recent_errors: 0,
+    environment_valid: false
   })
 
   const supabase = createClient()
 
   useEffect(() => {
+    // Validate environment variables first
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables:', {
+        url: !!supabaseUrl,
+        key: !!supabaseKey
+      })
+      setSystemHealth(prev => ({
+        ...prev,
+        database: 'error',
+        supabase: 'error',
+        environment_valid: false
+      }))
+      return
+    }
+
+    setSystemHealth(prev => ({ ...prev, environment_valid: true }))
     checkSystemHealth()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(checkSystemHealth, 30000)
+    
+    // Auto-refresh every 30 seconds only if environment is valid
+    const interval = setInterval(() => {
+      if (supabaseUrl && supabaseKey) {
+        checkSystemHealth()
+      }
+    }, 30000)
+    
     return () => clearInterval(interval)
   }, [])
 
   const checkSystemHealth = async () => {
     try {
-      const [accounts, proxies, rentals, errors] = await Promise.all([
+      // Test basic Supabase connection first
+      const { data: connectionTest, error: connectionError } = await supabase
+        .from('accounts')
+        .select('id')
+        .limit(1)
+        .maybeSingle()
+
+      if (connectionError) {
+        console.error('Supabase connection error:', connectionError)
+        setSystemHealth(prev => ({
+          ...prev,
+          database: 'error',
+          supabase: 'error'
+        }))
+        return
+      }
+
+      // If connection works, proceed with detailed queries
+      const results = await Promise.allSettled([
         supabase.from('accounts').select('*', { count: 'exact', head: true }),
         supabase.from('proxies').select('*', { count: 'exact', head: true }),
         supabase.from('sms_rentals').select('*', { count: 'exact', head: true }),
@@ -73,15 +117,29 @@ export default function SettingsPage() {
           .gte('timestamp', new Date(Date.now() - 3600000).toISOString())
       ])
 
-      setSystemHealth({
+      // Process results and handle individual failures gracefully
+      const [accounts, proxies, rentals, errors] = results
+
+      setSystemHealth(prev => ({
+        ...prev,
         database: 'healthy',
         supabase: 'healthy',
-        total_accounts: accounts.count || 0,
-        total_proxies: proxies.count || 0,
-        total_rentals: rentals.count || 0,
-        recent_errors: errors.count || 0
+        total_accounts: accounts.status === 'fulfilled' ? (accounts.value.count || 0) : 0,
+        total_proxies: proxies.status === 'fulfilled' ? (proxies.value.count || 0) : 0,
+        total_rentals: rentals.status === 'fulfilled' ? (rentals.value.count || 0) : 0,
+        recent_errors: errors.status === 'fulfilled' ? (errors.value.count || 0) : 0
+      }))
+
+      // Log any individual query failures
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const tableNames = ['accounts', 'proxies', 'sms_rentals', 'logs']
+          console.warn(`Failed to query ${tableNames[index]}:`, result.reason)
+        }
       })
+
     } catch (error) {
+      console.error('System health check failed:', error)
       setSystemHealth(prev => ({
         ...prev,
         database: 'error',
@@ -312,7 +370,10 @@ export default function SettingsPage() {
             <div>
               <p className="text-sm font-medium text-gray-600">Database</p>
               <p className={`mt-1 text-sm font-semibold ${getHealthColor(systemHealth.database)}`}>
-                {systemHealth.database === 'healthy' ? 'Connected' : 'Error'}
+                {systemHealth.environment_valid 
+                  ? (systemHealth.database === 'healthy' ? 'Connected' : 'Error')
+                  : 'Config Missing'
+                }
               </p>
             </div>
             <Database className={`h-6 w-6 ${getHealthColor(systemHealth.database)}`} />
@@ -645,7 +706,10 @@ export default function SettingsPage() {
           <div>
             <p className="text-sm font-medium text-gray-700">Database Status</p>
             <p className={`text-sm ${getHealthColor(systemHealth.supabase)}`}>
-              {systemHealth.supabase === 'healthy' ? 'Connected' : 'Connection Error'}
+              {!systemHealth.environment_valid 
+                ? 'Environment variables missing'
+                : (systemHealth.supabase === 'healthy' ? 'Connected' : 'Connection Error')
+              }
             </p>
           </div>
           
@@ -657,16 +721,32 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {!systemHealth.environment_valid && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm text-red-800 mb-3 font-medium">
+              🚨 Missing Supabase Configuration
+            </p>
+            <p className="text-sm text-red-700 mb-2">
+              The following environment variables are required in your <code>.env.local</code> file:
+            </p>
+            <div className="text-xs font-mono bg-red-100 p-2 rounded">
+              <div>NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url</div>
+              <div>NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key</div>
+            </div>
+          </div>
+        )}
+
         {showCredentials && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
             <p className="text-sm text-yellow-800 mb-3">
               ⚠️ Sensitive information - do not share these values
             </p>
             <div className="grid grid-cols-1 gap-2 text-xs font-mono">
+              <div>NEXT_PUBLIC_SUPABASE_URL: {process.env.NEXT_PUBLIC_SUPABASE_URL ? '✓ Set' : '❌ Not Set'}</div>
+              <div>NEXT_PUBLIC_SUPABASE_ANON_KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✓ Set' : '❌ Not Set'}</div>
               <div>DAISYSMS_API_KEY: {process.env.NEXT_PUBLIC_DAISYSMS_API_KEY ? '***' : 'Not Set'}</div>
               <div>GEELARK_API_KEY: {process.env.NEXT_PUBLIC_GEELARK_API_KEY ? '***' : 'Not Set'}</div>
-              <div>SOAX_API_KEY: {process.env.NEXT_PUBLIC_SOAX_API_KEY ? '***' : 'Not Set'}</div>
-              <div>SUPABASE_URL: {process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30)}...</div>
+              <div>SOAX_PACKAGE_KEY: {process.env.NEXT_PUBLIC_SOAX_PACKAGE_KEY ? '***' : 'Not Set'}</div>
             </div>
           </div>
         )}
