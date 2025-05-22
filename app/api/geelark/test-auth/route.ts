@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 
 const API_BASE_URL = process.env.GEELARK_API_BASE_URL!
 const API_KEY = process.env.GEELARK_API_KEY!
 const APP_ID = process.env.GEELARK_APP_ID!
+
+function generateUUID(): string {
+  return 'yxxyxxxxyxyxxyxxyxxxyxxxyxxyxxyx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  }).toUpperCase()
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,22 +22,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Try a simple profile list call to test authentication
-    // Use the correct GeeLark API endpoint
-    const response = await fetch(`${API_BASE_URL}/api/v1/profile/list`, {
+    // Generate required authentication parameters
+    const timestamp = new Date().getTime().toString()
+    const traceId = generateUUID()
+    const nonce = traceId.substring(0, 6)
+    
+    // Generate signature: SHA256(appId + traceId + ts + nonce + apiKey)
+    const signString = APP_ID + traceId + timestamp + nonce + API_KEY
+    const sign = createHash('sha256').update(signString).digest('hex').toUpperCase()
+
+    // GeeLark API call with proper authentication headers
+    const response = await fetch(`${API_BASE_URL}/open/v1/phone/list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'appId': APP_ID,
+        'traceId': traceId,
+        'ts': timestamp,
+        'nonce': nonce,
+        'sign': sign,
       },
       body: JSON.stringify({
-        api_key: API_KEY,
-        app_id: APP_ID,
         page: 1,
-        page_size: 1
+        pageSize: 1
       }),
     })
 
-    // Get response as text first to handle non-JSON responses
     const responseText = await response.text()
 
     if (!response.ok) {
@@ -49,10 +68,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check for GeeLark error responses
-    if (data.code && data.code !== 200 && data.code !== 0) {
+    // Check for GeeLark success (code: 0 means success)
+    if (data.code !== 0) {
       return NextResponse.json(
-        { error: `GeeLark error (${data.code}): ${data.msg || data.message || 'Unknown error'}` },
+        { error: `GeeLark error (${data.code}): ${data.msg || 'Unknown error'}` },
         { status: 400 }
       )
     }
@@ -64,7 +83,9 @@ export async function POST(request: NextRequest) {
         api_accessible: true,
         app_id: APP_ID,
         response_code: data.code,
-        response_preview: responseText.substring(0, 200)
+        trace_id: traceId,
+        phone_count: data.data?.total || 0,
+        response_preview: responseText.substring(0, 300)
       }
     })
 
