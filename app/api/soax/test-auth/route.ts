@@ -13,9 +13,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const url = `${API_BASE_URL}/packages/${PACKAGE_KEY}/stats`
-
-    const response = await fetch(url, {
+    // Test authentication using package stats endpoint
+    // Try different SOAX API endpoint patterns
+    const response = await fetch(`${API_BASE_URL}/v1/packages/${PACKAGE_KEY}/stats`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
@@ -23,26 +23,48 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const data = await response.json()
+    if (response.status === 401) {
+      return NextResponse.json(
+        { error: 'Invalid API key - authentication failed' },
+        { status: 401 }
+      )
+    }
+
+    if (response.status === 403) {
+      return NextResponse.json(
+        { error: 'API key lacks required permissions' },
+        { status: 403 }
+      )
+    }
+
+    const responseText = await response.text()
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `HTTP ${response.status}: ${data.error || 'Authentication failed'}` },
+        { error: `HTTP ${response.status}: ${responseText}` },
         { status: 400 }
       )
     }
 
-    if (!data.success) {
+    // Try to parse JSON response
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
       return NextResponse.json(
-        { error: `SOAX error: ${data.error}` },
+        { error: `Non-JSON response: ${responseText}` },
         { status: 400 }
       )
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Authentication successful',
-      data: data.data
+      message: 'SOAX authentication successful',
+      data: {
+        api_key_valid: true,
+        package_key: PACKAGE_KEY,
+        response_preview: responseText.substring(0, 200)
+      }
     })
 
   } catch (error) {

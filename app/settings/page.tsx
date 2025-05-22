@@ -170,7 +170,7 @@ export default function SettingsPage() {
     return { message: `Balance: ${data.balance} credits`, data }
   })
 
-  // GeeLark Tests
+  // GeeLark Tests (uses POST with JSON body - api_key, app_id)
   const testGeeLarkAuth = () => runTest('geelark-auth', async () => {
     const response = await fetch('/api/geelark/test-auth', { method: 'POST' })
     const data = await response.json()
@@ -193,7 +193,7 @@ export default function SettingsPage() {
     return { message: `Found ${data.profiles?.length || 0} profiles`, data }
   })
 
-  // SOAX Tests
+  // SOAX Tests (uses Bearer token authentication)
   const testSOAXAuth = () => runTest('soax-auth', async () => {
     const response = await fetch('/api/soax/test-auth', { method: 'POST' })
     const data = await response.json()

@@ -13,43 +13,63 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const url = `${API_BASE_URL}/api/v1/profiles`
-
-    const response = await fetch(url, {
-      method: 'GET',
+    // GeeLark uses POST method with JSON body for all API calls
+    // Use the correct GeeLark API endpoint
+    const response = await fetch(`${API_BASE_URL}/api/v1/profile/list`, {
+      method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
-        'X-App-ID': APP_ID,
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        api_key: API_KEY,
+        app_id: APP_ID,
+        page: 1,
+        page_size: 10  // Get up to 10 profiles for testing
+      }),
     })
 
-    const data = await response.json()
+    // Get response as text first to handle non-JSON responses
+    const responseText = await response.text()
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: `HTTP ${response.status}: ${data.message || 'Profile listing failed'}` },
+        { error: `HTTP ${response.status}: ${responseText}` },
         { status: 400 }
       )
     }
 
-    if (data.code !== 0) {
+    // Try to parse as JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
       return NextResponse.json(
-        { error: `GeeLark error: ${data.msg}` },
+        { error: `Non-JSON response: ${responseText}` },
         { status: 400 }
       )
     }
 
-    const profiles = data.data || []
+    // Check for GeeLark error responses
+    if (data.code && data.code !== 200 && data.code !== 0) {
+      return NextResponse.json(
+        { error: `GeeLark error (${data.code}): ${data.msg || data.message || 'Unknown error'}` },
+        { status: 400 }
+      )
+    }
+
+    const profiles = data.data?.list || []
 
     return NextResponse.json({
       success: true,
       message: `Found ${profiles.length} profiles`,
       profiles: profiles.map((p: any) => ({
-        id: p.profile_id,
+        id: p.profile_id || p.id,
+        name: p.profile_name || p.name,
         status: p.status,
-        device: p.device_info
-      }))
+        device: p.device_info || 'unknown'
+      })),
+      total: data.data?.total || profiles.length,
+      response_preview: responseText.substring(0, 200)
     })
 
   } catch (error) {

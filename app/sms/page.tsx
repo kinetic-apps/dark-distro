@@ -44,7 +44,7 @@ export default function SMSPage() {
         .from('sms_rentals')
         .select(`
           *,
-          account:accounts!sms_rentals_account_id_fkey(
+          account:accounts(
             tiktok_username
           )
         `)
