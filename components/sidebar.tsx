@@ -11,7 +11,8 @@ import {
   Send, 
   FileText,
   Settings,
-  LogOut 
+  LogOut,
+  Wand2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Proxies', href: '/proxies', icon: Wifi },
   { name: 'SMS', href: '/sms', icon: MessageSquare },
   { name: 'Assets', href: '/assets', icon: Image },
+  { name: 'Image Generator', href: '/image-generator', icon: Wand2 },
   { name: 'Posts', href: '/posts', icon: Send },
   { name: 'Logs', href: '/logs', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
