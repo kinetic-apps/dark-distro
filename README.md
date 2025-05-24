@@ -1,11 +1,11 @@
-# Dark Distro - TikTok Cloud Phone Control Center
+# SPECTRE - Advanced Cloud Operations Control Center
 
-A Next.js 14 web application for managing TikTok cloud phone farms with GeeLark, SOAX proxies, and DaisySMS integration.
+A Next.js 14 web application for managing advanced cloud phone operations with GeeLark, SOAX proxies, and DaisySMS integration.
 
 ## Architecture
 
 - **Frontend**: Next.js 14 (App Router) with TypeScript
-- **Styling**: Tailwind CSS (grayscale theme)
+- **Styling**: Tailwind CSS with Geist Typography (grayscale theme)
 - **Database**: Supabase (PostgreSQL)
 - **Storage**: Supabase Storage
 - **Authentication**: Supabase Auth
@@ -21,7 +21,7 @@ A Next.js 14 web application for managing TikTok cloud phone farms with GeeLark,
 
 ### Proxy Management
 - SOAX sticky pool integration for warm-up
-- Dedicated SIM proxies for posting
+- Dedicated SIM proxies for operations
 - Health monitoring and automatic rotation
 - IP whitelisting support
 
@@ -33,7 +33,7 @@ A Next.js 14 web application for managing TikTok cloud phone farms with GeeLark,
 
 ### Content Distribution
 - Automatic asset detection from Supabase Storage
-- Batch posting campaigns
+- Batch campaign management
 - Task queue management
 - Success/failure tracking
 
@@ -87,7 +87,7 @@ See `.env.example` for required environment variables:
 ## Database Schema
 
 The application uses the following main tables:
-- `accounts` - TikTok accounts and profiles
+- `accounts` - Cloud profiles and accounts
 - `phones` - GeeLark device information
 - `proxies` - Proxy configurations
 - `sms_rentals` - Phone number rentals
@@ -124,3 +124,15 @@ Configure environment variables in Vercel dashboard.
 - Service role key used only for server-side operations
 - Authentication required for all routes
 - Sensitive data stored as environment variables
+
+## Typography
+
+SPECTRE uses the Geist font family with the following weight restrictions:
+- **Thin** (100) - For subtle text elements
+- **Extra Light** (200) - For secondary text
+- **Light** (300) - For captions and metadata
+- **Regular** (400) - For body text
+- **Medium** (500) - For emphasis
+- **Semi Bold** (600) - For headings and important text
+
+**Note**: Bold (700) and Black (900) weights are intentionally excluded from the design system.

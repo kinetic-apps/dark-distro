@@ -2,6 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Geist Font Family */
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/typography/Geist-Thin.otf') format('opentype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/typography/Geist-ExtraLight.otf') format('opentype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/typography/Geist-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/typography/Geist-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/typography/Geist-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./assets/typography/Geist-SemiBold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,7 +61,8 @@ html {
 
 body {
   @apply bg-gray-50 text-gray-900;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-weight: 400;
 }
 
 @layer components {
@@ -95,5 +145,32 @@ body {
   
   .status-neutral {
     @apply status-badge bg-gray-50 text-gray-700;
+  }
+
+  /* SPECTRE Brand Typography */
+  .brand-title {
+    @apply font-semibold tracking-wide;
+    font-family: 'Geist';
+    letter-spacing: 0.1em;
+  }
+  
+  .heading-primary {
+    @apply font-semibold text-gray-900;
+    font-family: 'Geist';
+  }
+  
+  .heading-secondary {
+    @apply font-medium text-gray-700;
+    font-family: 'Geist';
+  }
+  
+  .body-text {
+    @apply font-normal text-gray-600;
+    font-family: 'Geist';
+  }
+  
+  .caption-text {
+    @apply font-light text-gray-500;
+    font-family: 'Geist';
   }
 }

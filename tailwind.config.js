@@ -7,6 +7,19 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'sans': ['Geist', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'sans-serif'],
+        'geist': ['Geist', 'sans-serif'],
+      },
+      fontWeight: {
+        'thin': '100',
+        'extralight': '200', 
+        'light': '300',
+        'normal': '400',
+        'medium': '500',
+        'semibold': '600',
+        // Explicitly exclude bold (700) and black (900) to prevent usage
+      },
       colors: {
         gray: {
           50: '#fafafa',

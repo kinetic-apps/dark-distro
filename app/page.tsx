@@ -93,7 +93,7 @@ export default async function DashboardPage() {
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
         <p className="page-description">
-          Monitor your TikTok cloud phone farm operations
+          Monitor your advanced cloud operations and automation infrastructure
         </p>
       </div>
 
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2">
           <div className="card-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-medium text-gray-900">Recent Image Generations</h2>
+              <h2 className="text-base font-medium text-gray-900">Recent Carousel Generations</h2>
               <Link href="/image-generator/jobs" className="text-sm text-gray-600 hover:text-gray-900">
                 View all →
               </Link>
@@ -206,7 +206,7 @@ export default async function DashboardPage() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          {job.variants} variant{job.variants > 1 ? 's' : ''} • {job.generated_images?.length || 0} images
+                          {job.variants} carousel{job.variants > 1 ? 's' : ''} • {job.generated_images?.length || 0} total images
                         </p>
                       </div>
                       {job.generated_images && job.generated_images.length > 0 && (
@@ -236,7 +236,7 @@ export default async function DashboardPage() {
                 <p className="mt-2 text-sm text-gray-500">No recent generations</p>
                 <Link href="/image-generator" className="mt-3 inline-flex items-center text-sm text-blue-600 hover:text-blue-700">
                   <Sparkles className="mr-1 h-3 w-3" />
-                  Generate Images
+                  Generate Carousels
                 </Link>
               </div>
             )}
@@ -323,7 +323,7 @@ export default async function DashboardPage() {
         </Link>
         <Link href="/image-generator" className="btn-secondary">
           <Sparkles className="mr-2 h-4 w-4" />
-          Generate Images
+          Generate Carousels
         </Link>
       </div>
     </div>

@@ -184,33 +184,100 @@ export default function JobDetailsPage() {
         )}
       </div>
 
-      {/* Images Section */}
+      {/* View Mode Toggle */}
       {images.length > 0 && (
-        <>
-          {/* View Mode Toggle */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-medium text-gray-900">Generated Images</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-colors ${
-                  viewMode === 'grid' ? 'bg-gray-100' : 'hover:bg-gray-50'
-                }`}
-              >
-                <Grid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('carousel')}
-                className={`p-2 rounded-md transition-colors ${
-                  viewMode === 'carousel' ? 'bg-gray-100' : 'hover:bg-gray-50'
-                }`}
-              >
-                <List className="h-4 w-4" />
-              </button>
-              
-              {viewMode === 'carousel' && variantCount > 1 && (
-                <>
-                  <div className="w-px h-6 bg-gray-200 mx-2" />
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-medium text-gray-900">Generated Carousels</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'grid' ? 'bg-gray-100' : 'hover:bg-gray-50'
+              }`}
+              title="Grid view"
+            >
+              <Grid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('carousel')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'carousel' ? 'bg-gray-100' : 'hover:bg-gray-50'
+              }`}
+              title="Carousel view"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Images Display */}
+      {images.length > 0 && (
+        <div>
+          {viewMode === 'grid' ? (
+            // Grid View - Show carousels as groups
+            <div className="space-y-6">
+              {Object.entries(imagesByVariant).map(([variantIndex, variantImages]) => (
+                <div key={variantIndex} className="card-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-900">
+                      Carousel Variant {parseInt(variantIndex) + 1}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        variantImages.forEach((image) => {
+                          const link = document.createElement('a')
+                          link.href = image.generated_image_url
+                          link.download = `${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.png`
+                          link.click()
+                        })
+                      }}
+                      className="btn-secondary btn-sm"
+                    >
+                      <Download className="mr-1 h-3 w-3" />
+                      Download Carousel
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {variantImages
+                      .sort((a, b) => a.image_index - b.image_index)
+                      .map((image, idx) => (
+                        <div key={image.id} className="flex-shrink-0">
+                          <div className="relative group">
+                            <img
+                              src={image.generated_image_url}
+                              alt={`Image ${idx + 1}`}
+                              className="w-48 h-48 object-cover rounded-lg"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                              <a
+                                href={image.generated_image_url}
+                                download={`${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.png`}
+                                className="p-2 bg-white rounded-md shadow-lg hover:shadow-xl transition-shadow"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </div>
+                            <div className="absolute bottom-1 left-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">
+                              {idx + 1}
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-500 text-center mt-1 line-clamp-1">
+                            {image.prompt_used}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Carousel View - Show one carousel at a time
+            <div className="card-lg">
+              {variantCount > 1 && (
+                <div className="flex items-center justify-between mb-4">
                   <select
                     value={selectedVariant}
                     onChange={(e) => setSelectedVariant(Number(e.target.value))}
@@ -218,74 +285,63 @@ export default function JobDetailsPage() {
                   >
                     {Array.from({ length: variantCount }, (_, i) => (
                       <option key={i} value={i}>
-                        Variant {i + 1}
+                        Carousel Variant {i + 1}
                       </option>
                     ))}
                   </select>
-                </>
+                  
+                  <button
+                    onClick={() => {
+                      const variantImages = imagesByVariant[selectedVariant] || []
+                      variantImages.forEach((image) => {
+                        const link = document.createElement('a')
+                        link.href = image.generated_image_url
+                        link.download = `${job.name}_carousel${selectedVariant + 1}_image${image.image_index + 1}.png`
+                        link.click()
+                      })
+                    }}
+                    className="btn-secondary btn-sm"
+                  >
+                    <Download className="mr-1 h-3 w-3" />
+                    Download This Carousel
+                  </button>
+                </div>
               )}
-            </div>
-          </div>
-
-          {/* Images Display */}
-          <div className={viewMode === 'grid' ? 'card' : 'card-lg'}>
-            {viewMode === 'grid' ? (
-              // Grid View
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {images.map((image, index) => (
-                  <div key={image.id} className="space-y-2">
-                    <div className="relative group">
+              
+              <div className="space-y-4">
+                {imagesByVariant[selectedVariant]
+                  ?.sort((a, b) => a.image_index - b.image_index)
+                  .map((image, index) => (
+                    <div key={image.id} className="space-y-3">
                       <img
                         src={image.generated_image_url}
                         alt={`Generated ${index + 1}`}
-                        className="w-full aspect-square object-cover rounded-lg"
+                        className="w-full max-h-[600px] object-contain rounded-lg mx-auto"
                       />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            Image {image.image_index + 1} of {imagesByVariant[selectedVariant].length}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {image.prompt_used}
+                          </p>
+                        </div>
                         <a
                           href={image.generated_image_url}
-                          download={`${job.name}_v${image.carousel_index + 1}_${image.image_index + 1}.png`}
-                          className="p-2 bg-white rounded-md shadow-lg hover:shadow-xl transition-shadow"
-                          onClick={(e) => e.stopPropagation()}
+                          download={`${job.name}_carousel${selectedVariant + 1}_image${image.image_index + 1}.png`}
+                          className="btn-secondary btn-sm ml-4"
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="mr-1 h-3 w-3" />
+                          Download
                         </a>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 text-center">
-                      Variant {image.carousel_index + 1}, Image {image.image_index + 1}
-                    </p>
-                  </div>
-                ))}
+                  ))}
               </div>
-            ) : (
-              // Carousel View
-              <div className="space-y-4">
-                {imagesByVariant[selectedVariant]?.map((image, index) => (
-                  <div key={image.id} className="space-y-3">
-                    <img
-                      src={image.generated_image_url}
-                      alt={`Generated ${index + 1}`}
-                      className="w-full max-h-[600px] object-contain rounded-lg mx-auto"
-                    />
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-600">
-                        Image {image.image_index + 1} of {imagesByVariant[selectedVariant].length}
-                      </p>
-                      <a
-                        href={image.generated_image_url}
-                        download={`${job.name}_v${image.carousel_index + 1}_${image.image_index + 1}.png`}
-                        className="btn-secondary btn-sm"
-                      >
-                        <Download className="mr-1 h-3 w-3" />
-                        Download
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Empty State */}

@@ -24,7 +24,7 @@ const navigation = [
   { name: 'Proxies', href: '/proxies', icon: Wifi },
   { name: 'SMS', href: '/sms', icon: MessageSquare },
   { name: 'Assets', href: '/assets', icon: Image },
-  { name: 'Image Generator', href: '/image-generator', icon: Wand2 },
+  { name: 'Carousel Generator', href: '/image-generator', icon: Wand2 },
   { name: 'Posts', href: '/posts', icon: Send },
   { name: 'Logs', href: '/logs', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
@@ -44,7 +44,7 @@ export function Sidebar() {
     <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200">
       <div className="flex h-full flex-col">
         <div className="flex h-16 items-center px-6 border-b border-gray-200">
-          <h1 className="text-xl font-semibold text-gray-900">Dark Distro</h1>
+          <h1 className="text-xl brand-title text-gray-900">SPECTRE</h1>
         </div>
         
         <nav className="flex-1 space-y-1 px-3 py-4">
@@ -57,9 +57,9 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                  'group flex items-center px-3 py-2 text-sm transition-colors rounded-md body-text',
                   isActive
-                    ? 'bg-gray-100 text-gray-900'
+                    ? 'bg-gray-100 text-gray-900 font-medium'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 )}
               >

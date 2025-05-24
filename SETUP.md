@@ -1,4 +1,4 @@
-# Setup Guide for Dark Distro
+# Setup Guide for SPECTRE
 
 ## Prerequisites
 

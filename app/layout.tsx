@@ -4,8 +4,8 @@ import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/topbar";
 
 export const metadata: Metadata = {
-  title: "Dark Distro - TikTok Cloud Phone Control Center",
-  description: "Manage cloud phones, proxies, and content distribution",
+  title: "SPECTRE - Advanced Cloud Operations Control Center",
+  description: "Advanced cloud phone management, proxy orchestration, and content distribution platform",
 };
 
 export default function RootLayout({

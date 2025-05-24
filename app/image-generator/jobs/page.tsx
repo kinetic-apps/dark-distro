@@ -112,9 +112,9 @@ export default function JobsPage() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="page-title">Image Generation Jobs</h1>
+            <h1 className="page-title">Carousel Generation Jobs</h1>
             <p className="page-description">
-              Track and manage your image generation tasks
+              Track and manage your carousel generation tasks
             </p>
           </div>
           
@@ -219,7 +219,7 @@ export default function JobsPage() {
                     )}
                     
                     {job.variants && (
-                      <span>{job.variants} variant{job.variants > 1 ? 's' : ''}</span>
+                      <span>{job.variants} carousel{job.variants > 1 ? 's' : ''}</span>
                     )}
                   </div>
                 </div>

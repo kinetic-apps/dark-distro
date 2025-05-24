@@ -38,8 +38,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dark Distro</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-3xl brand-title text-gray-900">SPECTRE</h1>
+          <p className="mt-2 text-sm body-text">
             Sign in to your account
           </p>
         </div>
@@ -47,7 +47,7 @@ export default function LoginPage() {
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="label">
+              <label htmlFor="email" className="label heading-secondary">
                 Email address
               </label>
               <input
@@ -62,7 +62,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="label">
+              <label htmlFor="password" className="label heading-secondary">
                 Password
               </label>
               <input
@@ -78,7 +78,7 @@ export default function LoginPage() {
 
             {error && (
               <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-red-800 body-text">{error}</p>
               </div>
             )}
 

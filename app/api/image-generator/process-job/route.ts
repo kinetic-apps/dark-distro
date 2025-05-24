@@ -29,6 +29,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No source images found' }, { status: 400 })
     }
 
+    // Parse prompts array
+    let prompts: string[] = []
+    try {
+      prompts = JSON.parse(job.prompt)
+      if (!Array.isArray(prompts) || prompts.length !== sourceImages.length) {
+        // Fallback to single prompt for all images
+        prompts = new Array(sourceImages.length).fill(job.prompt)
+      }
+    } catch {
+      // If parsing fails, use the prompt as-is for all images
+      prompts = new Array(sourceImages.length).fill(job.prompt)
+    }
+
     const totalOperations = job.variants * sourceImages.length
     let completedOperations = 0
     const generatedImages = []
@@ -57,7 +70,7 @@ export async function POST(request: NextRequest) {
           // Create form data for OpenAI
           const formData = new FormData()
           formData.append('model', 'gpt-image-1')
-          formData.append('prompt', job.prompt)
+          formData.append('prompt', prompts[imageIndex])
           formData.append('n', '1')
           formData.append('size', '1024x1024')
           formData.append(
@@ -126,7 +139,7 @@ export async function POST(request: NextRequest) {
                 storage_path: fileName,
                 width: 1024,
                 height: 1024,
-                prompt_used: job.prompt,
+                prompt_used: prompts[imageIndex],
                 user_id: job.user_id
               })
               .select()
