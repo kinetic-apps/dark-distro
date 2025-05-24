@@ -16,12 +16,37 @@ body {
 }
 
 @layer components {
+  /* Consistent spacing and sizing */
+  .page-container {
+    @apply max-w-7xl mx-auto space-y-6;
+  }
+  
+  .page-header {
+    @apply pb-6 border-b border-gray-200;
+  }
+  
+  .page-title {
+    @apply text-2xl font-semibold text-gray-900;
+  }
+  
+  .page-description {
+    @apply mt-1 text-sm text-gray-600;
+  }
+  
   .card {
+    @apply bg-white border border-gray-200 rounded-lg p-4;
+  }
+  
+  .card-lg {
     @apply bg-white border border-gray-200 rounded-lg p-6;
   }
   
   .btn {
-    @apply px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply px-4 py-2 rounded-md font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 inline-flex items-center;
+  }
+  
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
   }
   
   .btn-primary {
@@ -29,7 +54,7 @@ body {
   }
   
   .btn-secondary {
-    @apply btn bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500;
+    @apply btn bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
   }
   
   .btn-danger {
@@ -37,7 +62,7 @@ body {
   }
   
   .input {
-    @apply px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent;
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900;
   }
   
   .label {
@@ -53,22 +78,22 @@ body {
   }
   
   .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2 py-1 rounded text-xs font-medium;
   }
   
   .status-active {
-    @apply status-badge bg-green-100 text-green-800;
+    @apply status-badge bg-green-50 text-green-700;
   }
   
   .status-warning {
-    @apply status-badge bg-yellow-100 text-yellow-800;
+    @apply status-badge bg-yellow-50 text-yellow-700;
   }
   
   .status-error {
-    @apply status-badge bg-red-100 text-red-800;
+    @apply status-badge bg-red-50 text-red-700;
   }
   
   .status-neutral {
-    @apply status-badge bg-gray-100 text-gray-800;
+    @apply status-badge bg-gray-50 text-gray-700;
   }
 }

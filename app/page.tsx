@@ -6,7 +6,9 @@ import {
   Wifi,
   MessageSquare,
   Send,
-  CheckCircle
+  CheckCircle,
+  Image as ImageIcon,
+  Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,7 +21,8 @@ async function getStats() {
     activePosts,
     recentErrors,
     healthyProxies,
-    activeRentals
+    activeRentals,
+    recentGenerations
   ] = await Promise.all([
     supabase
       .from('accounts')
@@ -47,7 +50,20 @@ async function getStats() {
     supabase
       .from('sms_rentals')
       .select('*', { count: 'exact', head: true })
-      .in('status', ['waiting', 'received'])
+      .in('status', ['waiting', 'received']),
+    supabase
+      .from('image_generation_jobs')
+      .select(`
+        *,
+        generated_images:generated_carousel_images(
+          id,
+          generated_image_url,
+          carousel_index,
+          image_index
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(3)
   ])
 
   const { data: activeTasks } = await supabase
@@ -64,7 +80,8 @@ async function getStats() {
     recentErrors: recentErrors.data || [],
     healthyProxies: healthyProxies.count || 0,
     activeRentals: activeRentals.count || 0,
-    activeTasks: activeTasks || []
+    activeTasks: activeTasks || [],
+    recentGenerations: recentGenerations.data || []
   }
 }
 
@@ -72,16 +89,17 @@ export default async function DashboardPage() {
   const stats = await getStats()
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-600">
+    <div className="page-container">
+      <div className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-description">
           Monitor your TikTok cloud phone farm operations
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Active Profiles</p>
@@ -92,13 +110,13 @@ export default async function DashboardPage() {
                 {stats.warmingUpProfiles} warming up
               </p>
             </div>
-            <div className="rounded-lg bg-green-100 p-3">
+            <div className="rounded-lg bg-green-50 p-3">
               <Users className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Today&apos;s Posts</p>
@@ -109,13 +127,13 @@ export default async function DashboardPage() {
                 Last 24 hours
               </p>
             </div>
-            <div className="rounded-lg bg-blue-100 p-3">
+            <div className="rounded-lg bg-blue-50 p-3">
               <Send className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Healthy Proxies</p>
@@ -126,13 +144,13 @@ export default async function DashboardPage() {
                 Working normally
               </p>
             </div>
-            <div className="rounded-lg bg-purple-100 p-3">
+            <div className="rounded-lg bg-purple-50 p-3">
               <Wifi className="h-6 w-6 text-purple-600" />
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">SMS Rentals</p>
@@ -143,85 +161,169 @@ export default async function DashboardPage() {
                 Active rentals
               </p>
             </div>
-            <div className="rounded-lg bg-orange-100 p-3">
+            <div className="rounded-lg bg-orange-50 p-3">
               <MessageSquare className="h-6 w-6 text-orange-600" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">Active Tasks</h2>
-            <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
-              View all →
-            </Link>
+      {/* Content Grid */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Recent Generations - 2 columns */}
+        <div className="lg:col-span-2">
+          <div className="card-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-medium text-gray-900">Recent Image Generations</h2>
+              <Link href="/image-generator/jobs" className="text-sm text-gray-600 hover:text-gray-900">
+                View all →
+              </Link>
+            </div>
+            
+            {stats.recentGenerations.length > 0 ? (
+              <div className="space-y-3">
+                {stats.recentGenerations.map((job: any) => (
+                  <Link 
+                    key={job.id} 
+                    href={`/image-generator/jobs/${job.id}`}
+                    className="block p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {job.name}
+                          </p>
+                          {job.status === 'completed' && (
+                            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                              Completed
+                            </span>
+                          )}
+                          {job.status === 'processing' && (
+                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                              Processing
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {job.variants} variant{job.variants > 1 ? 's' : ''} • {job.generated_images?.length || 0} images
+                        </p>
+                      </div>
+                      {job.generated_images && job.generated_images.length > 0 && (
+                        <div className="flex -space-x-2 ml-4">
+                          {job.generated_images.slice(0, 3).map((img: any, idx: number) => (
+                            <img
+                              key={img.id}
+                              src={img.generated_image_url}
+                              alt=""
+                              className="w-8 h-8 rounded ring-2 ring-white object-cover"
+                            />
+                          ))}
+                          {job.generated_images.length > 3 && (
+                            <div className="w-8 h-8 rounded ring-2 ring-white bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                              +{job.generated_images.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
+                <p className="mt-2 text-sm text-gray-500">No recent generations</p>
+                <Link href="/image-generator" className="mt-3 inline-flex items-center text-sm text-blue-600 hover:text-blue-700">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  Generate Images
+                </Link>
+              </div>
+            )}
           </div>
-          
-          {stats.activeTasks.length > 0 ? (
-            <div className="space-y-3">
-              {stats.activeTasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Activity className="h-4 w-4 text-gray-400 mr-3" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {task.type === 'warmup' ? 'Warming up' : 'Posting'}
+        </div>
+
+        {/* Activity Section - 1 column */}
+        <div className="space-y-6">
+          {/* Active Tasks */}
+          <div className="card-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-medium text-gray-900">Active Tasks</h2>
+              <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
+                View all →
+              </Link>
+            </div>
+            
+            {stats.activeTasks.length > 0 ? (
+              <div className="space-y-3">
+                {stats.activeTasks.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Activity className="h-4 w-4 text-gray-400 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {task.type === 'warmup' ? 'Warming up' : 'Posting'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          #{task.geelark_task_id?.slice(-8)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="status-warning">Running</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No active tasks</p>
+            )}
+          </div>
+
+          {/* Recent Errors */}
+          <div className="card-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-medium text-gray-900">Recent Errors</h2>
+              <Link href="/logs" className="text-sm text-gray-600 hover:text-gray-900">
+                View logs →
+              </Link>
+            </div>
+            
+            {stats.recentErrors.length > 0 ? (
+              <div className="space-y-3">
+                {stats.recentErrors.map((error) => (
+                  <div key={error.id} className="flex items-start">
+                    <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-900 truncate">
+                        {error.message}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Task #{task.geelark_task_id?.slice(-8)}
+                        {error.component} • {new Date(error.timestamp).toLocaleTimeString()}
                       </p>
                     </div>
                   </div>
-                  <span className="status-warning">Running</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">No active tasks</p>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">Recent Errors</h2>
-            <Link href="/logs" className="text-sm text-gray-600 hover:text-gray-900">
-              View logs →
-            </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center text-green-600">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                <p className="text-sm">No recent errors</p>
+              </div>
+            )}
           </div>
-          
-          {stats.recentErrors.length > 0 ? (
-            <div className="space-y-3">
-              {stats.recentErrors.map((error) => (
-                <div key={error.id} className="flex items-start">
-                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-gray-900 truncate">
-                      {error.message}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {error.component} • {new Date(error.timestamp).toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center text-green-600">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              <p className="text-sm">No recent errors</p>
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="flex gap-4">
+      {/* Quick Actions */}
+      <div className="flex gap-3">
         <Link href="/profiles?action=warmup" className="btn-primary">
-          New Warm-Up Batch
+          Start Warm-Up Batch
         </Link>
         <Link href="/posts?action=launch" className="btn-secondary">
           Launch Daily Posts
+        </Link>
+        <Link href="/image-generator" className="btn-secondary">
+          <Sparkles className="mr-2 h-4 w-4" />
+          Generate Images
         </Link>
       </div>
     </div>

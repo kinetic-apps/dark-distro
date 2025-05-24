@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation'
 import { 
   FolderOpen,
   Star,
-  StarOff,
   Plus,
   Loader2,
-  Grid3x3
+  Image as ImageIcon
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { ImageGenerationTemplate } from '@/lib/types/image-generation'
@@ -16,8 +15,7 @@ import type { ImageGenerationTemplate } from '@/lib/types/image-generation'
 export default function TemplatesPage() {
   const router = useRouter()
   const [templates, setTemplates] = useState<ImageGenerationTemplate[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadTemplates()
@@ -25,126 +23,127 @@ export default function TemplatesPage() {
 
   const loadTemplates = async () => {
     try {
-      setIsLoading(true)
       const data = await ImageGenerationService.getTemplates()
       setTemplates(data)
     } catch (error) {
       console.error('Error loading templates:', error)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   const toggleFavorite = async (templateId: string) => {
     try {
-      setTogglingFavorite(templateId)
       await ImageGenerationService.toggleTemplateFavorite(templateId)
       setTemplates(templates.map(t => 
         t.id === templateId ? { ...t, is_favorite: !t.is_favorite } : t
       ))
     } catch (error) {
       console.error('Error toggling favorite:', error)
-    } finally {
-      setTogglingFavorite(null)
     }
   }
 
   const useTemplate = (template: ImageGenerationTemplate) => {
-    // Navigate to image generator with template preloaded
     router.push(`/image-generator?template=${template.id}`)
   }
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Templates</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Reuse successful carousel configurations
-          </p>
-        </div>
-        
-        <button
-          onClick={() => router.push('/image-generator')}
-          className="btn-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Template
-        </button>
-      </div>
-
-      {templates.length === 0 ? (
-        <div className="card text-center py-12">
-          <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No templates yet</h3>
-          <p className="text-gray-600 mb-4">
-            Templates are created automatically when you generate carousels
-          </p>
+    <div className="page-container">
+      {/* Header */}
+      <div className="page-header">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="page-title">Templates</h1>
+            <p className="page-description">
+              Reuse successful image generation configurations
+            </p>
+          </div>
+          
           <button
             onClick={() => router.push('/image-generator')}
             className="btn-primary"
           >
-            Create First Template
+            <Plus className="mr-2 h-4 w-4" />
+            New Template
+          </button>
+        </div>
+      </div>
+
+      {/* Templates Grid */}
+      {templates.length === 0 ? (
+        <div className="card-lg text-center py-16">
+          <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-base font-medium text-gray-900">No templates yet</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Templates are created automatically when you generate images
+          </p>
+          <button
+            onClick={() => router.push('/image-generator')}
+            className="mt-4 btn-primary"
+          >
+            Create Your First Template
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {templates.map((template) => (
-            <div key={template.id} className="card hover:shadow-lg transition-shadow">
-              <div className="aspect-w-16 aspect-h-9 mb-4">
+            <div key={template.id} className="card hover:shadow-sm transition-shadow">
+              {/* Thumbnail */}
+              <div className="aspect-square relative mb-3 -m-4 mb-3">
                 {template.thumbnail_url ? (
                   <img
                     src={template.thumbnail_url}
                     alt={template.name}
-                    className="w-full h-48 object-cover rounded-lg"
+                    className="w-full h-full object-cover rounded-t-lg"
                   />
                 ) : (
-                  <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <Grid3x3 className="h-12 w-12 text-gray-400" />
+                  <div className="w-full h-full bg-gray-100 rounded-t-lg flex items-center justify-center">
+                    <ImageIcon className="h-8 w-8 text-gray-400" />
                   </div>
                 )}
-              </div>
-              
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="text-lg font-medium text-gray-900">{template.name}</h3>
+                
+                {/* Favorite Button */}
                 <button
-                  onClick={() => toggleFavorite(template.id)}
-                  className="text-gray-400 hover:text-yellow-500"
-                  disabled={togglingFavorite === template.id}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleFavorite(template.id)
+                  }}
+                  className={`absolute top-2 right-2 p-2 rounded-md bg-white shadow-sm hover:shadow-md transition-all ${
+                    template.is_favorite ? 'text-yellow-500' : 'text-gray-400'
+                  }`}
                 >
-                  {togglingFavorite === template.id ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : template.is_favorite ? (
-                    <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  ) : (
-                    <StarOff className="h-5 w-5" />
-                  )}
+                  <Star className={`h-4 w-4 ${template.is_favorite ? 'fill-current' : ''}`} />
                 </button>
               </div>
               
-              {template.description && (
-                <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-              )}
-              
-              <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                <span>{template.source_images.length} source images</span>
-                <span>Used {template.usage_count} times</span>
+              {/* Content */}
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900 truncate">{template.name}</h3>
+                  {template.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{template.description}</p>
+                  )}
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>{template.source_images.length} images</span>
+                </div>
+                
+                <button
+                  onClick={() => useTemplate(template)}
+                  className="btn-secondary btn-sm w-full"
+                >
+                  Use Template
+                </button>
               </div>
-              
-              <button
-                onClick={() => useTemplate(template)}
-                className="btn-primary w-full"
-              >
-                Use Template
-              </button>
             </div>
           ))}
         </div>

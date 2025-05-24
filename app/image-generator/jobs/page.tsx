@@ -2,195 +2,240 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
 import { 
-  Briefcase, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
+  Plus, 
+  Search, 
+  Filter,
   ChevronRight,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Loader2,
   Trash2,
-  Eye
+  Image as ImageIcon,
+  Calendar
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { ImageGenerationJob } from '@/lib/types/image-generation'
+import { format } from 'date-fns'
 
-export default function ImageGeneratorJobsPage() {
+export default function JobsPage() {
   const router = useRouter()
   const [jobs, setJobs] = useState<ImageGenerationJob[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   useEffect(() => {
     loadJobs()
+    
+    // Refresh jobs every 5 seconds to catch status updates
+    const interval = setInterval(loadJobs, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   const loadJobs = async () => {
     try {
-      setIsLoading(true)
-      const data = await ImageGenerationService.getJobs()
+      const data = await ImageGenerationService.getRecentJobs(50)
       setJobs(data)
+      setLoading(false)
     } catch (error) {
       console.error('Error loading jobs:', error)
-    } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleDeleteJob = async (jobId: string) => {
-    if (!confirm('Are you sure you want to delete this job and all its generated images?')) {
-      return
-    }
-
+  const handleDelete = async (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation()
+    if (!confirm('Are you sure you want to delete this job?')) return
+    
     try {
-      setDeletingJobId(jobId)
       await ImageGenerationService.deleteJob(jobId)
-      setJobs(jobs.filter(job => job.id !== jobId))
+      await loadJobs()
     } catch (error) {
       console.error('Error deleting job:', error)
-      alert('Failed to delete job')
-    } finally {
-      setDeletingJobId(null)
     }
   }
 
-  const getStatusIcon = (status: ImageGenerationJob['status']) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'queued':
-        return <Clock className="h-4 w-4 text-gray-500" />
       case 'processing':
-        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+        return (
+          <div className="flex items-center gap-1.5 text-blue-700">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span className="text-xs font-medium">Processing</span>
+          </div>
+        )
       case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return (
+          <div className="flex items-center gap-1.5 text-green-700">
+            <CheckCircle2 className="h-3 w-3" />
+            <span className="text-xs font-medium">Completed</span>
+          </div>
+        )
       case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500" />
+        return (
+          <div className="flex items-center gap-1.5 text-red-700">
+            <XCircle className="h-3 w-3" />
+            <span className="text-xs font-medium">Failed</span>
+          </div>
+        )
+      default:
+        return (
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <Clock className="h-3 w-3" />
+            <span className="text-xs font-medium">Queued</span>
+          </div>
+        )
     }
   }
 
-  const getStatusColor = (status: ImageGenerationJob['status']) => {
-    switch (status) {
-      case 'queued':
-        return 'text-gray-600 bg-gray-100'
-      case 'processing':
-        return 'text-blue-600 bg-blue-100'
-      case 'completed':
-        return 'text-green-600 bg-green-100'
-      case 'failed':
-        return 'text-red-600 bg-red-100'
-    }
-  }
+  // Filter jobs based on search and status
+  const filteredJobs = jobs.filter(job => {
+    const matchesSearch = job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         job.prompt.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || job.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Image Generation Jobs</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            View and manage your carousel generation history
-          </p>
-        </div>
-        
-        <button
-          onClick={() => router.push('/image-generator')}
-          className="btn-primary"
-        >
-          New Generation
-        </button>
-      </div>
-
-      {jobs.length === 0 ? (
-        <div className="card text-center py-12">
-          <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs yet</h3>
-          <p className="text-gray-600 mb-4">
-            Start by creating your first carousel generation job
-          </p>
+    <div className="page-container">
+      {/* Header */}
+      <div className="page-header">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="page-title">Image Generation Jobs</h1>
+            <p className="page-description">
+              Track and manage your image generation tasks
+            </p>
+          </div>
+          
           <button
             onClick={() => router.push('/image-generator')}
             className="btn-primary"
           >
-            Create First Job
+            <Plus className="mr-2 h-4 w-4" />
+            New Job
           </button>
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search jobs..."
+              className="input pl-9"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input"
+            >
+              <option value="all">All Status</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="queued">Queued</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Jobs List */}
+      {filteredJobs.length === 0 ? (
+        <div className="card-lg text-center py-12">
+          <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-sm font-medium text-gray-900">No jobs found</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchTerm || statusFilter !== 'all' 
+              ? 'Try adjusting your filters'
+              : 'Get started by creating your first job'}
+          </p>
+          {!searchTerm && statusFilter === 'all' && (
+            <button
+              onClick={() => router.push('/image-generator')}
+              className="mt-4 btn-primary"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Job
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <ul className="divide-y divide-gray-200">
-            {jobs.map((job) => (
-              <li key={job.id}>
-                <div className="px-4 py-4 sm:px-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        {getStatusIcon(job.status)}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {job.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {job.variants} variant{job.variants !== 1 ? 's' : ''} • 
-                          Created {format(new Date(job.created_at), 'MMM d, yyyy h:mm a')}
-                        </div>
-                      </div>
+        <div className="space-y-2">
+          {filteredJobs.map((job) => (
+            <div
+              key={job.id}
+              onClick={() => router.push(`/image-generator/jobs/${job.id}`)}
+              className="card hover:shadow-sm transition-shadow cursor-pointer group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-medium text-gray-900 truncate">
+                      {job.name}
+                    </h3>
+                    {getStatusBadge(job.status)}
+                  </div>
+                  
+                  <p className="mt-1 text-sm text-gray-600 truncate">
+                    {job.prompt}
+                  </p>
+                  
+                  <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {format(new Date(job.created_at), 'MMM d, h:mm a')}
                     </div>
                     
-                    <div className="flex items-center space-x-4">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(job.status)}`}>
-                        {job.status}
-                      </span>
-                      
-                      {job.status === 'processing' && (
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
+                    {job.status === 'processing' && job.progress > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 bg-gray-200 rounded-full h-1">
                           <div 
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-blue-600 h-1 rounded-full transition-all"
                             style={{ width: `${job.progress}%` }}
                           />
                         </div>
-                      )}
-                      
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => router.push(`/image-generator/jobs/${job.id}`)}
-                          className="text-gray-400 hover:text-gray-600"
-                          title="View details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        
-                        <button
-                          onClick={() => handleDeleteJob(job.id)}
-                          className="text-gray-400 hover:text-red-600"
-                          disabled={deletingJobId === job.id}
-                          title="Delete job"
-                        >
-                          {deletingJobId === job.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </button>
+                        <span>{job.progress}%</span>
                       </div>
-                    </div>
+                    )}
+                    
+                    {job.variants && (
+                      <span>{job.variants} variant{job.variants > 1 ? 's' : ''}</span>
+                    )}
                   </div>
-                  
-                  {job.message && (
-                    <div className="mt-2 text-sm text-gray-600">
-                      {job.message}
-                    </div>
-                  )}
                 </div>
-              </li>
-            ))}
-          </ul>
+                
+                <div className="flex items-center gap-2 ml-4">
+                  <button
+                    onClick={(e) => handleDelete(e, job.id)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

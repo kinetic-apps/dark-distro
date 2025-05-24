@@ -3,11 +3,18 @@ import type {
   ImageGenerationJob, 
   ImageGenerationTemplate, 
   GeneratedCarouselImage,
-  CreateJobParams,
-  ImageGenerationSettings 
+  CreateJobParams
 } from '@/lib/types/image-generation'
 
 const supabase = createClient()
+
+// In-memory job state for real-time updates
+const jobStates = new Map<string, {
+  status: string
+  progress: number
+  message: string
+  completedImages: GeneratedCarouselImage[]
+}>()
 
 export class ImageGenerationService {
   // Job Management
@@ -15,39 +22,188 @@ export class ImageGenerationService {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
 
-    // First, upload source images to create a template or use existing
-    let templateId = params.template_id
-    
-    if (!templateId && params.source_images.length > 0) {
-      // Create a new template from the uploaded images
-      const template = await this.createTemplate({
-        name: params.template_name,
-        description: params.template_description,
-        source_images: params.source_images,
-        default_prompt: params.prompt,
-        default_settings: params.settings
-      })
-      templateId = template.id
+    // Upload source images first
+    const imageUrls: string[] = []
+    for (let i = 0; i < params.source_images.length; i++) {
+      const file = params.source_images[i]
+      const fileName = `${user.id}/sources/${Date.now()}_${i}.${file.name.split('.').pop()}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('generated-carousels')
+        .upload(fileName, file)
+      
+      if (uploadError) throw uploadError
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('generated-carousels')
+        .getPublicUrl(fileName)
+      
+      imageUrls.push(publicUrl)
     }
 
+    // Create job record
     const { data: job, error } = await supabase
       .from('image_generation_jobs')
       .insert({
         name: params.name,
-        template_id: templateId,
         template_name: params.template_name,
-        template_description: params.template_description,
         prompt: params.prompt,
         variants: params.variants,
-        settings: params.settings,
         user_id: user.id,
-        status: 'queued'
+        status: 'processing', // Start as processing immediately
+        progress: 0,
+        message: 'Initializing...'
       })
       .select()
       .single()
 
     if (error) throw error
+
+    // Store source images in a simple JSON column if needed
+    await supabase
+      .from('image_generation_jobs')
+      .update({ 
+        template_description: JSON.stringify({ source_images: imageUrls })
+      })
+      .eq('id', job.id)
+
+    // Initialize in-memory state
+    jobStates.set(job.id, {
+      status: 'processing',
+      progress: 0,
+      message: 'Starting generation...',
+      completedImages: []
+    })
+
     return job
+  }
+
+  static async processJobInBackground(jobId: string): Promise<void> {
+    try {
+      // Call the server-side API to process the job
+      const response = await fetch('/api/image-generator/process-job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jobId })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to start job processing')
+      }
+
+      const result = await response.json()
+      console.log('Job processing started:', result)
+    } catch (error) {
+      console.error('Failed to start job processing:', error)
+      
+      // Update job state to failed
+      const state = jobStates.get(jobId)
+      if (state) {
+        state.status = 'failed'
+        state.message = error instanceof Error ? error.message : 'Failed to start processing'
+      }
+      
+      throw error
+    }
+  }
+
+  // Get job with real-time state
+  static async getJobWithState(jobId: string): Promise<{
+    job: ImageGenerationJob | null
+    state: typeof jobStates extends Map<string, infer T> ? T : never
+    images: GeneratedCarouselImage[]
+  }> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Get job from database
+    const { data: job } = await supabase
+      .from('image_generation_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .eq('user_id', user.id)
+      .single()
+
+    // Get generated images
+    const { data: images } = await supabase
+      .from('generated_carousel_images')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('user_id', user.id)
+      .order('carousel_index', { ascending: true })
+      .order('image_index', { ascending: true })
+
+    // Use database state as source of truth
+    const state = {
+      status: job?.status || 'unknown',
+      progress: job?.progress || 0,
+      message: job?.message || '',
+      completedImages: images || []
+    }
+
+    // Update in-memory state to match database
+    if (job) {
+      jobStates.set(jobId, state)
+    }
+
+    return {
+      job,
+      state,
+      images: images || []
+    }
+  }
+
+  static async getRecentJobs(limit = 10): Promise<ImageGenerationJob[]> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('image_generation_jobs')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) throw error
+    return data || []
+  }
+
+  static async deleteJob(jobId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Get images to delete from storage
+    const { data: images } = await supabase
+      .from('generated_carousel_images')
+      .select('storage_path')
+      .eq('job_id', jobId)
+      .eq('user_id', user.id)
+
+    // Delete from storage
+    if (images && images.length > 0) {
+      const paths = images
+        .filter(img => img.storage_path)
+        .map(img => img.storage_path!)
+      
+      if (paths.length > 0) {
+        await supabase.storage
+          .from('generated-carousels')
+          .remove(paths)
+      }
+    }
+
+    // Delete job (cascade will delete images)
+    await supabase
+      .from('image_generation_jobs')
+      .delete()
+      .eq('id', jobId)
+      .eq('user_id', user.id)
+
+    // Clean up in-memory state
+    jobStates.delete(jobId)
   }
 
   static async createTemplate(params: {
@@ -55,7 +211,6 @@ export class ImageGenerationService {
     description?: string
     source_images: File[]
     default_prompt?: string
-    default_settings?: ImageGenerationSettings
   }): Promise<ImageGenerationTemplate> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
@@ -89,7 +244,6 @@ export class ImageGenerationService {
         source_images: imageUrls,
         thumbnail_url: imageUrls[0], // Use first image as thumbnail
         default_prompt: params.default_prompt,
-        default_settings: params.default_settings || {},
         user_id: user.id
       })
       .select()
@@ -97,164 +251,6 @@ export class ImageGenerationService {
 
     if (error) throw error
     return template
-  }
-
-  static async processJob(jobId: string): Promise<void> {
-    try {
-      // Get the job details
-      const { data: job, error: jobError } = await supabase
-        .from('image_generation_jobs')
-        .select('*, template:image_generation_templates(*)')
-        .eq('id', jobId)
-        .single()
-
-      if (jobError) throw jobError
-      if (!job) throw new Error('Job not found')
-
-      // Update job status to processing
-      await this.updateJobStatus(jobId, 'processing', 10, 'Starting image generation...')
-
-      // Get source images from template
-      const sourceImages = job.template?.source_images || []
-      if (sourceImages.length === 0) {
-        throw new Error('No source images found in template')
-      }
-
-      // Process each carousel variant
-      const generatedImages: GeneratedCarouselImage[] = []
-      const totalOperations = job.variants * sourceImages.length
-      let completedOperations = 0
-
-      for (let carouselIndex = 0; carouselIndex < job.variants; carouselIndex++) {
-        const carouselImages: string[] = []
-        
-        for (let imageIndex = 0; imageIndex < sourceImages.length; imageIndex++) {
-          const sourceImageUrl = sourceImages[imageIndex]
-          const progress = Math.floor((completedOperations / totalOperations) * 80) + 10
-          
-          await this.updateJobStatus(
-            jobId, 
-            'processing', 
-            progress, 
-            `Generating carousel ${carouselIndex + 1}/${job.variants}, image ${imageIndex + 1}/${sourceImages.length}...`
-          )
-
-          // Call the API to generate the image
-          const formData = new FormData()
-          
-          // Download source image and add to form
-          const imageResponse = await fetch(sourceImageUrl)
-          const imageBlob = await imageResponse.blob()
-          formData.append('source_image', imageBlob, 'image.png')
-          formData.append('prompt', job.prompt)
-          formData.append('carousel_index', carouselIndex.toString())
-          formData.append('image_index', imageIndex.toString())
-          formData.append('settings', JSON.stringify(job.settings))
-
-          const response = await fetch('/api/image-generator/generate-v2', {
-            method: 'POST',
-            body: formData
-          })
-
-          if (!response.ok) {
-            throw new Error(`Failed to generate image: ${response.statusText}`)
-          }
-
-          const result = await response.json()
-          
-          // Store the generated image record
-          const { data: imageRecord, error: imageError } = await supabase
-            .from('generated_carousel_images')
-            .insert({
-              job_id: jobId,
-              carousel_index: carouselIndex,
-              image_index: imageIndex,
-              source_image_url: sourceImageUrl,
-              generated_image_url: result.imageUrl,
-              storage_path: result.storagePath,
-              width: result.width,
-              height: result.height,
-              prompt_used: job.prompt,
-              settings_used: job.settings,
-              user_id: job.user_id
-            })
-            .select()
-            .single()
-
-          if (imageError) throw imageError
-          
-          generatedImages.push(imageRecord)
-          carouselImages.push(result.imageUrl)
-          completedOperations++
-        }
-      }
-
-      // Update job as completed
-      await this.updateJobStatus(jobId, 'completed', 100, `Successfully generated ${job.variants} carousel(s)`)
-      
-    } catch (error) {
-      console.error('Error processing job:', error)
-      await this.updateJobStatus(jobId, 'failed', 0, error instanceof Error ? error.message : 'Unknown error')
-      throw error
-    }
-  }
-
-  static async updateJobStatus(
-    jobId: string, 
-    status: ImageGenerationJob['status'], 
-    progress: number, 
-    message?: string
-  ): Promise<void> {
-    const updateData: any = { status, progress, message }
-    
-    if (status === 'completed') {
-      updateData.completed_at = new Date().toISOString()
-    }
-
-    const { error } = await supabase
-      .from('image_generation_jobs')
-      .update(updateData)
-      .eq('id', jobId)
-
-    if (error) throw error
-  }
-
-  static async getJobs(limit = 20, offset = 0): Promise<ImageGenerationJob[]> {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('User not authenticated')
-
-    const { data, error } = await supabase
-      .from('image_generation_jobs')
-      .select(`
-        *,
-        generated_images:generated_carousel_images(count),
-        template:image_generation_templates(*)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (error) throw error
-    return data || []
-  }
-
-  static async getJob(jobId: string): Promise<ImageGenerationJob | null> {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('User not authenticated')
-
-    const { data, error } = await supabase
-      .from('image_generation_jobs')
-      .select(`
-        *,
-        generated_images:generated_carousel_images(*),
-        template:image_generation_templates(*)
-      `)
-      .eq('id', jobId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (error) throw error
-    return data
   }
 
   static async getTemplates(): Promise<ImageGenerationTemplate[]> {
@@ -290,44 +286,6 @@ export class ImageGenerationService {
       .from('image_generation_templates')
       .update({ is_favorite: !template.is_favorite })
       .eq('id', templateId)
-      .eq('user_id', user.id)
-
-    if (error) throw error
-  }
-
-  static async deleteJob(jobId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('User not authenticated')
-
-    // Get associated images to delete from storage
-    const { data: images, error: fetchError } = await supabase
-      .from('generated_carousel_images')
-      .select('storage_path')
-      .eq('job_id', jobId)
-      .eq('user_id', user.id)
-
-    if (fetchError) throw fetchError
-
-    // Delete from storage
-    if (images && images.length > 0) {
-      const paths = images
-        .filter(img => img.storage_path)
-        .map(img => img.storage_path!)
-      
-      if (paths.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from('generated-carousels')
-          .remove(paths)
-        
-        if (storageError) console.error('Error deleting images from storage:', storageError)
-      }
-    }
-
-    // Delete job (cascade will delete images)
-    const { error } = await supabase
-      .from('image_generation_jobs')
-      .delete()
-      .eq('id', jobId)
       .eq('user_id', user.id)
 
     if (error) throw error

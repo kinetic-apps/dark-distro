@@ -4,33 +4,28 @@ export interface ImageGenerationJob {
   template_id?: string
   template_name: string
   template_description?: string
+  prompt: string
+  variants: number
   status: 'queued' | 'processing' | 'completed' | 'failed'
   progress: number
   message?: string
-  variants: number
-  prompt: string
-  settings: ImageGenerationSettings
   created_at: string
-  updated_at: string
   completed_at?: string
   user_id: string
-  // Virtual fields populated from joins
-  generated_images?: GeneratedCarouselImage[]
+  // Relations
   template?: ImageGenerationTemplate
+  generated_images?: GeneratedCarouselImage[]
 }
 
 export interface ImageGenerationTemplate {
   id: string
   name: string
   description?: string
-  thumbnail_url?: string
   source_images: string[]
+  thumbnail_url?: string
   default_prompt?: string
-  default_settings: ImageGenerationSettings
-  usage_count: number
   is_favorite: boolean
   created_at: string
-  updated_at: string
   user_id: string
 }
 
@@ -39,13 +34,12 @@ export interface GeneratedCarouselImage {
   job_id: string
   carousel_index: number
   image_index: number
-  source_image_url?: string
+  source_image_url: string
   generated_image_url: string
   storage_path?: string
-  width?: number
-  height?: number
+  width: number
+  height: number
   prompt_used: string
-  settings_used: ImageGenerationSettings
   created_at: string
   user_id: string
 }
@@ -67,6 +61,5 @@ export interface CreateJobParams {
   template_description?: string
   prompt: string
   variants: number
-  settings: ImageGenerationSettings
   source_images: File[]
 } 

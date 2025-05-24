@@ -1,122 +1,92 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { 
-  ArrowLeft,
-  Download,
-  Loader2,
-  CheckCircle,
+  ArrowLeft, 
+  Download, 
+  Loader2, 
+  CheckCircle2,
   XCircle,
   Clock,
-  Grid3x3,
-  Eye,
-  X
+  Grid,
+  List,
+  Trash2
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
-import type { ImageGenerationJob, GeneratedCarouselImage } from '@/lib/types/image-generation'
+import type { GeneratedCarouselImage } from '@/lib/types/image-generation'
 
-export default function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+export default function JobDetailsPage() {
+  const params = useParams()
   const router = useRouter()
-  const { id } = use(params)
-  const [job, setJob] = useState<ImageGenerationJob | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedCarousel, setSelectedCarousel] = useState<number | null>(null)
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const jobId = params.id as string
+  
+  const [job, setJob] = useState<any>(null)
+  const [images, setImages] = useState<GeneratedCarouselImage[]>([])
+  const [progress, setProgress] = useState(0)
+  const [status, setStatus] = useState<string>('loading')
+  const [message, setMessage] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid')
+  const [selectedVariant, setSelectedVariant] = useState<number>(0)
 
-  useEffect(() => {
-    loadJob()
-    
-    // Subscribe to job updates
-    const channel = ImageGenerationService.subscribeToJobUpdates(id, (updatedJob) => {
-      setJob(updatedJob)
-    })
-
-    return () => {
-      channel.unsubscribe()
-    }
-  }, [id])
-
-  const loadJob = async () => {
+  const loadJobData = useCallback(async () => {
     try {
-      setIsLoading(true)
-      const data = await ImageGenerationService.getJob(id)
-      setJob(data)
+      const { job: jobData, state, images: generatedImages } = await ImageGenerationService.getJobWithState(jobId)
+      
+      if (!jobData) {
+        router.push('/image-generator/jobs')
+        return
+      }
+
+      setJob(jobData)
+      setImages(generatedImages)
+      setProgress(state.progress)
+      setStatus(state.status)
+      setMessage(state.message)
+      setLoading(false)
     } catch (error) {
       console.error('Error loading job:', error)
-    } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }
+  }, [jobId, router])
 
-  const getStatusIcon = (status: ImageGenerationJob['status']) => {
-    switch (status) {
-      case 'queued':
-        return <Clock className="h-5 w-5 text-gray-500" />
-      case 'processing':
-        return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-      case 'completed':
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'failed':
-        return <XCircle className="h-5 w-5 text-red-500" />
-    }
-  }
-
-  const getStatusText = (status: ImageGenerationJob['status']) => {
-    switch (status) {
-      case 'queued':
-        return 'Queued'
-      case 'processing':
-        return 'Processing'
-      case 'completed':
-        return 'Completed'
-      case 'failed':
-        return 'Failed'
-    }
-  }
-
-  const groupImagesByCarousel = (images: GeneratedCarouselImage[]) => {
-    const grouped: Record<number, GeneratedCarouselImage[]> = {}
-    images.forEach(image => {
-      if (!grouped[image.carousel_index]) {
-        grouped[image.carousel_index] = []
+  useEffect(() => {
+    loadJobData()
+    
+    // Poll for updates while job is processing
+    const interval = setInterval(() => {
+      if (status === 'processing') {
+        loadJobData()
       }
-      grouped[image.carousel_index].push(image)
-    })
-    
-    // Sort images within each carousel by image_index
-    Object.values(grouped).forEach(carouselImages => {
-      carouselImages.sort((a, b) => a.image_index - b.image_index)
-    })
-    
-    return grouped
-  }
+    }, 2000)
 
-  const downloadCarousel = async (carouselIndex: number) => {
-    if (!job?.generated_images) return
+    return () => clearInterval(interval)
+  }, [loadJobData, status])
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this job?')) return
     
-    const carouselImages = job.generated_images.filter(
-      img => img.carousel_index === carouselIndex
-    )
-    
-    // Download each image
-    for (const image of carouselImages) {
-      const response = await fetch(image.generated_image_url)
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${job.name}_carousel${carouselIndex + 1}_image${image.image_index + 1}.png`
-      a.click()
-      URL.revokeObjectURL(url)
+    try {
+      await ImageGenerationService.deleteJob(jobId)
+      router.push('/image-generator/jobs')
+    } catch (error) {
+      console.error('Error deleting job:', error)
     }
   }
 
-  if (isLoading) {
+  const downloadAll = () => {
+    images.forEach((image) => {
+      const link = document.createElement('a')
+      link.href = image.generated_image_url
+      link.download = `${job.name}_variant${image.carousel_index + 1}_image${image.image_index + 1}.png`
+      link.click()
+    })
+  }
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     )
@@ -125,210 +95,217 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
   if (!job) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Job not found</p>
+        <p className="text-gray-500">Job not found</p>
       </div>
     )
   }
 
-  const groupedImages = job.generated_images ? groupImagesByCarousel(job.generated_images) : {}
+  // Group images by variant
+  const imagesByVariant = images.reduce((acc, img) => {
+    if (!acc[img.carousel_index]) acc[img.carousel_index] = []
+    acc[img.carousel_index].push(img)
+    return acc
+  }, {} as Record<number, GeneratedCarouselImage[]>)
+
+  const variantCount = Object.keys(imagesByVariant).length
 
   return (
-    <div className="space-y-6">
+    <div className="page-container">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => router.push('/image-generator/jobs')}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{job.name}</h1>
-            <p className="text-sm text-gray-600">
-              Created {format(new Date(job.created_at), 'MMM d, yyyy h:mm a')}
-            </p>
+      <div className="page-header">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/image-generator/jobs')}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <div>
+              <h1 className="page-title">{job.name}</h1>
+              <p className="page-description">{job.prompt}</p>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          {getStatusIcon(job.status)}
-          <span className="text-sm font-medium">{getStatusText(job.status)}</span>
+          
+          <div className="flex items-center gap-2">
+            {status === 'completed' && images.length > 0 && (
+              <button
+                onClick={downloadAll}
+                className="btn-secondary"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download All
+              </button>
+            )}
+            <button
+              onClick={handleDelete}
+              className="btn-secondary text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Progress and Status */}
-      {job.status === 'processing' && (
-        <div className="card">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Progress</span>
-            <span className="text-sm text-gray-500">{job.progress}%</span>
+      {/* Status Card */}
+      <div className="card-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {status === 'processing' && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+            {status === 'completed' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+            {status === 'failed' && <XCircle className="h-5 w-5 text-red-600" />}
+            {status === 'queued' && <Clock className="h-5 w-5 text-gray-400" />}
+            
+            <div>
+              <p className="font-medium capitalize">{status}</p>
+              <p className="text-sm text-gray-600">{message}</p>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${job.progress}%` }}
-            />
-          </div>
-          {job.message && (
-            <p className="mt-2 text-sm text-gray-600">{job.message}</p>
+          
+          {status === 'processing' && (
+            <div className="text-right">
+              <p className="text-sm font-medium">{progress}%</p>
+              <p className="text-xs text-gray-500">
+                {images.length} of {job.variants * (images.length > 0 ? Math.ceil(images.length / job.variants) : 3)} images
+              </p>
+            </div>
           )}
         </div>
-      )}
 
-      {/* Job Details */}
-      <div className="card">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Job Details</h3>
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-sm font-medium text-gray-500">Template</dt>
-            <dd className="mt-1 text-sm text-gray-900">{job.template_name}</dd>
+        {/* Progress Bar */}
+        {status === 'processing' && (
+          <div className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div 
+              className="bg-blue-600 h-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
           </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500">Variants</dt>
-            <dd className="mt-1 text-sm text-gray-900">{job.variants}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-sm font-medium text-gray-500">Prompt</dt>
-            <dd className="mt-1 text-sm text-gray-900">{job.prompt}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-sm font-medium text-gray-500">Settings</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              <pre className="text-xs bg-gray-50 p-2 rounded">
-                {JSON.stringify(job.settings, null, 2)}
-              </pre>
-            </dd>
-          </div>
-        </dl>
+        )}
       </div>
 
-      {/* Generated Carousels */}
-      {job.status === 'completed' && Object.keys(groupedImages).length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Generated Carousels</h3>
-          
-          {Object.entries(groupedImages).map(([carouselIndex, images]) => (
-            <div key={carouselIndex} className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-md font-medium text-gray-900">
-                  Carousel {parseInt(carouselIndex) + 1}
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setSelectedCarousel(parseInt(carouselIndex))}
-                    className="btn-secondary text-sm"
-                  >
-                    <Grid3x3 className="h-4 w-4 mr-2" />
-                    View All
-                  </button>
-                  <button
-                    onClick={() => downloadCarousel(parseInt(carouselIndex))}
-                    className="btn-primary text-sm"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {images.map((image) => (
-                  <div
-                    key={image.id}
-                    className="relative group cursor-pointer"
-                    onClick={() => setPreviewImage(image.generated_image_url)}
-                  >
-                    <img
-                      src={image.generated_image_url}
-                      alt={`Generated ${image.image_index + 1}`}
-                      className="w-full h-32 object-cover rounded-lg border border-gray-200"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity rounded-lg flex items-center justify-center">
-                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-                      {image.image_index + 1}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Failed State */}
-      {job.status === 'failed' && (
-        <div className="card bg-red-50 border-red-200">
-          <div className="flex items-center">
-            <XCircle className="h-5 w-5 text-red-500 mr-3" />
-            <div>
-              <h3 className="text-sm font-medium text-red-800">Generation Failed</h3>
-              <p className="text-sm text-red-700 mt-1">{job.message || 'An unknown error occurred'}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Full Carousel Preview Modal */}
-      {selectedCarousel !== null && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedCarousel(null)}
-        >
-          <div
-            className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">
-                Carousel {selectedCarousel + 1} - Full View
-              </h3>
+      {/* Images Section */}
+      {images.length > 0 && (
+        <>
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium text-gray-900">Generated Images</h2>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedCarousel(null)}
-                className="text-gray-400 hover:text-gray-600"
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'grid' ? 'bg-gray-100' : 'hover:bg-gray-50'
+                }`}
               >
-                <X className="h-5 w-5" />
+                <Grid className="h-4 w-4" />
               </button>
+              <button
+                onClick={() => setViewMode('carousel')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'carousel' ? 'bg-gray-100' : 'hover:bg-gray-50'
+                }`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+              
+              {viewMode === 'carousel' && variantCount > 1 && (
+                <>
+                  <div className="w-px h-6 bg-gray-200 mx-2" />
+                  <select
+                    value={selectedVariant}
+                    onChange={(e) => setSelectedVariant(Number(e.target.value))}
+                    className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  >
+                    {Array.from({ length: variantCount }, (_, i) => (
+                      <option key={i} value={i}>
+                        Variant {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
-            <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+          </div>
+
+          {/* Images Display */}
+          <div className={viewMode === 'grid' ? 'card' : 'card-lg'}>
+            {viewMode === 'grid' ? (
+              // Grid View
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {groupedImages[selectedCarousel]?.map((image) => (
-                  <div key={image.id} className="relative">
+                {images.map((image, index) => (
+                  <div key={image.id} className="space-y-2">
+                    <div className="relative group">
+                      <img
+                        src={image.generated_image_url}
+                        alt={`Generated ${index + 1}`}
+                        className="w-full aspect-square object-cover rounded-lg"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <a
+                          href={image.generated_image_url}
+                          download={`${job.name}_v${image.carousel_index + 1}_${image.image_index + 1}.png`}
+                          className="p-2 bg-white rounded-md shadow-lg hover:shadow-xl transition-shadow"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 text-center">
+                      Variant {image.carousel_index + 1}, Image {image.image_index + 1}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              // Carousel View
+              <div className="space-y-4">
+                {imagesByVariant[selectedVariant]?.map((image, index) => (
+                  <div key={image.id} className="space-y-3">
                     <img
                       src={image.generated_image_url}
-                      alt={`Generated ${image.image_index + 1}`}
-                      className="w-full h-auto rounded-lg border border-gray-200"
+                      alt={`Generated ${index + 1}`}
+                      className="w-full max-h-[600px] object-contain rounded-lg mx-auto"
                     />
-                    <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-                      Image {image.image_index + 1}
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-600">
+                        Image {image.image_index + 1} of {imagesByVariant[selectedVariant].length}
+                      </p>
+                      <a
+                        href={image.generated_image_url}
+                        download={`${job.name}_v${image.carousel_index + 1}_${image.image_index + 1}.png`}
+                        className="btn-secondary btn-sm"
+                      >
+                        <Download className="mr-1 h-3 w-3" />
+                        Download
+                      </a>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
+        </>
+      )}
+
+      {/* Empty State */}
+      {status === 'completed' && images.length === 0 && (
+        <div className="card-lg text-center py-12">
+          <p className="text-gray-500">No images were generated</p>
         </div>
       )}
 
-      {/* Image Preview Modal */}
-      {previewImage && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
-          onClick={() => setPreviewImage(null)}
-        >
-          <img
-            src={previewImage}
-            alt="Preview"
-            className="max-w-full max-h-full object-contain"
-          />
-          <button
-            onClick={() => setPreviewImage(null)}
-            className="absolute top-4 right-4 text-white hover:text-gray-300"
-          >
-            <X className="h-6 w-6" />
-          </button>
+      {/* Processing State */}
+      {status === 'processing' && images.length === 0 && (
+        <div className="card-lg">
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <div className="relative">
+              <div className="h-20 w-20 rounded-full border-4 border-gray-200"></div>
+              <div className="absolute inset-0 h-20 w-20 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+            </div>
+            <p className="text-gray-900 font-medium">Generating your images...</p>
+            <p className="text-sm text-gray-500">This typically takes 20-30 seconds per image</p>
+          </div>
         </div>
       )}
     </div>
