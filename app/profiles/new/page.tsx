@@ -58,8 +58,8 @@ export default function NewProfilePage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Create New Profile</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="page-title">Create New Profile</h1>
+          <p className="page-description">
             Set up a new GeeLark phone profile
           </p>
         </div>
@@ -67,7 +67,7 @@ export default function NewProfilePage() {
 
       <form onSubmit={handleSubmit} className="card space-y-6">
         <div>
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Device Configuration</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4 dark:text-dark-100">Device Configuration</h2>
           
           <div className="space-y-4">
             <div>
@@ -78,7 +78,7 @@ export default function NewProfilePage() {
                 id="deviceModel"
                 value={formData.deviceModel}
                 onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
-                className="input w-full"
+                className="select w-full"
               >
                 <option value="Pixel 6">Google Pixel 6</option>
                 <option value="Pixel 7">Google Pixel 7</option>
@@ -96,7 +96,7 @@ export default function NewProfilePage() {
                 id="androidVersion"
                 value={formData.androidVersion}
                 onChange={(e) => setFormData({ ...formData, androidVersion: e.target.value })}
-                className="input w-full"
+                className="select w-full"
               >
                 <option value="13">Android 13</option>
                 <option value="12">Android 12</option>
@@ -107,20 +107,20 @@ export default function NewProfilePage() {
         </div>
 
         <div>
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Proxy Configuration</h2>
+          <h2 className="text-lg font-medium text-gray-900 mb-4 dark:text-dark-100">Proxy Configuration</h2>
           
           <div className="space-y-4">
             <div className="flex items-center">
-              <input
-                id="assignProxy"
-                type="checkbox"
-                checked={formData.assignProxy}
-                onChange={(e) => setFormData({ ...formData, assignProxy: e.target.checked })}
-                className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
-              />
-              <label htmlFor="assignProxy" className="ml-2 text-sm text-gray-700">
-                Assign proxy automatically
-              </label>
+                              <input
+                  id="assignProxy"
+                  type="checkbox"
+                  checked={formData.assignProxy}
+                  onChange={(e) => setFormData({ ...formData, assignProxy: e.target.checked })}
+                  className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded dark:text-dark-100 dark:focus:ring-dark-400 dark:border-dark-600 dark:bg-dark-800"
+                />
+                <label htmlFor="assignProxy" className="ml-2 text-sm text-gray-700 dark:text-dark-300">
+                  Assign proxy automatically
+                </label>
             </div>
 
             {formData.assignProxy && (
@@ -132,14 +132,14 @@ export default function NewProfilePage() {
                   id="proxyType"
                   value={formData.proxyType}
                   onChange={(e) => setFormData({ ...formData, proxyType: e.target.value })}
-                  className="input w-full"
+                  className="select w-full"
                 >
                   <option value="sticky">Sticky Pool (for warm-up)</option>
                   <option value="sim">Dedicated SIM (for posting)</option>
                 </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Sticky proxies are recommended for new profiles during warm-up
-                </p>
+                                  <p className="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                    Sticky proxies are recommended for new profiles during warm-up
+                  </p>
               </div>
             )}
           </div>

@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -18,29 +18,28 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
-      if (error) throw error
-
+    if (error) {
+      setError(error.message)
+    } else {
       router.push('/')
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
-    } finally {
-      setLoading(false)
+      router.refresh()
     }
+    
+    setLoading(false)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-start justify-center bg-gray-50 dark:bg-dark-900 transition-colors pt-60">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl brand-title text-gray-900">SPECTRE</h1>
-          <p className="mt-2 text-sm body-text">
-            Sign in to your account
+          <h1 className="text-3xl brand-title text-gray-900 dark:text-dark-100">SPECTRE</h1>
+          <p className="mt-2 text-sm body-text dark:text-dark-400">
+            Sign In
           </p>
         </div>
 
@@ -77,17 +76,17 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800 body-text">{error}</p>
+              <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+                <p className="text-sm text-red-800 dark:text-red-300 body-text">{error}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full"
+              className="btn-primary w-full flex items-center justify-center"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'LOADING...' : 'ENTER'}
             </button>
           </form>
         </div>

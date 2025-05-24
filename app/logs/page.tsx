@@ -82,7 +82,7 @@ export default function LogsPage() {
   const getLevelIcon = (level: Log['level']) => {
     switch (level) {
       case 'debug':
-        return <Bug className="h-4 w-4 text-gray-400" />
+        return <Bug className="h-4 w-4 text-gray-400 dark:text-dark-500" />
       case 'info':
         return <Info className="h-4 w-4 text-blue-500" />
       case 'warning':
@@ -90,17 +90,17 @@ export default function LogsPage() {
       case 'error':
         return <AlertCircle className="h-4 w-4 text-red-500" />
       case 'critical':
-        return <AlertCircle className="h-4 w-4 text-red-700" />
+        return <AlertCircle className="h-4 w-4 text-red-700 dark:text-red-400" />
     }
   }
 
   const getLevelBadge = (level: Log['level']) => {
     const classes = {
-      debug: 'bg-gray-100 text-gray-800',
-      info: 'bg-blue-100 text-blue-800',
-      warning: 'bg-yellow-100 text-yellow-800',
-      error: 'bg-red-100 text-red-800',
-      critical: 'bg-red-200 text-red-900'
+      debug: 'bg-gray-100 text-gray-800 dark:bg-dark-700 dark:text-dark-300',
+      info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
+      warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+      error: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+      critical: 'bg-red-200 text-red-900 dark:bg-red-900/30 dark:text-red-300'
     }
     
     return (
@@ -137,19 +137,19 @@ export default function LogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Logs</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">Logs</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-dark-400">
             System activity and error tracking
           </p>
         </div>
         
         <div className="flex items-center gap-3">
-          <label className="flex items-center text-sm text-gray-600">
+          <label className="flex items-center text-sm text-gray-600 dark:text-dark-300">
             <input
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="mr-2"
+              className="mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-100 dark:focus:ring-dark-400"
             />
             Auto-refresh
           </label>
@@ -162,12 +162,12 @@ export default function LogsPage() {
 
       <div className="card">
         <div className="flex items-center gap-4">
-          <Filter className="h-4 w-4 text-gray-400" />
+          <Filter className="h-4 w-4 text-gray-400 dark:text-dark-500" />
           
           <select
             value={filters.level}
             onChange={(e) => setFilters({ ...filters, level: e.target.value })}
-            className="input"
+            className="select"
           >
             <option value="all">All levels</option>
             <option value="debug">Debug</option>
@@ -180,7 +180,7 @@ export default function LogsPage() {
           <select
             value={filters.component}
             onChange={(e) => setFilters({ ...filters, component: e.target.value })}
-            className="input"
+            className="select"
           >
             <option value="all">All components</option>
             {components.map(comp => (
@@ -200,13 +200,13 @@ export default function LogsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-400">Loading logs...</div>
+          <div className="text-gray-400 dark:text-dark-500">Loading logs...</div>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden dark:bg-dark-850 dark:border-dark-700">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+              <thead className="bg-gray-50 dark:bg-dark-800">
                 <tr>
                   <th scope="col" className="table-header">Timestamp</th>
                   <th scope="col" className="table-header">Level</th>
@@ -215,9 +215,9 @@ export default function LogsPage() {
                   <th scope="col" className="table-header">Message</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
+                  <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
                     <td className="table-cell whitespace-nowrap font-mono text-xs">
                       {formatDate(log.timestamp)}
                     </td>
@@ -228,28 +228,28 @@ export default function LogsPage() {
                       </div>
                     </td>
                     <td className="table-cell">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-gray-900 dark:text-dark-100">
                         {log.component}
                       </span>
                     </td>
                     <td className="table-cell">
                       {log.account ? (
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-gray-600 dark:text-dark-300">
                           {log.account.tiktok_username || 'Unnamed'}
                         </span>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-gray-400 dark:text-dark-500">—</span>
                       )}
                     </td>
                     <td className="table-cell">
                       <div>
-                        <p className="text-sm text-gray-900">{log.message}</p>
+                        <p className="text-sm text-gray-900 dark:text-dark-100">{log.message}</p>
                         {log.meta && Object.keys(log.meta).length > 0 && (
                           <details className="mt-1">
-                            <summary className="text-xs text-gray-500 cursor-pointer">
+                            <summary className="text-xs text-gray-500 dark:text-dark-400 cursor-pointer">
                               View metadata
                             </summary>
-                            <pre className="mt-1 text-xs text-gray-600 bg-gray-50 p-2 rounded overflow-x-auto">
+                            <pre className="mt-1 text-xs text-gray-600 dark:text-dark-300 bg-gray-50 dark:bg-dark-800 p-2 rounded overflow-x-auto">
                               {JSON.stringify(log.meta, null, 2)}
                             </pre>
                           </details>
@@ -260,7 +260,7 @@ export default function LogsPage() {
                 ))}
                 {logs.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-gray-500">
+                    <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-dark-400">
                       No logs found
                     </td>
                   </tr>

@@ -100,8 +100,8 @@ export default async function PostsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Posts</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="page-title">Posts</h1>
+          <p className="page-description">
             Manage content distribution campaigns
           </p>
         </div>
@@ -143,8 +143,8 @@ export default async function PostsPage({
             href="/posts"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               !params.status
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             All ({statusCounts.all})
@@ -153,8 +153,8 @@ export default async function PostsPage({
             href="/posts?status=queued"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'queued'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Queued ({statusCounts.queued})
@@ -163,8 +163,8 @@ export default async function PostsPage({
             href="/posts?status=processing"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'processing'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Processing ({statusCounts.processing})
@@ -173,8 +173,8 @@ export default async function PostsPage({
             href="/posts?status=posted"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'posted'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Posted ({statusCounts.posted})
@@ -183,8 +183,8 @@ export default async function PostsPage({
             href="/posts?status=failed"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'failed'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Failed ({statusCounts.failed})
@@ -192,9 +192,9 @@ export default async function PostsPage({
         </nav>
       </div>
 
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+          <thead className="bg-gray-50 dark:bg-dark-800">
             <tr>
               <th scope="col" className="table-header">
                 Post
@@ -219,15 +219,15 @@ export default async function PostsPage({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
             {posts.map((post) => (
-              <tr key={post.id} className="hover:bg-gray-50">
+              <tr key={post.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
                 <td className="table-cell">
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-gray-900 dark:text-dark-100">
                       {post.asset_path.replace('.mp4', '')}
                     </p>
-                    <p className="text-xs text-gray-500 truncate max-w-xs">
+                    <p className="text-xs text-gray-500 dark:text-dark-400 truncate max-w-xs">
                       {post.caption}
                     </p>
                   </div>
@@ -236,12 +236,12 @@ export default async function PostsPage({
                   {post.account ? (
                     <Link 
                       href={`/profiles/${post.account.id}`}
-                      className="text-sm text-gray-900 hover:text-gray-700"
+                      className="text-sm text-gray-900 hover:text-gray-700 dark:text-dark-100 dark:hover:text-dark-200"
                     >
                       {post.account.tiktok_username || 'Unnamed'}
                     </Link>
                   ) : (
-                    <span className="text-sm text-gray-400">Unknown</span>
+                    <span className="text-sm text-gray-400 dark:text-dark-500">Unknown</span>
                   )}
                 </td>
                 <td className="table-cell">
@@ -250,10 +250,10 @@ export default async function PostsPage({
                     <span className="ml-2">{getStatusBadge(post.status)}</span>
                   </div>
                 </td>
-                <td className="table-cell text-sm text-gray-500">
+                <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                   {formatRelativeTime(post.created_at)}
                 </td>
-                <td className="table-cell text-sm text-gray-500">
+                <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                   {post.posted_at ? formatRelativeTime(post.posted_at) : '—'}
                 </td>
                 <td className="table-cell">
@@ -267,17 +267,17 @@ export default async function PostsPage({
                       {post.tiktok_post_id.slice(-8)}
                     </a>
                   ) : (
-                    <span className="text-sm text-gray-400">—</span>
+                    <span className="text-sm text-gray-400 dark:text-dark-500">—</span>
                   )}
                 </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   {post.status === 'failed' && post.retry_count < 3 && (
-                    <button className="text-gray-600 hover:text-gray-900">
+                    <button className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100">
                       Retry
                     </button>
                   )}
                   {post.status === 'queued' && (
-                    <button className="text-red-600 hover:text-red-900">
+                    <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
                       Cancel
                     </button>
                   )}
@@ -286,7 +286,7 @@ export default async function PostsPage({
             ))}
             {posts.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-500">
+                <td colSpan={7} className="text-center py-8 text-gray-500 dark:text-dark-400">
                   No posts found
                 </td>
               </tr>

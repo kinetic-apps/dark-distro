@@ -134,7 +134,7 @@ export default function ImageGeneratorPage() {
 
         {/* Images Section */}
         <div className="card-lg">
-          <h2 className="text-base font-medium text-gray-900 mb-4">Carousel Images</h2>
+          <h2 className="text-base font-medium text-gray-900 dark:text-dark-100 mb-4">Carousel Images</h2>
           
           {images.length === 0 ? (
             <label className="block">
@@ -145,12 +145,12 @@ export default function ImageGeneratorPage() {
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-gray-400 transition-colors">
-                <Upload className="mx-auto h-10 w-10 text-gray-400" />
-                <p className="mt-3 text-sm font-medium text-gray-900">
+              <div className="border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg p-12 text-center cursor-pointer hover:border-gray-400 dark:hover:border-dark-500 transition-colors">
+                <Upload className="mx-auto h-10 w-10 text-gray-400 dark:text-dark-500" />
+                <p className="mt-3 text-sm font-medium text-gray-900 dark:text-dark-100">
                   Click to upload carousel images
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
                   Upload multiple images to create a carousel
                 </p>
               </div>
@@ -170,9 +170,9 @@ export default function ImageGeneratorPage() {
                         />
                         <button
                           onClick={() => removeImage(index)}
-                          className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow-sm hover:shadow-md transition-shadow"
+                          className="absolute top-2 right-2 p-1.5 bg-white dark:bg-dark-800 rounded-full shadow-sm hover:shadow-md transition-shadow"
                         >
-                          <X className="h-4 w-4 text-gray-600" />
+                          <X className="h-4 w-4 text-gray-600 dark:text-dark-300" />
                         </button>
                         <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
                           Image {index + 1}
@@ -202,16 +202,16 @@ export default function ImageGeneratorPage() {
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <div className="card h-full min-h-[320px] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                  <div className="card h-full min-h-[320px] flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors">
                     <div className="text-center">
-                      <Plus className="mx-auto h-8 w-8 text-gray-400" />
-                      <p className="mt-2 text-sm text-gray-600">Add more images</p>
+                      <Plus className="mx-auto h-8 w-8 text-gray-400 dark:text-dark-500" />
+                      <p className="mt-2 text-sm text-gray-600 dark:text-dark-300">Add more images</p>
                     </div>
                   </div>
                 </label>
               </div>
               
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-500 dark:text-dark-400">
                 <p>Tip: Each image in your carousel can have its own unique prompt for targeted variations</p>
               </div>
             </div>
@@ -223,14 +223,14 @@ export default function ImageGeneratorPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <div className="card-lg">
-                <h3 className="text-base font-medium text-gray-900 mb-4">Generation Settings</h3>
+                <h3 className="text-base font-medium text-gray-900 dark:text-dark-100 mb-4">Generation Settings</h3>
                 
                 <div>
                   <label className="label">Number of Carousel Variations</label>
                   <select
                     value={variants}
                     onChange={(e) => setVariants(parseInt(e.target.value))}
-                    className="input"
+                    className="select w-full"
                   >
                     {[1, 2, 3, 4, 5].map(num => (
                       <option key={num} value={num}>
@@ -238,7 +238,7 @@ export default function ImageGeneratorPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
                     Each variation will create a full carousel with all {images.length} images
                   </p>
                 </div>
@@ -247,23 +247,23 @@ export default function ImageGeneratorPage() {
 
             <div>
               <div className="card-lg">
-                <h3 className="text-base font-medium text-gray-900 mb-4">Summary</h3>
+                <h3 className="text-base font-medium text-gray-900 dark:text-dark-100 mb-4">Summary</h3>
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-gray-600">Images per carousel</dt>
-                    <dd className="font-medium">{images.length}</dd>
+                    <dt className="text-gray-600 dark:text-dark-300">Images per carousel</dt>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100">{images.length}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-gray-600">Carousel variations</dt>
-                    <dd className="font-medium">{variants}</dd>
+                    <dt className="text-gray-600 dark:text-dark-300">Carousel variations</dt>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100">{variants}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-gray-600">Total images</dt>
-                    <dd className="font-medium">{images.length * variants}</dd>
+                    <dt className="text-gray-600 dark:text-dark-300">Total images</dt>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100">{images.length * variants}</dd>
                   </div>
                 </dl>
                 
-                <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-dark-700">
                   <button
                     onClick={handleCreateJob}
                     disabled={isCreating || !jobName || images.length === 0}
@@ -281,7 +281,7 @@ export default function ImageGeneratorPage() {
                       </>
                     )}
                   </button>
-                  <p className="text-xs text-gray-500 text-center mt-3">
+                  <p className="text-xs text-gray-500 dark:text-dark-400 text-center mt-3">
                     ~30s per image × {images.length * variants} images
                   </p>
                 </div>

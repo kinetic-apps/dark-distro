@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatRelativeTime } from '@/lib/utils'
 import { Activity, AlertCircle, CheckCircle, Users } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export function TopBar() {
   const [stats, setStats] = useState({
@@ -48,17 +49,17 @@ export function TopBar() {
   }, [])
 
   return (
-    <div className="fixed top-0 left-64 right-0 z-40 bg-white border-b border-gray-200">
+    <div className="fixed top-0 left-64 right-0 z-40 bg-white border-b border-gray-200 dark:bg-dark-850 dark:border-dark-700 transition-colors duration-200">
       <div className="px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6 text-sm">
-            <div className="flex items-center text-gray-600">
+            <div className="flex items-center text-gray-600 dark:text-dark-300">
               <Users className="h-4 w-4 mr-1.5" />
               <span className="font-medium">{stats.activeProfiles}</span>
               <span className="ml-1">active</span>
             </div>
             
-            <div className="flex items-center text-gray-600">
+            <div className="flex items-center text-gray-600 dark:text-dark-300">
               <Activity className="h-4 w-4 mr-1.5" />
               <span className="font-medium">{stats.activeTasks}</span>
               <span className="ml-1">running</span>
@@ -68,20 +69,23 @@ export function TopBar() {
               {stats.recentErrors > 0 ? (
                 <>
                   <AlertCircle className="h-4 w-4 mr-1.5 text-red-500" />
-                  <span className="font-medium text-red-600">{stats.recentErrors}</span>
-                  <span className="ml-1 text-red-600">errors</span>
+                  <span className="font-medium text-red-600 dark:text-red-400">{stats.recentErrors}</span>
+                  <span className="ml-1 text-red-600 dark:text-red-400">errors</span>
                 </>
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-1.5 text-green-500" />
-                  <span className="text-green-600">No recent errors</span>
+                  <span className="text-green-600 dark:text-green-400">No recent errors</span>
                 </>
               )}
             </div>
           </div>
           
-          <div className="text-xs text-gray-400">
-            Last sync: {formatRelativeTime(stats.lastSync)}
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-gray-400 dark:text-dark-500">
+              Last sync: {formatRelativeTime(stats.lastSync)}
+            </div>
+            <ThemeToggle />
           </div>
         </div>
       </div>

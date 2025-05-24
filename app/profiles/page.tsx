@@ -69,8 +69,8 @@ export default async function ProfilesPage({
             href="/profiles"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               !params.status
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             All ({statusCounts.all})
@@ -79,8 +79,8 @@ export default async function ProfilesPage({
             href="/profiles?status=new"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'new'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             New ({statusCounts.new})
@@ -89,8 +89,8 @@ export default async function ProfilesPage({
             href="/profiles?status=warming_up"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'warming_up'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Warming Up ({statusCounts.warming_up})
@@ -99,8 +99,8 @@ export default async function ProfilesPage({
             href="/profiles?status=active"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'active'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Active ({statusCounts.active})
@@ -109,8 +109,8 @@ export default async function ProfilesPage({
             href="/profiles?status=paused"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'paused'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Paused ({statusCounts.paused})
@@ -119,8 +119,8 @@ export default async function ProfilesPage({
             href="/profiles?status=banned"
             className={`px-3 py-1.5 text-sm font-medium rounded-md ${
               params.status === 'banned'
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
             }`}
           >
             Banned ({statusCounts.banned})

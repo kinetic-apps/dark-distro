@@ -102,16 +102,16 @@ export default async function DashboardPage() {
         <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Profiles</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Active Profiles</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.activeProfiles}
               </p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
                 {stats.warmingUpProfiles} warming up
               </p>
             </div>
-            <div className="rounded-lg bg-green-50 p-3">
-              <Users className="h-6 w-6 text-green-600" />
+            <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
+              <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
@@ -119,16 +119,16 @@ export default async function DashboardPage() {
         <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Today&apos;s Posts</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Today&apos;s Posts</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.todayPosts}
               </p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
                 Last 24 hours
               </p>
             </div>
-            <div className="rounded-lg bg-blue-50 p-3">
-              <Send className="h-6 w-6 text-blue-600" />
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
+              <Send className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </div>
@@ -136,16 +136,16 @@ export default async function DashboardPage() {
         <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Healthy Proxies</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Healthy Proxies</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.healthyProxies}
               </p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
                 Working normally
               </p>
             </div>
-            <div className="rounded-lg bg-purple-50 p-3">
-              <Wifi className="h-6 w-6 text-purple-600" />
+            <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 p-3">
+              <Wifi className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
         </div>
@@ -153,16 +153,16 @@ export default async function DashboardPage() {
         <div className="card-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">SMS Rentals</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">SMS Rentals</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.activeRentals}
               </p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
                 Active rentals
               </p>
             </div>
-            <div className="rounded-lg bg-orange-50 p-3">
-              <MessageSquare className="h-6 w-6 text-orange-600" />
+            <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 p-3">
+              <MessageSquare className="h-6 w-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </div>
@@ -174,8 +174,8 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2">
           <div className="card-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-medium text-gray-900">Recent Carousel Generations</h2>
-              <Link href="/image-generator/jobs" className="text-sm text-gray-600 hover:text-gray-900">
+              <h2 className="text-base font-medium text-gray-900 dark:text-dark-100">Recent Carousel Generations</h2>
+              <Link href="/image-generator/jobs" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-200">
                 View all →
               </Link>
             </div>
@@ -186,26 +186,26 @@ export default async function DashboardPage() {
                   <Link 
                     key={job.id} 
                     href={`/image-generator/jobs/${job.id}`}
-                    className="block p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                    className="block p-3 rounded-lg border border-gray-200 hover:border-gray-300 dark:border-dark-600 dark:hover:border-dark-500 transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-gray-900 dark:text-dark-100 truncate">
                             {job.name}
                           </p>
                           {job.status === 'completed' && (
-                            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                            <span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded">
                               Completed
                             </span>
                           )}
                           {job.status === 'processing' && (
-                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">
                               Processing
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
                           {job.variants} carousel{job.variants > 1 ? 's' : ''} • {job.generated_images?.length || 0} total images
                         </p>
                       </div>
@@ -216,11 +216,11 @@ export default async function DashboardPage() {
                               key={img.id}
                               src={img.generated_image_url}
                               alt=""
-                              className="w-8 h-8 rounded ring-2 ring-white object-cover"
+                              className="w-8 h-8 rounded ring-2 ring-white dark:ring-dark-850 object-cover"
                             />
                           ))}
                           {job.generated_images.length > 3 && (
-                            <div className="w-8 h-8 rounded ring-2 ring-white bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
+                            <div className="w-8 h-8 rounded ring-2 ring-white dark:ring-dark-850 bg-gray-100 dark:bg-dark-700 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-dark-300">
                               +{job.generated_images.length - 3}
                             </div>
                           )}
@@ -232,9 +232,9 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-500">No recent generations</p>
-                <Link href="/image-generator" className="mt-3 inline-flex items-center text-sm text-blue-600 hover:text-blue-700">
+                <ImageIcon className="mx-auto h-8 w-8 text-gray-400 dark:text-dark-500" />
+                <p className="mt-2 text-sm text-gray-500 dark:text-dark-400">No recent generations</p>
+                <Link href="/image-generator" className="mt-3 inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
                   <Sparkles className="mr-1 h-3 w-3" />
                   Generate Carousels
                 </Link>
@@ -248,8 +248,8 @@ export default async function DashboardPage() {
           {/* Active Tasks */}
           <div className="card-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-medium text-gray-900">Active Tasks</h2>
-              <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900">
+              <h2 className="text-base font-medium text-gray-900 dark:text-dark-100">Active Tasks</h2>
+              <Link href="/posts" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-200">
                 View all →
               </Link>
             </div>
@@ -259,12 +259,12 @@ export default async function DashboardPage() {
                 {stats.activeTasks.map((task) => (
                   <div key={task.id} className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <Activity className="h-4 w-4 text-gray-400 mr-3" />
+                      <Activity className="h-4 w-4 text-gray-400 dark:text-dark-500 mr-3" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 dark:text-dark-100">
                           {task.type === 'warmup' ? 'Warming up' : 'Posting'}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-dark-400">
                           #{task.geelark_task_id?.slice(-8)}
                         </p>
                       </div>
@@ -274,15 +274,15 @@ export default async function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">No active tasks</p>
+              <p className="text-sm text-gray-500 dark:text-dark-400">No active tasks</p>
             )}
           </div>
 
           {/* Recent Errors */}
           <div className="card-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-medium text-gray-900">Recent Errors</h2>
-              <Link href="/logs" className="text-sm text-gray-600 hover:text-gray-900">
+              <h2 className="text-base font-medium text-gray-900 dark:text-dark-100">Recent Errors</h2>
+              <Link href="/logs" className="text-sm text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-200">
                 View logs →
               </Link>
             </div>
@@ -291,12 +291,12 @@ export default async function DashboardPage() {
               <div className="space-y-3">
                 {stats.recentErrors.map((error) => (
                   <div key={error.id} className="flex items-start">
-                    <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
+                    <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-900 truncate">
+                      <p className="text-sm text-gray-900 dark:text-dark-100 truncate">
                         {error.message}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-dark-400">
                         {error.component} • {new Date(error.timestamp).toLocaleTimeString()}
                       </p>
                     </div>
@@ -304,7 +304,7 @@ export default async function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex items-center text-green-600">
+              <div className="flex items-center text-green-600 dark:text-green-400">
                 <CheckCircle className="h-4 w-4 mr-2" />
                 <p className="text-sm">No recent errors</p>
               </div>

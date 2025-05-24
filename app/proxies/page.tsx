@@ -69,8 +69,8 @@ export default async function ProxiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Proxies</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="page-title">Proxies</h1>
+          <p className="page-description">
             Manage SOAX proxy connections
           </p>
         </div>
@@ -85,13 +85,13 @@ export default async function ProxiesPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Proxies</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Total Proxies</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.total}
               </p>
             </div>
-            <div className="rounded-lg bg-gray-100 p-3">
-              <Wifi className="h-6 w-6 text-gray-600" />
+            <div className="rounded-lg bg-gray-100 p-3 dark:bg-dark-700">
+              <Wifi className="h-6 w-6 text-gray-600 dark:text-dark-300" />
             </div>
           </div>
         </div>
@@ -99,13 +99,13 @@ export default async function ProxiesPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Healthy</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Healthy</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.healthy}
               </p>
             </div>
-            <div className="rounded-lg bg-green-100 p-3">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/20">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
           </div>
         </div>
@@ -113,13 +113,13 @@ export default async function ProxiesPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Blocked</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Blocked</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.blocked}
               </p>
             </div>
-            <div className="rounded-lg bg-red-100 p-3">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="rounded-lg bg-red-100 p-3 dark:bg-red-900/20">
+              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
           </div>
         </div>
@@ -127,21 +127,21 @@ export default async function ProxiesPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Assigned</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Assigned</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
                 {stats.assigned}
               </p>
             </div>
-            <div className="rounded-lg bg-blue-100 p-3">
-              <Wifi className="h-6 w-6 text-blue-600" />
+            <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/20">
+              <Wifi className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+          <thead className="bg-gray-50 dark:bg-dark-800">
             <tr>
               <th scope="col" className="table-header">
                 Proxy
@@ -166,16 +166,16 @@ export default async function ProxiesPage() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
             {proxies.map((proxy) => (
-              <tr key={proxy.id} className="hover:bg-gray-50">
+              <tr key={proxy.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
                 <td className="table-cell">
-                  <div>
-                    <p className="font-medium text-gray-900">{proxy.label}</p>
-                    <p className="text-xs text-gray-500">
-                      {proxy.host}:{proxy.port}
-                    </p>
-                  </div>
+                                      <div>
+                      <p className="font-medium text-gray-900 dark:text-dark-100">{proxy.label}</p>
+                      <p className="text-xs text-gray-500 dark:text-dark-400">
+                        {proxy.host}:{proxy.port}
+                      </p>
+                    </div>
                 </td>
                 <td className="table-cell">
                   <span className={`status-badge ${
@@ -200,18 +200,18 @@ export default async function ProxiesPage() {
                 <td className="table-cell">
                   {proxy.account ? (
                     <div>
-                      <p className="text-sm text-gray-900">
+                      <p className="text-sm text-gray-900 dark:text-dark-100">
                         {proxy.account.tiktok_username || 'Unnamed'}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-dark-400">
                         {proxy.account.status}
                       </p>
                     </div>
                   ) : (
-                    <span className="text-sm text-gray-400">Unassigned</span>
+                    <span className="text-sm text-gray-400 dark:text-dark-500">Unassigned</span>
                   )}
                 </td>
-                <td className="table-cell text-sm text-gray-500">
+                <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                   {formatRelativeTime(proxy.last_rotated)}
                 </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
@@ -220,7 +220,7 @@ export default async function ProxiesPage() {
                       'use server'
                       // Rotate proxy action
                     }}
-                    className="text-gray-600 hover:text-gray-900"
+                    className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100"
                     title="Rotate IP"
                   >
                     <RefreshCw className="h-4 w-4" />

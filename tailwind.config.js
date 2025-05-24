@@ -5,6 +5,7 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -33,6 +34,21 @@ module.exports = {
           800: '#262626',
           900: '#171717',
           950: '#0a0a0a',
+        },
+        // iOS-style dark mode colors
+        dark: {
+          50: '#f8f9fa',
+          100: '#f1f3f4',
+          200: '#e8eaed',
+          300: '#dadce0',
+          400: '#9aa0a6',
+          500: '#5f6368',
+          600: '#3c4043',
+          700: '#2d3136',
+          800: '#1f2124',
+          850: '#1a1d21',
+          900: '#161a1d',
+          950: '#0f1419',
         },
       },
     },

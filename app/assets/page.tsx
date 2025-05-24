@@ -132,8 +132,8 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Assets Library</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">Assets Library</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-dark-400">
             Videos from Ghostpost ready for posting
           </p>
         </div>
@@ -155,11 +155,11 @@ export default function AssetsPage() {
       </div>
 
       <div className="flex items-center gap-4">
-        <Filter className="h-4 w-4 text-gray-400" />
+        <Filter className="h-4 w-4 text-gray-400 dark:text-dark-500" />
         <select
           value={filter.dateRange}
           onChange={(e) => setFilter({ ...filter, dateRange: e.target.value })}
-          className="input"
+          className="select"
         >
           <option value="all">All time</option>
           <option value="today">Today</option>
@@ -177,13 +177,13 @@ export default function AssetsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-400">Loading assets...</div>
+          <div className="text-gray-400 dark:text-dark-500">Loading assets...</div>
         </div>
       ) : assets.length === 0 ? (
         <div className="card text-center py-12">
-          <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No assets found</p>
-          <p className="text-sm text-gray-400 mt-2">
+          <ImageIcon className="h-12 w-12 text-gray-400 dark:text-dark-500 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-dark-400">No assets found</p>
+          <p className="text-sm text-gray-400 dark:text-dark-500 mt-2">
             Upload videos to the ghostpost-outbox bucket to see them here
           </p>
         </div>
@@ -192,10 +192,10 @@ export default function AssetsPage() {
           {assets.map((asset) => (
             <div
               key={asset.id}
-              className="group relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+              className="group relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer dark:bg-dark-850 dark:border-dark-700 dark:hover:shadow-xl"
               onClick={() => setSelectedAsset(asset)}
             >
-              <div className="aspect-[9/16] bg-gray-100 relative">
+              <div className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 relative">
                 {asset.signedUrl && (
                   <video
                     src={asset.signedUrl}
@@ -209,14 +209,14 @@ export default function AssetsPage() {
                 </div>
               </div>
               <div className="p-3">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-gray-900 dark:text-dark-100 truncate">
                   {asset.name.replace('.mp4', '')}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
                   {formatFileSize(asset.metadata.size)} • {formatRelativeTime(asset.created_at)}
                 </p>
                 {asset.manifest && (
-                  <p className="text-xs text-gray-400 mt-1 truncate">
+                  <p className="text-xs text-gray-400 dark:text-dark-500 mt-1 truncate">
                     {asset.manifest.caption}
                   </p>
                 )}
@@ -227,18 +227,18 @@ export default function AssetsPage() {
                     e.stopPropagation()
                     postAsset(asset)
                   }}
-                  className="bg-white rounded-full p-2 shadow-lg hover:shadow-xl"
+                  className="bg-white dark:bg-dark-800 rounded-full p-2 shadow-lg hover:shadow-xl dark:hover:bg-dark-700 transition-colors"
                 >
-                  <Send className="h-4 w-4 text-gray-700" />
+                  <Send className="h-4 w-4 text-gray-700 dark:text-dark-300" />
                 </button>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+            <thead className="bg-gray-50 dark:bg-dark-800">
               <tr>
                 <th scope="col" className="table-header">Name</th>
                 <th scope="col" className="table-header">Caption</th>
@@ -249,38 +249,38 @@ export default function AssetsPage() {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
               {assets.map((asset) => (
-                <tr key={asset.id} className="hover:bg-gray-50">
+                <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
                   <td className="table-cell">
                     <div className="flex items-center">
-                      <ImageIcon className="h-5 w-5 text-gray-400 mr-3" />
-                      <span className="font-medium text-gray-900">
+                      <ImageIcon className="h-5 w-5 text-gray-400 dark:text-dark-500 mr-3" />
+                      <span className="font-medium text-gray-900 dark:text-dark-100">
                         {asset.name.replace('.mp4', '')}
                       </span>
                     </div>
                   </td>
                   <td className="table-cell">
-                    <span className="text-sm text-gray-600 truncate block max-w-xs">
+                    <span className="text-sm text-gray-600 dark:text-dark-300 truncate block max-w-xs">
                       {asset.manifest?.caption || '—'}
                     </span>
                   </td>
-                  <td className="table-cell text-sm text-gray-500">
+                  <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                     {formatFileSize(asset.metadata.size)}
                   </td>
-                  <td className="table-cell text-sm text-gray-500">
+                  <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                     {formatRelativeTime(asset.created_at)}
                   </td>
                   <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                     <button
                       onClick={() => postAsset(asset)}
-                      className="text-gray-600 hover:text-gray-900 mr-3"
+                      className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100 mr-3"
                     >
                       <Send className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => deleteAsset(asset.name)}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -294,15 +294,15 @@ export default function AssetsPage() {
 
       {selectedAsset && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black bg-opacity-75 dark:bg-black dark:bg-opacity-85 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedAsset(null)}
         >
           <div
-            className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+            className="bg-white dark:bg-dark-850 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">
+            <div className="p-4 border-b border-gray-200 dark:border-dark-700">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-dark-100">
                 {selectedAsset.name.replace('.mp4', '')}
               </h3>
             </div>
@@ -317,37 +317,37 @@ export default function AssetsPage() {
               </div>
               <div className="w-80 space-y-4">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Details</h4>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-dark-300 mb-2">Details</h4>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-xs text-gray-500">Size</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="text-xs text-gray-500 dark:text-dark-400">Size</dt>
+                      <dd className="text-sm text-gray-900 dark:text-dark-100">
                         {formatFileSize(selectedAsset.metadata.size)}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-xs text-gray-500">Uploaded</dt>
-                      <dd className="text-sm text-gray-900">
+                      <dt className="text-xs text-gray-500 dark:text-dark-400">Uploaded</dt>
+                      <dd className="text-sm text-gray-900 dark:text-dark-100">
                         {formatDate(selectedAsset.created_at)}
                       </dd>
                     </div>
                     {selectedAsset.manifest && (
                       <>
                         <div>
-                          <dt className="text-xs text-gray-500">Duration</dt>
-                          <dd className="text-sm text-gray-900">
+                          <dt className="text-xs text-gray-500 dark:text-dark-400">Duration</dt>
+                          <dd className="text-sm text-gray-900 dark:text-dark-100">
                             {selectedAsset.manifest.duration}s
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-xs text-gray-500">Caption</dt>
-                          <dd className="text-sm text-gray-900">
+                          <dt className="text-xs text-gray-500 dark:text-dark-400">Caption</dt>
+                          <dd className="text-sm text-gray-900 dark:text-dark-100">
                             {selectedAsset.manifest.caption}
                           </dd>
                         </div>
                         <div>
-                          <dt className="text-xs text-gray-500">Hashtags</dt>
-                          <dd className="text-sm text-gray-900">
+                          <dt className="text-xs text-gray-500 dark:text-dark-400">Hashtags</dt>
+                          <dd className="text-sm text-gray-900 dark:text-dark-100">
                             {selectedAsset.manifest.hashtags.join(' ')}
                           </dd>
                         </div>

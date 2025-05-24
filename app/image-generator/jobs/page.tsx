@@ -147,7 +147,7 @@ export default function JobsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="input"
+              className="select"
             >
               <option value="all">All Status</option>
               <option value="processing">Processing</option>

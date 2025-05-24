@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
-import { TopBar } from "@/components/topbar";
+import { ThemeProvider } from "@/lib/context/ThemeContext";
+import ConditionalLayout from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
   title: "SPECTRE - Advanced Cloud Operations Control Center",
@@ -16,15 +16,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <div className="min-h-screen bg-gray-50">
-          <Sidebar />
-          <TopBar />
-          <main className="pl-64 pt-16">
-            <div className="p-6">
+        <ThemeProvider>
+          <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-200">
+            <ConditionalLayout>
               {children}
-            </div>
-          </main>
-        </div>
+            </ConditionalLayout>
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

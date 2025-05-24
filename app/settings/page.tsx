@@ -343,8 +343,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Settings & Diagnostics</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="page-title">Settings & Diagnostics</h1>
+          <p className="page-description">
             System configuration, API tests, and health monitoring
           </p>
         </div>
@@ -368,7 +368,7 @@ export default function SettingsPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Database</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Database</p>
               <p className={`mt-1 text-sm font-semibold ${getHealthColor(systemHealth.database)}`}>
                 {systemHealth.environment_valid 
                   ? (systemHealth.database === 'healthy' ? 'Connected' : 'Error')
@@ -383,41 +383,41 @@ export default function SettingsPage() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Accounts</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Accounts</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-dark-100">
                 {systemHealth.total_accounts}
               </p>
             </div>
-            <Smartphone className="h-6 w-6 text-blue-600" />
+            <Smartphone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Proxies</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Proxies</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-dark-100">
                 {systemHealth.total_proxies}
               </p>
             </div>
-            <Wifi className="h-6 w-6 text-purple-600" />
+            <Wifi className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Errors (1h)</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Errors (1h)</p>
               <p className={`mt-1 text-2xl font-semibold ${
-                systemHealth.recent_errors > 0 ? 'text-red-600' : 'text-green-600'
+                systemHealth.recent_errors > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
               }`}>
                 {systemHealth.recent_errors}
               </p>
             </div>
             {systemHealth.recent_errors > 0 ? (
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+              <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
             ) : (
-              <CheckCircle className="h-6 w-6 text-green-600" />
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
             )}
           </div>
         </div>
@@ -427,16 +427,16 @@ export default function SettingsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Database Tests */}
         <div className="card">
-          <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100 mb-4 flex items-center">
             <Database className="h-5 w-5 mr-2" />
             Database Tests
           </h2>
           
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Supabase Connection</p>
-                <p className="text-sm text-gray-600">Test database connectivity</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Supabase Connection</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Test database connectivity</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests.supabase && (
@@ -451,14 +451,14 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Database Schema</p>
-                <p className="text-sm text-gray-600">Verify all tables exist</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Database Schema</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Verify all tables exist</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests.schema && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests.schema.duration}ms
                   </span>
                 )}
@@ -473,20 +473,20 @@ export default function SettingsPage() {
 
         {/* DaisySMS Tests */}
         <div className="card">
-          <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100 mb-4 flex items-center">
             <MessageSquare className="h-5 w-5 mr-2" />
             DaisySMS Tests
           </h2>
           
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Authentication</p>
-                <p className="text-sm text-gray-600">Test API key validity</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Authentication</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Test API key validity</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests['daisy-auth'] && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests['daisy-auth'].duration}ms
                   </span>
                 )}
@@ -497,14 +497,14 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Balance Check</p>
-                <p className="text-sm text-gray-600">Check account balance</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Balance Check</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Check account balance</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests['daisy-balance'] && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests['daisy-balance'].duration}ms
                   </span>
                 )}
@@ -519,20 +519,20 @@ export default function SettingsPage() {
 
         {/* GeeLark Tests */}
         <div className="card">
-          <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100 mb-4 flex items-center">
             <Smartphone className="h-5 w-5 mr-2" />
             GeeLark Tests
           </h2>
           
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Authentication</p>
-                <p className="text-sm text-gray-600">Test API credentials</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Authentication</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Test API credentials</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests['geelark-auth'] && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests['geelark-auth'].duration}ms
                   </span>
                 )}
@@ -543,14 +543,14 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Profile Management</p>
-                <p className="text-sm text-gray-600">List existing profiles</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Profile Management</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">List existing profiles</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests['geelark-profiles'] && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests['geelark-profiles'].duration}ms
                   </span>
                 )}
@@ -565,20 +565,20 @@ export default function SettingsPage() {
 
         {/* SOAX Tests */}
         <div className="card">
-          <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100 mb-4 flex items-center">
             <Wifi className="h-5 w-5 mr-2" />
             SOAX Tests
           </h2>
           
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Authentication</p>
-                <p className="text-sm text-gray-600">Test API access</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Authentication</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Test API access</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests['soax-auth'] && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests['soax-auth'].duration}ms
                   </span>
                 )}
@@ -589,14 +589,14 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md dark:bg-dark-800">
               <div>
-                <p className="font-medium">Proxy Connection</p>
-                <p className="text-sm text-gray-600">Test proxy connectivity</p>
+                <p className="font-medium text-gray-900 dark:text-dark-100">Proxy Connection</p>
+                <p className="text-sm text-gray-600 dark:text-dark-400">Test proxy connectivity</p>
               </div>
               <div className="flex items-center gap-2">
                 {tests['soax-proxies'] && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-dark-400">
                     {tests['soax-proxies'].duration}ms
                   </span>
                 )}
@@ -612,21 +612,21 @@ export default function SettingsPage() {
 
       {/* Integration Test */}
       <div className="card">
-        <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100 mb-4 flex items-center">
           <Settings className="h-5 w-5 mr-2" />
           Integration Test
         </h2>
         
-        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-md">
+        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-md dark:bg-blue-900/20">
           <div>
-            <p className="font-medium">Full Workflow Test</p>
-            <p className="text-sm text-gray-600">
+            <p className="font-medium text-gray-900 dark:text-dark-100">Full Workflow Test</p>
+            <p className="text-sm text-gray-600 dark:text-dark-400">
               Test complete integration: Profile creation → Proxy assignment → Status check
             </p>
           </div>
           <div className="flex items-center gap-2">
             {tests.workflow && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-dark-400">
                 {tests.workflow.duration}ms
               </span>
             )}
@@ -641,16 +641,16 @@ export default function SettingsPage() {
       {/* Test Results */}
       {Object.keys(tests).length > 0 && (
         <div className="card">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Test Results</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100 mb-4">Test Results</h2>
           
           <div className="space-y-3">
             {Object.entries(tests).map(([testId, result]) => (
-              <div key={testId} className="border border-gray-200 rounded-md p-4">
+              <div key={testId} className="border border-gray-200 rounded-md p-4 dark:border-dark-700">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium capitalize">{testId.replace('-', ' ')}</h3>
+                  <h3 className="font-medium capitalize text-gray-900 dark:text-dark-100">{testId.replace('-', ' ')}</h3>
                   <div className="flex items-center gap-2">
                     {result.duration && (
-                      <span className="text-xs text-gray-500">{result.duration}ms</span>
+                      <span className="text-xs text-gray-500 dark:text-dark-400">{result.duration}ms</span>
                     )}
                     {getStatusIcon(result.status)}
                   </div>
@@ -658,7 +658,7 @@ export default function SettingsPage() {
                 
                 {result.message && (
                   <p className={`text-sm ${
-                    result.status === 'error' ? 'text-red-600' : 'text-gray-600'
+                    result.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-dark-400'
                   }`}>
                     {result.message}
                   </p>
@@ -666,10 +666,10 @@ export default function SettingsPage() {
                 
                 {result.data && (
                   <details className="mt-2">
-                    <summary className="text-xs text-gray-500 cursor-pointer">
+                    <summary className="text-xs text-gray-500 dark:text-dark-400 cursor-pointer">
                       View Details
                     </summary>
-                    <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
+                    <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto dark:bg-dark-700 dark:text-dark-200">
                       {JSON.stringify(result.data, null, 2)}
                     </pre>
                   </details>
@@ -683,7 +683,7 @@ export default function SettingsPage() {
       {/* Environment Configuration */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Environment Configuration</h2>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100">Environment Configuration</h2>
           <button
             onClick={() => setShowCredentials(!showCredentials)}
             className="btn-secondary text-xs"
@@ -704,7 +704,7 @@ export default function SettingsPage() {
         
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-sm font-medium text-gray-700">Database Status</p>
+            <p className="text-sm font-medium text-gray-700 dark:text-dark-300">Database Status</p>
             <p className={`text-sm ${getHealthColor(systemHealth.supabase)}`}>
               {!systemHealth.environment_valid 
                 ? 'Environment variables missing'
@@ -714,8 +714,8 @@ export default function SettingsPage() {
           </div>
           
           <div>
-            <p className="text-sm font-medium text-gray-700">Environment</p>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm font-medium text-gray-700 dark:text-dark-300">Environment</p>
+            <p className="text-sm text-gray-600 dark:text-dark-400">
               {process.env.NODE_ENV || 'development'}
             </p>
           </div>

@@ -57,14 +57,14 @@ export default async function ProfileDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/profiles" className="text-gray-400 hover:text-gray-600">
+        <Link href="/profiles" className="text-gray-400 hover:text-gray-600 dark:text-dark-500 dark:hover:text-dark-300">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="page-title">
             {profile.tiktok_username || 'Unnamed Profile'}
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-dark-400">
             Profile ID: {profile.geelark_profile_id || 'Not assigned'}
           </p>
         </div>

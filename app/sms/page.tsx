@@ -302,8 +302,8 @@ export default function SMSPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">SMS Rentals</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="page-title">SMS Rentals</h1>
+          <p className="page-description">
             Manage DaisySMS phone number rentals for OTP verification
           </p>
         </div>
@@ -326,21 +326,21 @@ export default function SMSPage() {
 
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Active Rentals</h2>
-          <div className="flex items-center text-sm text-gray-600">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-dark-100">Active Rentals</h2>
+          <div className="flex items-center text-sm text-gray-600 dark:text-dark-300">
             <MessageSquare className="h-4 w-4 mr-1" />
             {activeCount} / 20 active
           </div>
         </div>
         
-        <div className="text-xs text-gray-500 mb-4">
+        <div className="text-xs text-gray-500 dark:text-dark-400 mb-4">
           Numbers are rented for 72 hours. OTP codes are polled automatically every 3 seconds.
         </div>
       </div>
 
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+          <thead className="bg-gray-50 dark:bg-dark-800">
             <tr>
               <th scope="col" className="table-header">
                 Phone Number
@@ -362,15 +362,15 @@ export default function SMSPage() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
             {rentals.map((rental) => (
-              <tr key={rental.id} className="hover:bg-gray-50">
+                              <tr key={rental.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
                 <td className="table-cell">
                   <div className="flex items-center">
                     <span className="font-mono">{rental.phone_number}</span>
                     <button
                       onClick={() => copyToClipboard(rental.phone_number)}
-                      className="ml-2 text-gray-400 hover:text-gray-600"
+                      className="ml-2 text-gray-400 hover:text-gray-600 dark:text-dark-500 dark:hover:text-dark-300"
                     >
                       <Copy className="h-3 w-3" />
                     </button>
@@ -384,18 +384,18 @@ export default function SMSPage() {
                       </span>
                       <button
                         onClick={() => copyToClipboard(rental.otp!)}
-                        className="ml-2 text-gray-400 hover:text-gray-600"
+                        className="ml-2 text-gray-400 hover:text-gray-600 dark:text-dark-500 dark:hover:text-dark-300"
                       >
                         <Copy className="h-3 w-3" />
                       </button>
                     </div>
                   ) : rental.status === 'waiting' ? (
-                    <div className="flex items-center text-gray-400">
+                    <div className="flex items-center text-gray-400 dark:text-dark-500">
                       <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
                       <span className="text-sm">Waiting...</span>
                     </div>
                   ) : (
-                    <span className="text-sm text-gray-400">—</span>
+                    <span className="text-sm text-gray-400 dark:text-dark-500">—</span>
                   )}
                 </td>
                 <td className="table-cell">
@@ -406,21 +406,21 @@ export default function SMSPage() {
                 </td>
                 <td className="table-cell">
                   {rental.account ? (
-                    <span className="text-sm text-gray-900">
+                    <span className="text-sm text-gray-900 dark:text-dark-100">
                       {rental.account.tiktok_username || 'Unnamed'}
                     </span>
                   ) : (
-                    <span className="text-sm text-gray-400">Unlinked</span>
+                    <span className="text-sm text-gray-400 dark:text-dark-500">Unlinked</span>
                   )}
                 </td>
-                <td className="table-cell text-sm text-gray-500">
+                <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                   {formatRelativeTime(rental.expires_at)}
                 </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   {rental.status === 'received' && (
                     <button
                       onClick={() => completeRental(rental.rental_id!)}
-                      className="text-green-600 hover:text-green-900 mr-3"
+                      className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 mr-3"
                     >
                       Complete
                     </button>
@@ -428,7 +428,7 @@ export default function SMSPage() {
                   {['waiting', 'received'].includes(rental.status) && (
                     <button
                       onClick={() => cancelRental(rental.rental_id!)}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                     >
                       Cancel
                     </button>
