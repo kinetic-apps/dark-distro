@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { ImportProxiesButton } from '@/components/import-proxies-button'
 import { RotateProxyButton } from '@/components/rotate-proxy-button'
+import { SyncProxiesButton } from '@/components/sync-proxies-button'
 
 async function getProxies() {
   const supabase = await createClient()
@@ -77,7 +78,10 @@ export default async function ProxiesPage() {
           </p>
         </div>
         
+        <div className="flex gap-3">
+          <SyncProxiesButton />
         <ImportProxiesButton />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">

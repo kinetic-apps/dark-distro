@@ -11,11 +11,13 @@ export default function NewProfilePage() {
   const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
-    deviceModel: 'Pixel 6',
-    deviceBrand: 'Google',
+    deviceModel: 'Galaxy S23',
+    deviceBrand: 'samsung',
     androidVersion: '13',
     assignProxy: true,
-    proxyType: 'sticky'
+    proxyType: 'sticky',
+    region: 'us',
+    language: 'default'
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,22 +26,36 @@ export default function NewProfilePage() {
     setLoading(true)
 
     try {
+      // Map Android version string to number
+      const androidVersionMap: { [key: string]: number } = {
+        '10': 1,
+        '11': 2,
+        '12': 3,
+        '13': 4,
+        '14': 7,
+        '15': 8
+      }
+
       const response = await fetch('/api/geelark/create-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          device_info: {
-            model: formData.deviceModel,
-            brand: formData.deviceBrand,
-            android_version: formData.androidVersion
-          },
+          android_version: androidVersionMap[formData.androidVersion] || 4,
+          surface_brand: formData.deviceBrand,
+          surface_model: formData.deviceModel,
           assign_proxy: formData.assignProxy,
-          proxy_type: formData.proxyType
+          proxy_type: formData.proxyType,
+          region: formData.region,
+          language: formData.language,
+          charge_mode: 0, // Pay per minute
+          group_name: 'ungrouped',
+          tags: []
         })
       })
 
       if (!response.ok) {
-        throw new Error('Failed to create profile')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create profile')
       }
 
       const data = await response.json()
@@ -71,6 +87,30 @@ export default function NewProfilePage() {
           
           <div className="space-y-4">
             <div>
+              <label htmlFor="deviceBrand" className="label">
+                Device Brand
+              </label>
+              <select
+                id="deviceBrand"
+                value={formData.deviceBrand}
+                onChange={(e) => {
+                  setFormData({ ...formData, deviceBrand: e.target.value })
+                  // Reset model when brand changes
+                  if (e.target.value === 'Google') {
+                    setFormData({ ...formData, deviceBrand: e.target.value, deviceModel: 'Pixel 6' })
+                  } else if (e.target.value === 'samsung') {
+                    setFormData({ ...formData, deviceBrand: e.target.value, deviceModel: 'Galaxy S23' })
+                  }
+                }}
+                className="select w-full"
+              >
+                <option value="samsung">Samsung</option>
+                <option value="Google">Google</option>
+                <option value="OnePlus">OnePlus</option>
+              </select>
+            </div>
+
+            <div>
               <label htmlFor="deviceModel" className="label">
                 Device Model
               </label>
@@ -80,11 +120,26 @@ export default function NewProfilePage() {
                 onChange={(e) => setFormData({ ...formData, deviceModel: e.target.value })}
                 className="select w-full"
               >
-                <option value="Pixel 6">Google Pixel 6</option>
-                <option value="Pixel 7">Google Pixel 7</option>
-                <option value="Galaxy S22">Samsung Galaxy S22</option>
-                <option value="Galaxy S23">Samsung Galaxy S23</option>
+                {formData.deviceBrand === 'Google' && (
+                  <>
+                    <option value="Pixel 6">Pixel 6</option>
+                    <option value="Pixel 7">Pixel 7</option>
+                    <option value="Pixel 8">Pixel 8</option>
+                  </>
+                )}
+                {formData.deviceBrand === 'samsung' && (
+                  <>
+                    <option value="Galaxy S22">Galaxy S22</option>
+                    <option value="Galaxy S23">Galaxy S23</option>
+                    <option value="Galaxy S24">Galaxy S24</option>
+                  </>
+                )}
+                {formData.deviceBrand === 'OnePlus' && (
+                  <>
                 <option value="OnePlus 10">OnePlus 10</option>
+                    <option value="OnePlus 11">OnePlus 11</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -98,9 +153,28 @@ export default function NewProfilePage() {
                 onChange={(e) => setFormData({ ...formData, androidVersion: e.target.value })}
                 className="select w-full"
               >
+                <option value="15">Android 15</option>
+                <option value="14">Android 14 (Monthly subscription only)</option>
                 <option value="13">Android 13</option>
                 <option value="12">Android 12</option>
                 <option value="11">Android 11</option>
+                <option value="10">Android 10</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="region" className="label">
+                Region
+              </label>
+              <select
+                id="region"
+                value={formData.region}
+                onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                className="select w-full"
+              >
+                <option value="us">United States</option>
+                <option value="cn">China</option>
+                <option value="sgp">Singapore</option>
               </select>
             </div>
           </div>

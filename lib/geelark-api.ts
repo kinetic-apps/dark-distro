@@ -21,12 +21,30 @@ interface GeeLarkResponse<T> {
 }
 
 interface CreateProfileData {
-  profile_id: string
-  device_info: {
-    model: string
-    brand: string
-    android_version: string
-  }
+  totalAmount: number
+  successAmount: number
+  failAmount: number
+  details: Array<{
+    index: number
+    code: number
+    msg: string
+    id: string
+    profileName: string
+    envSerialNo: string
+    equipmentInfo: {
+      countryName: string
+      phoneNumber: string
+      enableSim: number
+      imei: string
+      osVersion: string
+      wifiBssid: string
+      mac: string
+      bluetoothMac: string
+      timeZone: string
+      deviceBrand?: string
+      deviceModel?: string
+    }
+  }>
 }
 
 interface TaskData {
@@ -90,31 +108,95 @@ export class GeeLarkAPI {
     }
   }
 
-  async createProfile(deviceInfo?: Partial<CreateProfileData['device_info']>): Promise<CreateProfileData> {
-    const data = await this.request<CreateProfileData>('/api/v1/profiles', {
+  async createProfile(deviceInfo?: {
+    androidVersion?: number
+    proxyConfig?: {
+      typeId: number
+      server: string
+      port: number
+      username?: string
+      password?: string
+    }
+    groupName?: string
+    tagsName?: string[]
+    remark?: string
+    region?: string
+    chargeMode?: number
+    language?: string
+    surfaceBrandName?: string
+    surfaceModelName?: string
+  }): Promise<CreateProfileData> {
+    // Android version mapping
+    const androidVersionMap: { [key: string]: number } = {
+      '10': 1,
+      '11': 2,
+      '12': 3,
+      '13': 4,
+      '14': 7,
+      '15': 8
+    }
+
+    const androidVersion = deviceInfo?.androidVersion || androidVersionMap['13'] || 4
+
+    const requestBody: any = {
+      amount: 1, // Basic plan only supports 1 at a time
+      androidVersion: androidVersion,
+      groupName: deviceInfo?.groupName || 'ungrouped',
+      tagsName: deviceInfo?.tagsName || [],
+      remark: deviceInfo?.remark || '',
+      region: deviceInfo?.region || 'us', // Default to US
+      chargeMode: deviceInfo?.chargeMode || 0, // Default to pay per minute
+      language: deviceInfo?.language || 'default'
+    }
+
+    // Add proxy configuration if provided
+    if (deviceInfo?.proxyConfig) {
+      requestBody.proxyConfig = deviceInfo.proxyConfig
+      console.log('Proxy config being sent:', JSON.stringify(deviceInfo.proxyConfig, null, 2))
+    }
+
+    // Add surface brand and model if provided
+    if (deviceInfo?.surfaceBrandName && deviceInfo?.surfaceModelName) {
+      requestBody.surfaceBrandName = deviceInfo.surfaceBrandName
+      requestBody.surfaceModelName = deviceInfo.surfaceModelName
+    }
+
+    // Log the request body for debugging
+    console.log('GeeLark createProfile request body:', JSON.stringify(requestBody, null, 2))
+
+    const data = await this.request<CreateProfileData>('/open/v1/phone/add', {
       method: 'POST',
-      body: JSON.stringify({
-        device_info: {
-          model: deviceInfo?.model || 'Pixel 6',
-          brand: deviceInfo?.brand || 'Google',
-          android_version: deviceInfo?.android_version || '13',
-        }
-      })
+      body: JSON.stringify(requestBody)
     })
+
+    if (data.failAmount > 0) {
+      const failedDetail = data.details.find(d => d.code !== 0)
+      throw new Error(`Failed to create profile: ${failedDetail?.msg || 'Unknown error'}`)
+    }
+
+    const successDetail = data.details[0]
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'geelark-api',
       message: 'Profile created',
-      meta: { profile_id: data.profile_id }
+      meta: { 
+        profile_id: successDetail.id,
+        profile_name: successDetail.profileName,
+        serial_no: successDetail.envSerialNo,
+        equipment_info: successDetail.equipmentInfo
+      }
     })
 
     return data
   }
 
   async deleteProfile(profileId: string): Promise<void> {
-    await this.request(`/api/v1/profiles/${profileId}`, {
-      method: 'DELETE'
+    await this.request(`/open/v1/phone/delete`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: [profileId]
+      })
     })
 
     await supabaseAdmin.from('logs').insert({
@@ -131,21 +213,12 @@ export class GeeLarkAPI {
     username?: string
     password?: string
   }): Promise<void> {
-    await this.request(`/api/v1/profiles/${profileId}/proxy`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        proxy_type: 'http',
-        proxy_host: proxy.host,
-        proxy_port: proxy.port,
-        proxy_username: proxy.username,
-        proxy_password: proxy.password,
-      })
-    })
-
+    // For now, we'll need to update the proxy when creating the profile
+    // GeeLark doesn't seem to have a separate endpoint for updating proxy after creation
     await supabaseAdmin.from('logs').insert({
-      level: 'info',
+      level: 'warning',
       component: 'geelark-api',
-      message: 'Proxy set for profile',
+      message: 'Proxy update after profile creation not supported - proxy must be set during profile creation',
       meta: { profile_id: profileId, proxy_host: proxy.host }
     })
   }
@@ -218,7 +291,21 @@ export class GeeLarkAPI {
   }
 
   async getProfileStatus(profileId: string): Promise<ProfileStatus> {
-    return await this.request<ProfileStatus>(`/api/v1/profiles/${profileId}/status`)
+    // Use the phone status endpoint instead
+    const data = await this.request<any>('/open/v1/phone/status', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: [profileId]
+      })
+    })
+    
+    // Transform the response to match our ProfileStatus interface
+    const phoneData = data.data?.[0] || {}
+    return {
+      online: phoneData.status === 'online' || phoneData.status === 1,
+      battery: phoneData.battery || 0,
+      last_heartbeat: new Date().toISOString()
+    }
   }
 
   async updateProfileHeartbeat(profileId: string, status: ProfileStatus): Promise<void> {
@@ -532,6 +619,77 @@ export class GeeLarkAPI {
     })
 
     return data
+  }
+
+  // Proxy Management
+  async addProxies(proxies: Array<{
+    scheme: 'socks5' | 'http' | 'https'
+    server: string
+    port: number
+    username?: string
+    password?: string
+  }>): Promise<{
+    totalAmount: number
+    successAmount: number
+    failAmount: number
+    failDetails: Array<{
+      index: number
+      code: number
+      msg: string
+    }>
+    successDetails: Array<{
+      index: number
+      id: string
+    }>
+  }> {
+    const data = await this.request<any>('/open/v1/proxy/add', {
+      method: 'POST',
+      body: JSON.stringify({
+        list: proxies
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Proxies added to GeeLark',
+      meta: { 
+        total: data.totalAmount,
+        success: data.successAmount,
+        failed: data.failAmount,
+        details: data
+      }
+    })
+
+    return data
+  }
+
+  async listProxies(page: number = 1, pageSize: number = 100, ids?: string[]): Promise<{
+    total: number
+    page: number
+    pageSize: number
+    list: Array<{
+      id: string
+      scheme: string
+      server: string
+      port: number
+      username: string
+      password: string
+    }>
+  }> {
+    const requestBody: any = {
+      page,
+      pageSize
+    }
+
+    if (ids && ids.length > 0) {
+      requestBody.ids = ids
+    }
+
+    return await this.request('/open/v1/proxy/list', {
+      method: 'POST',
+      body: JSON.stringify(requestBody)
+    })
   }
 
   // Profile Management
