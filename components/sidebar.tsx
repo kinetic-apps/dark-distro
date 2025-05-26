@@ -13,7 +13,8 @@ import {
   FileText,
   Settings,
   LogOut,
-  Wand2
+  Wand2,
+  Camera
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +23,7 @@ import { useRouter } from 'next/navigation'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Profiles', href: '/profiles', icon: Users },
+  { name: 'Screenshots', href: '/screenshots', icon: Camera },
   { name: 'Proxies', href: '/proxies', icon: Wifi },
   { name: 'SMS', href: '/sms', icon: MessageSquare },
   { name: 'Assets', href: '/assets', icon: ImageIcon },

@@ -261,6 +261,36 @@ export class GeeLarkAPI {
     })
   }
 
+  async takeScreenshot(phoneId: string): Promise<{ taskId: string }> {
+    const data = await this.request<{ taskId: string }>('/open/v1/phone/screenShot', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: phoneId
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Screenshot requested',
+      meta: { phone_id: phoneId, task_id: data.taskId }
+    })
+
+    return data
+  }
+
+  async getScreenshotResult(taskId: string): Promise<{
+    status: number
+    downloadLink?: string
+  }> {
+    return await this.request('/open/v1/phone/screenShot/result', {
+      method: 'POST',
+      body: JSON.stringify({
+        taskId: taskId
+      })
+    })
+  }
+
   // TikTok App Management
   async getInstallableApps(profileId: string, searchName?: string): Promise<any> {
     const data = await this.request('/open/v1/app/installable/list', {

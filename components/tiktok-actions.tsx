@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Loader2, Smartphone, LogIn, Activity, Image, Video, X, Power, RefreshCw } from 'lucide-react'
+import { ScreenshotViewer } from './screenshot-viewer'
 
 interface TikTokActionsProps {
   accountId: string
@@ -395,6 +396,15 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
             )}
             Stop Phone
           </button>
+        )}
+
+        {/* Screenshot Viewer */}
+        {profileId && (
+          <ScreenshotViewer 
+            profileId={profileId} 
+            phoneStatus={phoneStatus}
+            profileName="TikTok Profile"
+          />
         )}
 
         {/* Explore Apps (Debug) - Only show when phone is running */}

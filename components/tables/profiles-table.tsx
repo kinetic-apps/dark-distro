@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime } from '@/lib/utils'
 import { 
@@ -11,10 +11,12 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react'
 import { VariantAssignmentModal } from '@/components/variant-assignment-modal'
 import { ProfileStatus } from '@/components/profile-status'
+import { ScreenshotViewer } from '@/components/screenshot-viewer'
 
 interface Profile {
   id: string
@@ -47,6 +49,39 @@ interface ProfilesTableProps {
 export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [assigningProfile, setAssigningProfile] = useState<{id: string, name: string} | null>(null)
+  const [phoneStatuses, setPhoneStatuses] = useState<Record<string, 'started' | 'starting' | 'stopped' | 'expired' | 'unknown'>>({})
+
+  // Fetch phone statuses on mount
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      const profileIds = profiles
+        .filter(p => p.geelark_profile_id)
+        .map(p => p.geelark_profile_id!)
+
+      if (profileIds.length === 0) return
+
+      try {
+        const response = await fetch('/api/geelark/phone-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile_ids: profileIds })
+        })
+
+        const data = await response.json()
+        if (response.ok && data.statuses) {
+          const statusMap: Record<string, any> = {}
+          data.statuses.forEach((status: any) => {
+            statusMap[status.profile_id] = status.status
+          })
+          setPhoneStatuses(statusMap)
+        }
+      } catch (error) {
+        console.error('Failed to fetch phone statuses:', error)
+      }
+    }
+
+    fetchStatuses()
+  }, [profiles])
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -213,6 +248,13 @@ export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
                 </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">
+                    {profile.geelark_profile_id && (
+                      <ScreenshotViewer
+                        profileId={profile.geelark_profile_id}
+                        profileName={profile.tiktok_username || 'Unnamed'}
+                        phoneStatus={phoneStatuses[profile.geelark_profile_id] || 'unknown'}
+                      />
+                    )}
                     {profile.status === 'active' && (
                       <button
                         onClick={() => handleAssignVariant(profile)}
