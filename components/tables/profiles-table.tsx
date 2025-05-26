@@ -171,7 +171,7 @@ export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
                 Profile
               </th>
               <th scope="col" className="table-header">
-                Status
+                Account Status
               </th>
               <th scope="col" className="table-header">
                 Proxy

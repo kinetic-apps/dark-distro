@@ -163,24 +163,27 @@ export default function ScreenshotsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-gray-500 dark:text-dark-400" />
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-          Phone Screenshots
-        </h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="page-title">Phone Screenshots</h1>
+          <p className="page-description">
+            Capture and view screenshots from GeeLark phone profiles
+          </p>
+        </div>
         
         <div className="flex items-center gap-4">
           <button
             onClick={takeAllScreenshots}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary"
           >
-            <Camera className="h-5 w-5" />
+            <Camera className="h-4 w-4 mr-2" />
             Capture All Screens
           </button>
 
@@ -189,9 +192,9 @@ export default function ScreenshotsPage() {
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-gray-600 dark:bg-gray-700"
+              className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-dark-600 dark:bg-dark-700 dark:focus:ring-dark-400"
             />
-            <span className="text-gray-700 dark:text-gray-300">Auto-refresh (30s)</span>
+            <span className="text-sm text-gray-700 dark:text-dark-300">Auto-refresh (30s)</span>
           </label>
         </div>
       </div>
@@ -203,26 +206,26 @@ export default function ScreenshotsPage() {
           return (
             <div
               key={profile.profile_id}
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden"
+              className="card overflow-hidden"
             >
-              <div className="p-4 border-b dark:border-gray-700">
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">
+              <div className="p-4 border-b border-gray-200 dark:border-dark-700">
+                <h3 className="font-medium text-gray-900 dark:text-dark-100">
                   {screenshot?.profileName}
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-gray-500 dark:text-dark-400">
                   {profile.profile_id.slice(-8)}
                 </p>
                 {screenshot?.lastUpdated && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
                     Updated: {screenshot.lastUpdated.toLocaleTimeString()}
                   </p>
                 )}
               </div>
 
-              <div className="relative aspect-[9/16] bg-gray-100 dark:bg-gray-900">
+              <div className="relative aspect-[9/16] bg-gray-100 dark:bg-dark-900">
                 {screenshot?.status === 'loading' ? (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-dark-500" />
                   </div>
                 ) : screenshot?.status === 'completed' && screenshot.url ? (
                   <img
@@ -239,20 +242,20 @@ export default function ScreenshotsPage() {
                   />
                 ) : screenshot?.status === 'failed' ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-                    <Camera className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-2" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Failed to capture</p>
+                    <Camera className="h-12 w-12 text-gray-300 dark:text-dark-600 mb-2" />
+                    <p className="text-sm text-gray-500 dark:text-dark-400">Failed to capture</p>
                   </div>
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-                    <Camera className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-2" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No screenshot</p>
+                    <Camera className="h-12 w-12 text-gray-300 dark:text-dark-600 mb-2" />
+                    <p className="text-sm text-gray-500 dark:text-dark-400">No screenshot</p>
                   </div>
                 )}
 
                 <button
                   onClick={() => takeScreenshot(profile.profile_id)}
                   disabled={screenshot?.status === 'loading'}
-                  className="absolute bottom-2 right-2 p-2 bg-black bg-opacity-50 rounded-lg text-white hover:bg-opacity-70 transition-opacity"
+                  className="absolute bottom-2 right-2 p-2 bg-black bg-opacity-50 rounded-lg text-white hover:bg-opacity-70 transition-opacity disabled:opacity-50"
                   title="Refresh screenshot"
                 >
                   <RefreshCw className={`h-4 w-4 ${screenshot?.status === 'loading' ? 'animate-spin' : ''}`} />
@@ -265,8 +268,8 @@ export default function ScreenshotsPage() {
 
       {profiles.length === 0 && (
         <div className="text-center py-12">
-          <Camera className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">No phone profiles found</p>
+          <Camera className="h-16 w-16 text-gray-300 dark:text-dark-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-dark-400">No phone profiles found</p>
         </div>
       )}
     </div>

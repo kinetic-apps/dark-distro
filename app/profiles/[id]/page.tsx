@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { ProfileDetailWrapper } from '@/components/profile-detail-wrapper'
+import { ProfileStatus } from '@/components/profile-status'
 
 export default async function ProfileDetailPage({
   params,
@@ -79,7 +80,7 @@ export default async function ProfileDetailPage({
             
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Account Status</dt>
                 <dd className="mt-1">
                   <span className={`status-badge ${
                     profile.status === 'active' ? 'status-active' :
@@ -129,12 +130,8 @@ export default async function ProfileDetailPage({
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Device Info</h2>
-              {profile.phone && (
-                <span className={`status-badge ${
-                  profile.phone.status === 'online' ? 'status-active' : 'status-neutral'
-                }`}>
-                  {profile.phone.status}
-                </span>
+              {profile.geelark_profile_id && (
+                <ProfileStatus profileId={profile.geelark_profile_id} />
               )}
             </div>
             

@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { account_id, profile_id, phone_number, otp_code } = body
+    const { account_id, profile_id, login_method = 'email', email, password, phone_number, otp_code } = body
 
     if (!account_id || !profile_id) {
       return NextResponse.json(
@@ -15,68 +15,60 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // If no phone number provided, check if account has an SMS rental
-    let phoneToUse = phone_number
-    let rentalId: string | null = null
-
-    if (!phoneToUse && !otp_code) {
-      // Check for existing SMS rental
-      const { data: rental } = await supabaseAdmin
-        .from('sms_rentals')
-        .select('*')
-        .eq('account_id', account_id)
-        .eq('status', 'waiting')
-        .single()
-
-      if (rental) {
-        phoneToUse = rental.phone_number
-        rentalId = rental.rental_id
-      } else {
-        // Rent a new number
-        const rentalInfo = await daisyApi.rentNumber(account_id)
-        phoneToUse = rentalInfo.phone
-        
-        // Get the rental ID from database
-        const { data: newRental } = await supabaseAdmin
-          .from('sms_rentals')
-          .select('rental_id')
-          .eq('id', rentalInfo.id)
-          .single()
-          
-        rentalId = newRental?.rental_id || null
+    // Handle email/password login
+    if (login_method === 'email') {
+      if (!email || !password) {
+        return NextResponse.json(
+          { error: 'Email and password are required for email login' },
+          { status: 400 }
+        )
       }
+
+      // Initiate TikTok login with email/password
+      const taskData = await geelarkApi.loginTikTok(profile_id, email, password)
+
+      // Store login attempt
+      await supabaseAdmin.from('tasks').insert({
+        type: 'login',
+        geelark_task_id: taskData.taskId,
+        account_id,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        meta: {
+          login_method: 'email',
+          email
+        }
+      })
+
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'api-tiktok-login',
+        message: 'TikTok email login initiated',
+        meta: { account_id, profile_id, email }
+      })
+
+      return NextResponse.json({
+        success: true,
+        task_id: taskData.taskId,
+        login_method: 'email',
+        status: 'logging_in'
+      })
     }
 
-    // Initiate TikTok login
-    const taskData = await geelarkApi.loginTikTok(profile_id, phoneToUse, otp_code)
-
-    // Store login attempt
-    await supabaseAdmin.from('tasks').insert({
-      type: 'login',
-      geelark_task_id: taskData.task_id,
-      account_id,
-      status: 'running',
-      started_at: new Date().toISOString(),
-      meta: {
-        phone_number: phoneToUse,
-        rental_id: rentalId,
-        has_otp: !!otp_code
-      }
-    })
-
-    // If OTP was not provided, we need to wait for it
-    if (!otp_code && rentalId) {
-      // Start checking for OTP in background
-      checkForOTP(rentalId, account_id, profile_id, taskData.task_id)
+    // Handle phone/OTP login (legacy - keeping for compatibility)
+    // Note: According to docs, this would require a separate implementation
+    // The current API only supports email/password login
+    if (login_method === 'phone') {
+      return NextResponse.json(
+        { error: 'Phone/OTP login is not currently supported by the API. Please use email/password login.' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({
-      success: true,
-      task_id: taskData.task_id,
-      phone_number: phoneToUse,
-      rental_id: rentalId,
-      status: otp_code ? 'logging_in' : 'waiting_for_otp'
-    })
+    return NextResponse.json(
+      { error: 'Invalid login method' },
+      { status: 400 }
+    )
   } catch (error) {
     console.error('TikTok login error:', error)
     

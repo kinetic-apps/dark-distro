@@ -344,14 +344,14 @@ export class GeeLarkAPI {
   }
 
   // TikTok Automation
-  async loginTikTok(profileId: string, phoneNumber: string, otpCode?: string): Promise<TaskData> {
-    const data = await this.request<TaskData>('/open/v1/automation/tiktok/login', {
+  async loginTikTok(profileId: string, account: string, password: string): Promise<{ taskId: string }> {
+    const data = await this.request<{ taskId: string }>('/open/v1/rpa/task/tiktokLogin', {
       method: 'POST',
       body: JSON.stringify({
-        profile_id: profileId,
-        login_method: 'phone',
-        phone_number: phoneNumber,
-        otp_code: otpCode
+        scheduleAt: Math.floor(Date.now() / 1000),
+        id: profileId,
+        account: account,
+        password: password
       })
     })
 
@@ -359,7 +359,7 @@ export class GeeLarkAPI {
       level: 'info',
       component: 'geelark-api',
       message: 'TikTok login initiated',
-      meta: { profile_id: profileId, phone_number: phoneNumber, task_id: data.task_id }
+      meta: { profile_id: profileId, account: account, task_id: data.taskId }
     })
 
     return data
@@ -367,26 +367,35 @@ export class GeeLarkAPI {
 
   async startTikTokWarmup(profileId: string, accountId: string, options?: {
     duration_minutes?: number
-    actions?: string[]
+    action?: 'browse video' | 'search video' | 'search profile'
+    keywords?: string[]
   }): Promise<string> {
-    const data = await this.request<TaskData>('/open/v1/automation/tiktok/warmup', {
+    const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
       method: 'POST',
       body: JSON.stringify({
-        profile_id: profileId,
-        duration_minutes: options?.duration_minutes || 30,
-        actions: options?.actions || ['browse', 'like', 'follow', 'comment', 'watch']
+        planName: `warmup_${accountId}_${Date.now()}`,
+        taskType: 2, // Warmup
+        list: [{
+          scheduleAt: Math.floor(Date.now() / 1000),
+          envId: profileId,
+          action: options?.action || 'browse video',
+          keywords: options?.keywords,
+          duration: options?.duration_minutes || 30
+        }]
       })
     })
 
+    const taskId = data.taskIds[0]
+
     await supabaseAdmin.from('tasks').insert({
       type: 'warmup',
-      geelark_task_id: data.task_id,
+      geelark_task_id: taskId,
       account_id: accountId,
       status: 'running',
       started_at: new Date().toISOString()
     })
 
-    return data.task_id
+    return taskId
   }
 
   async postTikTokCarousel(profileId: string, accountId: string, content: {
@@ -395,28 +404,35 @@ export class GeeLarkAPI {
     hashtags?: string[]
     music?: string
   }): Promise<string> {
-    const data = await this.request<TaskData>('/open/v1/automation/tiktok/post/carousel', {
+    const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
       method: 'POST',
       body: JSON.stringify({
-        profile_id: profileId,
-        media_type: 'carousel',
-        images: content.images,
-        caption: content.caption,
-        hashtags: content.hashtags || [],
-        music_id: content.music
+        planName: `carousel_${accountId}_${Date.now()}`,
+        taskType: 3, // Publish image set
+        list: [{
+          scheduleAt: Math.floor(Date.now() / 1000),
+          envId: profileId,
+          images: content.images,
+          videoDesc: content.caption + (content.hashtags ? ' ' + content.hashtags.join(' ') : ''),
+          videoTitle: content.caption.substring(0, 50),
+          maxTryTimes: 1,
+          timeoutMin: 30
+        }]
       })
     })
 
+    const taskId = data.taskIds[0]
+
     await supabaseAdmin.from('tasks').insert({
       type: 'post',
-      geelark_task_id: data.task_id,
+      geelark_task_id: taskId,
       account_id: accountId,
       status: 'running',
       started_at: new Date().toISOString(),
       meta: { type: 'carousel', images_count: content.images.length }
     })
 
-    return data.task_id
+    return taskId
   }
 
   async postTikTokVideo(profileId: string, accountId: string, content: {
@@ -425,28 +441,97 @@ export class GeeLarkAPI {
     hashtags?: string[]
     music?: string
   }): Promise<string> {
-    const data = await this.request<TaskData>('/open/v1/automation/tiktok/post/video', {
+    const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
       method: 'POST',
       body: JSON.stringify({
-        profile_id: profileId,
-        media_type: 'video',
-        video_url: content.video_url,
-        caption: content.caption,
-        hashtags: content.hashtags || [],
-        music_id: content.music
+        planName: `video_${accountId}_${Date.now()}`,
+        taskType: 1, // Publish video
+        list: [{
+          scheduleAt: Math.floor(Date.now() / 1000),
+          envId: profileId,
+          video: content.video_url,
+          videoDesc: content.caption + (content.hashtags ? ' ' + content.hashtags.join(' ') : ''),
+          maxTryTimes: 1,
+          timeoutMin: 30
+        }]
       })
     })
 
+    const taskId = data.taskIds[0]
+
     await supabaseAdmin.from('tasks').insert({
       type: 'post',
-      geelark_task_id: data.task_id,
+      geelark_task_id: taskId,
       account_id: accountId,
       status: 'running',
       started_at: new Date().toISOString(),
       meta: { type: 'video' }
     })
 
-    return data.task_id
+    return taskId
+  }
+
+  async editTikTokProfile(profileId: string, profile: {
+    avatar?: string
+    nickName?: string
+    bio?: string
+    site?: string
+  }): Promise<{ taskId: string }> {
+    const data = await this.request<{ taskId: string }>('/open/v1/rpa/task/tiktokEdit', {
+      method: 'POST',
+      body: JSON.stringify({
+        scheduleAt: Math.floor(Date.now() / 1000),
+        id: profileId,
+        ...profile
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'TikTok profile edit initiated',
+      meta: { profile_id: profileId, task_id: data.taskId, changes: profile }
+    })
+
+    return data
+  }
+
+  async cancelTasks(taskIds: string[]): Promise<any> {
+    return await this.request('/open/v1/task/cancel', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: taskIds
+      })
+    })
+  }
+
+  async retryTasks(taskIds: string[]): Promise<any> {
+    return await this.request('/open/v1/task/restart', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: taskIds
+      })
+    })
+  }
+
+  async uploadFilesToPhone(profileId: string, files: string[]): Promise<{ taskId: string }> {
+    const data = await this.request<{ taskId: string }>('/open/v1/rpa/task/fileUpload', {
+      method: 'POST',
+      body: JSON.stringify({
+        scheduleAt: Math.floor(Date.now() / 1000),
+        id: profileId,
+        files: files
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Files upload initiated',
+      meta: { profile_id: profileId, task_id: data.taskId, files_count: files.length }
+    })
+
+    return data
   }
 
   // Profile Management

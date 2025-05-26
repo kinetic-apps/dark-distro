@@ -14,7 +14,8 @@ import {
   Settings,
   LogOut,
   Wand2,
-  Camera
+  Camera,
+  ListChecks
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -23,6 +24,7 @@ import { useRouter } from 'next/navigation'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Profiles', href: '/profiles', icon: Users },
+  { name: 'Tasks', href: '/tasks', icon: ListChecks },
   { name: 'Screenshots', href: '/screenshots', icon: Camera },
   { name: 'Proxies', href: '/proxies', icon: Wifi },
   { name: 'SMS', href: '/sms', icon: MessageSquare },

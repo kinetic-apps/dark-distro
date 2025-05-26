@@ -17,8 +17,12 @@ import {
   Clock,
   User,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Upload
 } from 'lucide-react'
+import GoogleDriveExportModal from '@/components/GoogleDriveExportModal'
+import { GoogleAuthService } from '@/lib/services/google-auth'
+import { useSearchParams } from 'next/navigation'
 
 interface VariantSlide {
   id: string
@@ -69,12 +73,49 @@ export default function AssetsPage() {
     status: 'all',
     dateRange: 'all'
   })
+  
+  // Google Drive export states
+  const [driveExportModal, setDriveExportModal] = useState({
+    isOpen: false,
+    job: null as any,
+    variant: null as any
+  })
 
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const authService = GoogleAuthService.getInstance()
 
   useEffect(() => {
     fetchJobs()
-  }, [filter])
+    
+    // Handle Google OAuth callback
+    const handleOAuthCallback = async () => {
+      const success = searchParams.get('google_auth_success')
+      const error = searchParams.get('google_auth_error')
+      const accessToken = searchParams.get('access_token')
+      const refreshToken = searchParams.get('refresh_token')
+      const expiresIn = searchParams.get('expires_in')
+      
+      if (success && accessToken) {
+        // Store tokens from OAuth callback
+        await authService.storeTokens({
+          access_token: accessToken,
+          refresh_token: refreshToken || undefined,
+          expires_in: parseInt(expiresIn || '3600'),
+          token_type: 'Bearer'
+        })
+        
+        // Clean up URL
+        window.history.replaceState({}, '', '/assets')
+      } else if (error) {
+        console.error('Google auth error:', error)
+        // Clean up URL
+        window.history.replaceState({}, '', '/assets')
+      }
+    }
+    
+    handleOAuthCallback()
+  }, [filter, searchParams])
 
   const fetchJobs = async () => {
     setLoading(true)
@@ -323,29 +364,44 @@ export default function AssetsPage() {
                               <Send className="h-3 w-3 mr-1" />
                               Assign
                             </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedVariant(variant)
-                            }}
-                            className="btn-secondary text-sm"
-                          >
-                            Preview
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (confirm('Delete this variant?')) {
-                                deleteVariant(variant)
-                              }
-                            }}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                                                  )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDriveExportModal({
+                              isOpen: true,
+                              job: job,
+                              variant: variant
+                            })
+                          }}
+                          className="btn-secondary text-sm"
+                          title="Export to Google Drive"
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Export
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedVariant(variant)
+                          }}
+                          className="btn-secondary text-sm"
+                        >
+                          Preview
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm('Delete this variant?')) {
+                              deleteVariant(variant)
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
+                    </div>
 
                       {/* Slide thumbnails */}
                       <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
@@ -367,9 +423,24 @@ export default function AssetsPage() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  ))}
+                                      </div>
+                ))}
+                
+                {/* Export entire job button */}
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => setDriveExportModal({
+                      isOpen: true,
+                      job: job,
+                      variant: null
+                    })}
+                    className="btn-secondary text-sm"
+                  >
+                    <Upload className="h-3 w-3 mr-1" />
+                    Export All to Google Drive
+                  </button>
                 </div>
+              </div>
               )}
             </div>
           ))}
@@ -447,6 +518,14 @@ export default function AssetsPage() {
           </div>
         </div>
       )}
+      
+      {/* Google Drive Export Modal */}
+      <GoogleDriveExportModal
+        isOpen={driveExportModal.isOpen}
+        onClose={() => setDriveExportModal({ isOpen: false, job: null, variant: null })}
+        job={driveExportModal.job}
+        variant={driveExportModal.variant}
+      />
     </div>
   )
 }

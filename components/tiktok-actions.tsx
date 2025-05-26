@@ -24,8 +24,8 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
   const [appExplorationResults, setAppExplorationResults] = useState<any>(null)
   
   // Login form state
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [otpCode, setOtpCode] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   
   // Warmup options
@@ -208,6 +208,11 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       return
     }
 
+    if (!email || !password) {
+      showNotification('error', 'Email and password are required')
+      return
+    }
+
     setIsLoggingIn(true)
     try {
       const response = await fetch('/api/geelark/tiktok-login', {
@@ -216,22 +221,19 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
         body: JSON.stringify({
           account_id: accountId,
           profile_id: profileId,
-          phone_number: phoneNumber || undefined,
-          otp_code: otpCode || undefined
+          login_method: 'email',
+          email: email,
+          password: password
         })
       })
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      if (data.status === 'waiting_for_otp') {
-        showNotification('info', 'Waiting for OTP code. Check SMS messages.')
-      } else {
-        showNotification('success', 'TikTok login initiated')
-      }
+      showNotification('success', 'TikTok login initiated')
       
-      setPhoneNumber('')
-      setOtpCode('')
+      setEmail('')
+      setPassword('')
       setShowLoginModal(false)
       onActionComplete?.()
     } catch (error) {
@@ -251,7 +253,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
           account_ids: [accountId],
           options: {
             duration_minutes: parseInt(warmupDuration),
-            actions: ['browse', 'like', 'follow', 'comment', 'watch']
+            action: 'browse video'
           }
         })
       })
@@ -477,35 +479,34 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
               </button>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Login to TikTok using phone number and OTP verification
+              Login to TikTok using email and password
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Phone Number (optional)</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Email</label>
                 <input
-                  type="text"
-                  placeholder="+1234567890"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  type="email"
+                  placeholder="example@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                  required
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Leave empty to use DaisySMS rental
-                </p>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">OTP Code (if available)</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Password</label>
                 <input
-                  type="text"
-                  placeholder="123456"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
+                  type="password"
+                  placeholder="********"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                  required
                 />
               </div>
               <button
                 onClick={handleLogin}
-                disabled={isLoggingIn}
+                disabled={isLoggingIn || !email || !password}
                 className="btn-primary w-full"
               >
                 {isLoggingIn ? 'Logging in...' : 'Start Login'}

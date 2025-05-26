@@ -218,7 +218,7 @@ export default function JobDetailsPage() {
   const variantCount = Object.keys(imagesByVariant).length
 
   return (
-    <div className="page-container">
+    <div>
       {/* Header */}
       <div className="page-header">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

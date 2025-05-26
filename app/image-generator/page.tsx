@@ -185,7 +185,7 @@ export default function ImageGeneratorPage() {
   }
 
   return (
-    <div className="page-container">
+    <div>
       {/* Loading Template Overlay */}
       {isLoadingTemplate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -186,6 +186,10 @@ body {
   .status-neutral {
     @apply status-badge bg-gray-50 text-gray-700 dark:bg-dark-700/50 dark:text-dark-300;
   }
+  
+  .status-info {
+    @apply status-badge bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400;
+  }
 
   /* SPECTRE Brand Typography */
   .brand-title {

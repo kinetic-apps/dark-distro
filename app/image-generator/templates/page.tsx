@@ -56,7 +56,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="page-container">
+    <div>
       {/* Header */}
       <div className="page-header">
         <div className="flex items-center justify-between">
