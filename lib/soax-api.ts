@@ -66,11 +66,13 @@ export class SOAXAPI {
   }
 
   getStickyPoolProxy(sessionId?: string): ProxyCredentials {
+    const session = sessionId || this.generateStickySession()
     return {
       host: process.env.SOAX_POOL_HOST!,
       port: parseInt(process.env.SOAX_POOL_PORT!),
-      username: `${PACKAGE_KEY}-session-${sessionId || this.generateStickySession()}`,
+      username: `package-${PACKAGE_KEY}-sessionid-${session}`,
       password: PACKAGE_KEY,
+      sessionId: session
     }
   }
 
@@ -183,7 +185,7 @@ export class SOAXAPI {
         .from('proxies')
         .update({
           session_id: newSessionId,
-          username: `${PACKAGE_KEY}-session-${newSessionId}`,
+          username: `package-${PACKAGE_KEY}-sessionid-${newSessionId}`,
           last_rotated: new Date().toISOString(),
           current_ip: null,
           health: 'unknown'

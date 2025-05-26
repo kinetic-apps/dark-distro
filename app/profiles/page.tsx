@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { ProfilesTable } from '@/components/tables/profiles-table'
+import { ProfilesPageWrapper } from '@/components/profiles-page-wrapper'
 import { Plus, Filter } from 'lucide-react'
 import Link from 'next/link'
+import { SyncProfilesButton } from '@/components/sync-profiles-button'
 
 export default async function ProfilesPage({
   searchParams,
@@ -16,7 +17,7 @@ export default async function ProfilesPage({
     .select(`
       *,
       proxy:proxies!proxy_id(*),
-      phone:phones!accounts_phone_account_id_fkey(*)
+      phone:phones!fk_account(*)
     `)
     .order('created_at', { ascending: false })
 
@@ -56,10 +57,14 @@ export default async function ProfilesPage({
           </p>
         </div>
         
-        <Link href="/profiles/new" className="btn-primary">
-          <Plus className="h-4 w-4 mr-2" />
-          New Profile
-        </Link>
+        <div className="flex gap-2">
+          <SyncProfilesButton />
+          
+          <Link href="/profiles/new" className="btn-primary">
+            <Plus className="h-4 w-4 mr-2" />
+            New Profile
+          </Link>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -128,14 +133,7 @@ export default async function ProfilesPage({
         </nav>
       </div>
 
-      <ProfilesTable
-        profiles={profiles || []}
-        onBulkAction={async (action, ids) => {
-          'use server'
-          // Server actions will be implemented in API routes
-          console.log('Bulk action:', action, ids)
-        }}
-      />
+      <ProfilesPageWrapper profiles={profiles || []} />
     </div>
   )
 }

@@ -8,6 +8,8 @@ import {
   Clock,
   Plus
 } from 'lucide-react'
+import { ImportProxiesButton } from '@/components/import-proxies-button'
+import { RotateProxyButton } from '@/components/rotate-proxy-button'
 
 async function getProxies() {
   const supabase = await createClient()
@@ -75,10 +77,7 @@ export default async function ProxiesPage() {
           </p>
         </div>
         
-        <button className="btn-primary">
-          <Plus className="h-4 w-4 mr-2" />
-          Import Proxies
-        </button>
+        <ImportProxiesButton />
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -215,16 +214,7 @@ export default async function ProxiesPage() {
                   {formatRelativeTime(proxy.last_rotated)}
                 </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <button
-                    onClick={async () => {
-                      'use server'
-                      // Rotate proxy action
-                    }}
-                    className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100"
-                    title="Rotate IP"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
+                  <RotateProxyButton proxyId={proxy.id} proxyType={proxy.type} />
                 </td>
               </tr>
             ))}

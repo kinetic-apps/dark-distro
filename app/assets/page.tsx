@@ -11,130 +11,197 @@ import {
   Trash2,
   Filter,
   Grid,
-  List
+  List,
+  Folder,
+  CheckCircle,
+  Clock,
+  User,
+  ChevronRight,
+  ChevronDown
 } from 'lucide-react'
 
-interface Asset {
-  name: string
+interface VariantSlide {
   id: string
-  updated_at: string
+  slide_order: number
+  filename: string
+  storage_path: string
+  image_url: string
+  width: number
+  height: number
+  caption?: string
+  alt_text?: string
+}
+
+interface CarouselVariant {
+  id: string
+  job_id: string
+  variant_index: number
+  variant_id: string
+  folder_path: string
+  slide_count: number
+  status: 'ready' | 'assigned' | 'posted' | 'archived'
+  assigned_profile_id?: string
+  assigned_at?: string
+  posted_at?: string
+  metadata: any
   created_at: string
-  metadata: Record<string, any>
-  signedUrl?: string
-  manifest?: {
-    caption: string
-    hashtags: string[]
-    duration: number
-  }
+  slides?: VariantSlide[]
+}
+
+interface ImageGenerationJob {
+  id: string
+  name: string
+  template_name: string
+  status: string
+  variants: number
+  created_at: string
+  completed_at?: string
+  carousel_variants?: CarouselVariant[]
 }
 
 export default function AssetsPage() {
-  const [assets, setAssets] = useState<Asset[]>([])
+  const [jobs, setJobs] = useState<ImageGenerationJob[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState<CarouselVariant | null>(null)
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState({
-    tag: '',
+    status: 'all',
     dateRange: 'all'
   })
 
   const supabase = createClient()
 
   useEffect(() => {
-    fetchAssets()
+    fetchJobs()
   }, [filter])
 
-  const fetchAssets = async () => {
+  const fetchJobs = async () => {
     setLoading(true)
     
-    const { data, error } = await supabase
-      .storage
-      .from('ghostpost-outbox')
-      .list('', {
-        limit: 100,
-        offset: 0,
-        sortBy: { column: 'created_at', order: 'desc' }
-      })
+    // Fetch completed jobs with their variants
+    let query = supabase
+      .from('image_generation_jobs')
+      .select(`
+        *,
+        carousel_variants (
+          *,
+          variant_slides (
+            *
+          )
+        )
+      `)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+
+    // Apply date filter
+    if (filter.dateRange !== 'all') {
+      const now = new Date()
+      let startDate = new Date()
+      
+      switch (filter.dateRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0)
+          break
+        case 'week':
+          startDate.setDate(now.getDate() - 7)
+          break
+        case 'month':
+          startDate.setMonth(now.getMonth() - 1)
+          break
+      }
+      
+      query = query.gte('created_at', startDate.toISOString())
+    }
+
+    const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching assets:', error)
+      console.error('Error fetching jobs:', error)
       setLoading(false)
       return
     }
 
-    // Filter out non-video files and fetch signed URLs
-    const videoAssets = data.filter(file => 
-      file.name.endsWith('.mp4') && 
-      !file.name.startsWith('.')
-    )
+    // Process jobs and organize variants with slides
+    const processedJobs = data?.map(job => ({
+      ...job,
+      carousel_variants: job.carousel_variants?.map((variant: any) => ({
+        ...variant,
+        slides: variant.variant_slides?.sort((a: any, b: any) => a.slide_order - b.slide_order) || []
+      })) || []
+    })) || []
 
-    // Get signed URLs for thumbnails/videos
-    const assetsWithUrls = await Promise.all(
-      videoAssets.map(async (asset) => {
-        const { data: signedData } = await supabase
-          .storage
-          .from('ghostpost-outbox')
-          .createSignedUrl(asset.name, 3600)
-
-        // Try to fetch manifest
-        const manifestName = asset.name.replace('.mp4', '_manifest.json')
-        const { data: manifestData } = await supabase
-          .storage
-          .from('ghostpost-outbox')
-          .download(manifestName)
-
-        let manifest = null
-        if (manifestData) {
-          try {
-            const text = await manifestData.text()
-            manifest = JSON.parse(text)
-          } catch (e) {
-            console.error('Error parsing manifest:', e)
-          }
-        }
-
-        return {
-          ...asset,
-          signedUrl: signedData?.signedUrl,
-          manifest
-        }
-      })
-    )
-
-    setAssets(assetsWithUrls)
+    setJobs(processedJobs)
     setLoading(false)
   }
 
-  const deleteAsset = async (assetName: string) => {
-    const { error } = await supabase
-      .storage
-      .from('ghostpost-outbox')
-      .remove([assetName])
+  const deleteVariant = async (variant: CarouselVariant) => {
+    // Delete all slides from storage
+    const paths = variant.slides?.map(slide => slide.storage_path) || []
+    
+    if (paths.length > 0) {
+      await supabase.storage
+        .from('generated-carousels')
+        .remove(paths)
+    }
 
-    if (!error) {
-      await fetchAssets()
+    // Delete variant from database (cascades to slides)
+    await supabase
+      .from('carousel_variants')
+      .delete()
+      .eq('id', variant.id)
+
+    await fetchJobs()
+  }
+
+  const assignVariantToProfile = async (variant: CarouselVariant) => {
+    // Navigate to profiles page with variant pre-selected
+    window.location.href = `/profiles?assign_variant=${variant.id}`
+  }
+
+  const toggleJobExpansion = (jobId: string) => {
+    const newExpanded = new Set(expandedJobs)
+    if (newExpanded.has(jobId)) {
+      newExpanded.delete(jobId)
+    } else {
+      newExpanded.add(jobId)
+    }
+    setExpandedJobs(newExpanded)
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ready':
+        return 'text-green-600 dark:text-green-400'
+      case 'assigned':
+        return 'text-blue-600 dark:text-blue-400'
+      case 'posted':
+        return 'text-purple-600 dark:text-purple-400'
+      default:
+        return 'text-gray-600 dark:text-gray-400'
     }
   }
 
-  const postAsset = async (asset: Asset) => {
-    // Navigate to posts page with asset pre-selected
-    window.location.href = `/posts?asset=${encodeURIComponent(asset.name)}`
-  }
-
-  const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    if (bytes === 0) return '0 B'
-    const i = Math.floor(Math.log(bytes) / Math.log(1024))
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'ready':
+        return <Clock className="h-4 w-4" />
+      case 'assigned':
+        return <User className="h-4 w-4" />
+      case 'posted':
+        return <CheckCircle className="h-4 w-4" />
+      default:
+        return null
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">Assets Library</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">Carousel Assets</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-dark-400">
-            Videos from Ghostpost ready for posting
+            Generated carousel variants ready for TikTok posting
           </p>
         </div>
         
@@ -146,7 +213,7 @@ export default function AssetsPage() {
             {view === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
           </button>
           <button
-            onClick={fetchAssets}
+            onClick={fetchJobs}
             className="btn-secondary"
           >
             Refresh
@@ -157,6 +224,16 @@ export default function AssetsPage() {
       <div className="flex items-center gap-4">
         <Filter className="h-4 w-4 text-gray-400 dark:text-dark-500" />
         <select
+          value={filter.status}
+          onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+          className="select"
+        >
+          <option value="all">All statuses</option>
+          <option value="ready">Ready</option>
+          <option value="assigned">Assigned</option>
+          <option value="posted">Posted</option>
+        </select>
+        <select
           value={filter.dateRange}
           onChange={(e) => setFilter({ ...filter, dateRange: e.target.value })}
           className="select"
@@ -166,213 +243,205 @@ export default function AssetsPage() {
           <option value="week">This week</option>
           <option value="month">This month</option>
         </select>
-        <input
-          type="text"
-          placeholder="Filter by tag..."
-          value={filter.tag}
-          onChange={(e) => setFilter({ ...filter, tag: e.target.value })}
-          className="input flex-1"
-        />
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-400 dark:text-dark-500">Loading assets...</div>
         </div>
-      ) : assets.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <div className="card text-center py-12">
           <ImageIcon className="h-12 w-12 text-gray-400 dark:text-dark-500 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-dark-400">No assets found</p>
+          <p className="text-gray-500 dark:text-dark-400">No carousel assets found</p>
           <p className="text-sm text-gray-400 dark:text-dark-500 mt-2">
-            Upload videos to the ghostpost-outbox bucket to see them here
+            Generate some carousels from the Image Generator
           </p>
         </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {assets.map((asset) => (
-            <div
-              key={asset.id}
-              className="group relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer dark:bg-dark-850 dark:border-dark-700 dark:hover:shadow-xl"
-              onClick={() => setSelectedAsset(asset)}
-            >
-              <div className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 relative">
-                {asset.signedUrl && (
-                  <video
-                    src={asset.signedUrl}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    muted
-                    playsInline
-                  />
-                )}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity flex items-center justify-center">
-                  <Play className="h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+      ) : (
+        <div className="space-y-4">
+          {jobs.map((job) => (
+            <div key={job.id} className="card">
+              <div 
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => toggleJobExpansion(job.id)}
+              >
+                <div className="flex items-center gap-3">
+                  {expandedJobs.has(job.id) ? (
+                    <ChevronDown className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  )}
+                  <Folder className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-dark-100">{job.name}</h3>
+                    <p className="text-sm text-gray-500 dark:text-dark-400">
+                      {job.carousel_variants?.length || 0} variants • {formatRelativeTime(job.created_at)}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-500 dark:text-dark-400">
+                  Template: {job.template_name}
                 </div>
               </div>
-              <div className="p-3">
-                <p className="text-sm font-medium text-gray-900 dark:text-dark-100 truncate">
-                  {asset.name.replace('.mp4', '')}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
-                  {formatFileSize(asset.metadata.size)} • {formatRelativeTime(asset.created_at)}
-                </p>
-                {asset.manifest && (
-                  <p className="text-xs text-gray-400 dark:text-dark-500 mt-1 truncate">
-                    {asset.manifest.caption}
-                  </p>
-                )}
-              </div>
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    postAsset(asset)
-                  }}
-                  className="bg-white dark:bg-dark-800 rounded-full p-2 shadow-lg hover:shadow-xl dark:hover:bg-dark-700 transition-colors"
-                >
-                  <Send className="h-4 w-4 text-gray-700 dark:text-dark-300" />
-                </button>
-              </div>
+
+              {expandedJobs.has(job.id) && job.carousel_variants && (
+                <div className="mt-4 space-y-3">
+                  {job.carousel_variants.map((variant) => (
+                    <div 
+                      key={variant.id} 
+                      className="border border-gray-200 dark:border-dark-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-gray-900 dark:text-dark-100">
+                              Variant {variant.variant_index + 1}
+                            </h4>
+                            <div className={`flex items-center gap-1 ${getStatusColor(variant.status)}`}>
+                              {getStatusIcon(variant.status)}
+                              <span className="text-sm capitalize">{variant.status}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-500 dark:text-dark-400 mt-1">
+                            {variant.slide_count} slides • ID: {variant.variant_id.slice(0, 8)}...
+                          </p>
+                          {variant.assigned_profile_id && (
+                            <p className="text-xs text-gray-400 dark:text-dark-500 mt-1">
+                              Assigned to: {variant.assigned_profile_id}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {variant.status === 'ready' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                assignVariantToProfile(variant)
+                              }}
+                              className="btn-secondary text-sm"
+                            >
+                              <Send className="h-3 w-3 mr-1" />
+                              Assign
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedVariant(variant)
+                            }}
+                            className="btn-secondary text-sm"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (confirm('Delete this variant?')) {
+                                deleteVariant(variant)
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Slide thumbnails */}
+                      <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                        {variant.slides?.map((slide) => (
+                          <div 
+                            key={slide.id}
+                            className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded overflow-hidden relative group"
+                          >
+                            <img
+                              src={slide.image_url}
+                              alt={slide.alt_text || `Slide ${slide.slide_order}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                                {slide.slide_order}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
-      ) : (
-        <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-            <thead className="bg-gray-50 dark:bg-dark-800">
-              <tr>
-                <th scope="col" className="table-header">Name</th>
-                <th scope="col" className="table-header">Caption</th>
-                <th scope="col" className="table-header">Size</th>
-                <th scope="col" className="table-header">Uploaded</th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
-              {assets.map((asset) => (
-                <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
-                  <td className="table-cell">
-                    <div className="flex items-center">
-                      <ImageIcon className="h-5 w-5 text-gray-400 dark:text-dark-500 mr-3" />
-                      <span className="font-medium text-gray-900 dark:text-dark-100">
-                        {asset.name.replace('.mp4', '')}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="table-cell">
-                    <span className="text-sm text-gray-600 dark:text-dark-300 truncate block max-w-xs">
-                      {asset.manifest?.caption || '—'}
-                    </span>
-                  </td>
-                  <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
-                    {formatFileSize(asset.metadata.size)}
-                  </td>
-                  <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
-                    {formatRelativeTime(asset.created_at)}
-                  </td>
-                  <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                    <button
-                      onClick={() => postAsset(asset)}
-                      className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100 mr-3"
-                    >
-                      <Send className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => deleteAsset(asset.name)}
-                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
 
-      {selectedAsset && (
+      {/* Variant Preview Modal */}
+      {selectedVariant && (
         <div
           className="fixed inset-0 bg-black bg-opacity-75 dark:bg-black dark:bg-opacity-85 flex items-center justify-center z-50 p-4"
-          onClick={() => setSelectedAsset(null)}
+          onClick={() => setSelectedVariant(null)}
         >
           <div
-            className="bg-white dark:bg-dark-850 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden"
+            className="bg-white dark:bg-dark-850 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-gray-200 dark:border-dark-700">
               <h3 className="text-lg font-medium text-gray-900 dark:text-dark-100">
-                {selectedAsset.name.replace('.mp4', '')}
+                Variant {selectedVariant.variant_index + 1} Preview
               </h3>
+              <p className="text-sm text-gray-500 dark:text-dark-400 mt-1">
+                {selectedVariant.slide_count} slides • Status: {selectedVariant.status}
+              </p>
             </div>
-            <div className="p-4 flex gap-4">
-              <div className="flex-1">
-                <video
-                  src={selectedAsset.signedUrl}
-                  controls
-                  className="w-full rounded-lg"
-                  style={{ maxHeight: '60vh' }}
-                />
+            <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {selectedVariant.slides?.map((slide) => (
+                  <div key={slide.id} className="space-y-2">
+                    <div className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded-lg overflow-hidden">
+                      <img
+                        src={slide.image_url}
+                        alt={slide.alt_text || `Slide ${slide.slide_order}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-900 dark:text-dark-100">
+                        Slide {slide.slide_order}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-dark-400">
+                        {slide.width}x{slide.height}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="w-80 space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-dark-300 mb-2">Details</h4>
-                  <dl className="space-y-2">
-                    <div>
-                      <dt className="text-xs text-gray-500 dark:text-dark-400">Size</dt>
-                      <dd className="text-sm text-gray-900 dark:text-dark-100">
-                        {formatFileSize(selectedAsset.metadata.size)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500 dark:text-dark-400">Uploaded</dt>
-                      <dd className="text-sm text-gray-900 dark:text-dark-100">
-                        {formatDate(selectedAsset.created_at)}
-                      </dd>
-                    </div>
-                    {selectedAsset.manifest && (
-                      <>
-                        <div>
-                          <dt className="text-xs text-gray-500 dark:text-dark-400">Duration</dt>
-                          <dd className="text-sm text-gray-900 dark:text-dark-100">
-                            {selectedAsset.manifest.duration}s
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-gray-500 dark:text-dark-400">Caption</dt>
-                          <dd className="text-sm text-gray-900 dark:text-dark-100">
-                            {selectedAsset.manifest.caption}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-gray-500 dark:text-dark-400">Hashtags</dt>
-                          <dd className="text-sm text-gray-900 dark:text-dark-100">
-                            {selectedAsset.manifest.hashtags.join(' ')}
-                          </dd>
-                        </div>
-                      </>
-                    )}
-                  </dl>
-                </div>
-                
-                <div className="space-y-2">
+              
+              <div className="mt-6 flex justify-end gap-3">
+                {selectedVariant.status === 'ready' && (
                   <button
-                    onClick={() => postAsset(selectedAsset)}
-                    className="btn-primary w-full"
+                    onClick={() => assignVariantToProfile(selectedVariant)}
+                    className="btn-primary"
                   >
                     <Send className="h-4 w-4 mr-2" />
-                    Post to TikTok
+                    Assign to Profile
                   </button>
-                  <a
-                    href={selectedAsset.signedUrl}
-                    download={selectedAsset.name}
-                    className="btn-secondary w-full flex items-center justify-center"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </a>
-                </div>
+                )}
+                <button
+                  onClick={() => {
+                    // Download all slides
+                    selectedVariant.slides?.forEach((slide, index) => {
+                      const link = document.createElement('a')
+                      link.href = slide.image_url
+                      link.download = slide.filename
+                      link.click()
+                    })
+                  }}
+                  className="btn-secondary"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download All
+                </button>
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { AntiShadowbanProcessor } from '@/lib/services/anti-shadowban-processor'
 import { DEFAULT_ANTI_SHADOWBAN_SETTINGS } from '@/lib/constants/anti-shadowban'
 import { smartWrapPrompt } from '@/lib/services/prompt-wrapper'
 import type { ImageGenerationSettings, AntiShadowbanSettings } from '@/lib/types/image-generation'
+import { v4 as uuidv4 } from 'uuid'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 
@@ -55,7 +56,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    // Clear existing generated images for this job (for retry functionality)
+    // Clear existing data for this job (for retry functionality)
+    // First get existing variants
+    const { data: existingVariants } = await supabase
+      .from('carousel_variants')
+      .select('id')
+      .eq('job_id', jobId)
+
+    if (existingVariants && existingVariants.length > 0) {
+      const variantIds = existingVariants.map(v => v.id)
+      
+      // Delete slides
+      await supabase
+        .from('variant_slides')
+        .delete()
+        .in('variant_id', variantIds)
+      
+      // Delete assignments
+      await supabase
+        .from('variant_assignments')
+        .delete()
+        .in('variant_id', variantIds)
+    }
+
+    // Delete variants
+    await supabase
+      .from('carousel_variants')
+      .delete()
+      .eq('job_id', jobId)
+
+    // Clear existing generated images for this job
     const { data: existingImages } = await supabase
       .from('generated_carousel_images')
       .select('storage_path')
@@ -126,6 +156,10 @@ export async function POST(request: NextRequest) {
     const totalOperations = job.variants * sourceImages.length
     let completedOperations = 0
     const generatedImages = []
+
+    // Create job folder path
+    const timestamp = Date.now()
+    const jobFolderPath = `${job.user_id}/generated/job-${timestamp}-${jobId}`
 
     // Step 1: Generate base images from OpenAI (one per source image)
     const baseImages: { 
@@ -254,6 +288,36 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Create variants by applying anti-shadowban processing
     for (let variantIndex = 0; variantIndex < job.variants; variantIndex++) {
+      // Generate unique variant ID
+      const variantId = uuidv4()
+      const variantFolderPath = `${jobFolderPath}/variant-${variantId}`
+      
+      // Create variant record
+      const { data: variantRecord, error: variantError } = await supabase
+        .from('carousel_variants')
+        .insert({
+          job_id: jobId,
+          variant_index: variantIndex,
+          variant_id: variantId,
+          folder_path: variantFolderPath,
+          slide_count: baseImages.length,
+          status: 'ready',
+          metadata: {
+            prompts: prompts,
+            settings: settings,
+            antiShadowbanSettings: antiShadowbanSettings
+          }
+        })
+        .select()
+        .single()
+
+      if (variantError || !variantRecord) {
+        console.error('Error creating variant record:', variantError)
+        continue
+      }
+
+      const variantSlides = []
+
       for (let imageIndex = 0; imageIndex < baseImages.length; imageIndex++) {
         const baseImage = baseImages[imageIndex]
         
@@ -271,10 +335,13 @@ export async function POST(request: NextRequest) {
           // Apply anti-shadowban processing
           const processor = new AntiShadowbanProcessor(antiShadowbanSettings, variantIndex, imageIndex)
           const processedBuffer = await processor.processImage(baseImage.buffer)
-          const fileName = processor.generateFileName()
+          
+          // Generate sequential filename
+          const slideNumber = String(imageIndex + 1).padStart(3, '0')
+          const fileName = `${slideNumber}-${jobId}-${variantId}.jpg`
+          const storagePath = `${variantFolderPath}/${fileName}`
           
           // Upload processed image to storage
-          const storagePath = `${job.user_id}/generated/${Date.now()}_${fileName}`
           const { error: uploadError } = await supabase.storage
             .from('generated-carousels')
             .upload(storagePath, processedBuffer, {
@@ -293,7 +360,28 @@ export async function POST(request: NextRequest) {
             .from('generated-carousels')
             .getPublicUrl(storagePath)
 
-          // Save to database
+          // Save slide record
+          const { data: slideRecord, error: slideError } = await supabase
+            .from('variant_slides')
+            .insert({
+              variant_id: variantRecord.id,
+              slide_order: imageIndex + 1,
+              filename: fileName,
+              storage_path: storagePath,
+              image_url: publicUrl,
+              width: baseImage.width,
+              height: baseImage.height,
+              caption: `Slide ${imageIndex + 1}`,
+              alt_text: baseImage.prompt
+            })
+            .select()
+            .single()
+
+          if (!slideError && slideRecord) {
+            variantSlides.push(slideRecord)
+          }
+
+          // Also save to generated_carousel_images for backward compatibility
           const { data: imageRecord, error: dbError } = await supabase
             .from('generated_carousel_images')
             .insert({
@@ -306,7 +394,8 @@ export async function POST(request: NextRequest) {
               width: baseImage.width,
               height: baseImage.height,
               prompt_used: baseImage.prompt,
-              user_id: job.user_id
+              user_id: job.user_id,
+              variant_id: variantRecord.id
             })
             .select()
             .single()
@@ -319,6 +408,12 @@ export async function POST(request: NextRequest) {
           console.error(`Error processing variant ${variantIndex} of image ${imageIndex}:`, error)
         }
       }
+
+      // Update variant with slide count
+      await supabase
+        .from('carousel_variants')
+        .update({ slide_count: variantSlides.length })
+        .eq('id', variantRecord.id)
     }
 
     // Update job as completed
@@ -327,7 +422,7 @@ export async function POST(request: NextRequest) {
       .update({
         status: 'completed',
         progress: 100,
-        message: `Successfully generated ${generatedImages.length} images`,
+        message: `Successfully generated ${generatedImages.length} images in ${job.variants} variants`,
         completed_at: new Date().toISOString()
       })
       .eq('id', jobId)
@@ -335,7 +430,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       generatedCount: generatedImages.length,
-      totalExpected: totalOperations
+      totalExpected: totalOperations,
+      variantCount: job.variants
     })
 
   } catch (error) {

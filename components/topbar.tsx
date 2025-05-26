@@ -50,8 +50,8 @@ export function TopBar() {
 
   return (
     <div className="fixed top-0 left-64 right-0 z-40 bg-white border-b border-gray-200 dark:bg-dark-850 dark:border-dark-700 transition-colors duration-200">
-      <div className="px-6 py-3">
-        <div className="flex items-center justify-between">
+      <div className="h-16 px-6 flex items-center">
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center space-x-6 text-sm">
             <div className="flex items-center text-gray-600 dark:text-dark-300">
               <Users className="h-4 w-4 mr-1.5" />

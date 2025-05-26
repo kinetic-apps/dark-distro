@@ -30,20 +30,36 @@ export function wrapTextReplacementPrompt(
     .replace(/\\/g, '\\\\')  // Escape backslashes first
     .replace(/"/g, '\\"')    // Escape quotes
 
-  // Create a very specific prompt that emphasizes exact style preservation
-  let prompt = `Replace ALL text in this image with exactly: "${escapedText}". `
+  // Create an extremely specific prompt that leaves no room for interpretation
+  let prompt = `INSTRUCTION: Replace ONLY the text characters in this image with exactly: "${escapedText}". `
   
-  // Strong emphasis on preserving original styling
-  prompt += `CRITICAL: You must preserve EXACTLY the same font family, font size, font weight, font style (italic/normal), letter spacing, line height, text color, text effects (shadows, outlines, gradients), and any other visual text properties from the original image. `
+  // Ultra-specific preservation requirements
+  prompt += `ABSOLUTE REQUIREMENTS - DO NOT CHANGE ANY OF THE FOLLOWING: `
+  prompt += `1. Font family - use the EXACT same font as the original text. `
+  prompt += `2. Font size - maintain the EXACT same size in pixels/points. `
+  prompt += `3. Font weight - preserve the EXACT same weight (thin/regular/bold/etc). `
+  prompt += `4. Font style - keep the EXACT same style (italic/normal/oblique). `
+  prompt += `5. Letter spacing (tracking) - maintain the EXACT same spacing between letters. `
+  prompt += `6. Line height (leading) - preserve the EXACT same spacing between lines. `
+  prompt += `7. Text color - use the EXACT same color values (RGB/HEX) as the original. `
+  prompt += `8. Text shadows - preserve ALL shadow properties: color, blur, offset X, offset Y, spread. `
+  prompt += `9. Text outlines/strokes - maintain the EXACT same stroke width, color, and style. `
+  prompt += `10. Text effects - preserve ALL effects: gradients, glows, bevels, emboss, textures. `
+  prompt += `11. Text position - keep the EXACT same X,Y coordinates and alignment. `
+  prompt += `12. Text rotation/transformation - maintain any rotation, skew, or perspective. `
+  prompt += `13. Opacity/transparency - preserve the EXACT same opacity levels. `
+  prompt += `14. Blend modes - maintain any blend modes applied to the text. `
   
-  // Positioning and layout
-  prompt += `Keep the exact same text positioning, alignment, and layout as the original. `
+  // Emphasize what should NOT happen
+  prompt += `CRITICAL WARNINGS: `
+  prompt += `- Do NOT apply any new styling or "improvements" to the text. `
+  prompt += `- Do NOT change the font to something "similar" - use the EXACT same font. `
+  prompt += `- Do NOT adjust positioning to "look better" - keep EXACT same position. `
+  prompt += `- Do NOT add or remove any effects - preserve ALL original effects exactly. `
+  prompt += `- Do NOT change colors even slightly - use EXACT same color values. `
   
-  // Additional preservation instructions
-  prompt += `Do not change any aspect of the text appearance except for the actual words/characters. The new text should look like it was originally designed with the same exact styling as the text being replaced. `
-  
-  // Background and design elements
-  prompt += `Maintain all background elements, graphics, and design components unchanged. Only replace the text content itself.`
+  // Final emphasis
+  prompt += `SUMMARY: This is a pure character replacement task. Imagine you are selecting each character in a text editor and typing new characters while keeping all formatting intact. The result should be indistinguishable from the original except for the actual letters/numbers/symbols being different. Every single visual property must remain EXACTLY the same.`
 
   return prompt
 }
