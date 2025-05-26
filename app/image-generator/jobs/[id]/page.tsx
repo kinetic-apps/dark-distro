@@ -13,7 +13,10 @@ import {
   Trash2,
   RefreshCw,
   Save,
-  FileText
+  FileText,
+  Pencil,
+  Check,
+  X
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { GeneratedCarouselImage, ImageGenerationSettings } from '@/lib/types/image-generation'
@@ -33,6 +36,8 @@ export default function JobDetailsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid')
   const [selectedVariant, setSelectedVariant] = useState<number>(0)
   const [existingTemplate, setExistingTemplate] = useState<any>(null)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [editedName, setEditedName] = useState('')
 
   const loadJobData = useCallback(async () => {
     try {
@@ -155,6 +160,35 @@ export default function JobDetailsPage() {
     }
   }
 
+  const handleSaveName = async () => {
+    if (!editedName.trim() || editedName === job.name) {
+      setIsEditingName(false)
+      return
+    }
+
+    try {
+      await ImageGenerationService.updateJobName(jobId, editedName.trim())
+      setJob({ ...job, name: editedName.trim() })
+      setIsEditingName(false)
+    } catch (error) {
+      console.error('Error updating job name:', error)
+      // Show more detailed error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update job name'
+      alert(errorMessage)
+      // Don't close the edit mode on error
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditedName(job.name)
+    setIsEditingName(false)
+  }
+
+  const startEditingName = () => {
+    setEditedName(job.name)
+    setIsEditingName(true)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -187,7 +221,7 @@ export default function JobDetailsPage() {
     <div className="page-container">
       {/* Header */}
       <div className="page-header">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/image-generator/jobs')}
@@ -195,56 +229,99 @@ export default function JobDetailsPage() {
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <div>
-              <h1 className="page-title">{job.name}</h1>
-              <p className="page-description">{job.prompt}</p>
+            <div className="flex-1">
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveName()
+                      if (e.key === 'Escape') handleCancelEdit()
+                    }}
+                    className="input text-2xl font-semibold px-2 py-1"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSaveName}
+                    className="p-1.5 text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 rounded-md transition-colors"
+                    title="Save"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-700 rounded-md transition-colors"
+                    title="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                  <h1 className="page-title">{job.name}</h1>
+                  <button
+                    onClick={startEditingName}
+                    className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-md transition-all"
+                    title="Rename job"
+                  >
+                    <Pencil className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </button>
+                </div>
+              )}
+              <p className="page-description">
+                {job.variants} variant{job.variants > 1 ? 's' : ''} • Created {new Date(job.created_at).toLocaleDateString()}
+              </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             {status === 'completed' && images.length > 0 && (
-              <>
+              <div className="flex flex-col sm:flex-row gap-2">
                 {existingTemplate ? (
                   <button
                     onClick={handleViewTemplate}
-                    className="btn-secondary"
+                    className="btn-secondary whitespace-nowrap"
                   >
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Template
+                    <FileText className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span>View Template</span>
                   </button>
                 ) : (
                   <button
                     onClick={handleSaveAsTemplate}
-                    className="btn-secondary"
+                    className="btn-secondary whitespace-nowrap"
                   >
-                    <Save className="mr-2 h-4 w-4" />
-                    Save as Template
+                    <Save className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span>Save Template</span>
                   </button>
                 )}
                 <button
                   onClick={downloadAll}
-                  className="btn-secondary"
+                  className="btn-secondary whitespace-nowrap"
                 >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download All
+                  <Download className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span>Download All</span>
                 </button>
-              </>
+              </div>
             )}
-            <button
-              onClick={handleRetry}
-              className="btn-secondary"
-              disabled={status === 'processing'}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </button>
-            <button
-              onClick={handleDelete}
-              className="btn-secondary text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRetry}
+                className="btn-secondary whitespace-nowrap"
+                disabled={status === 'processing'}
+              >
+                <RefreshCw className="mr-2 h-4 w-4 flex-shrink-0" />
+                <span>Retry</span>
+              </button>
+              <button
+                onClick={handleDelete}
+                className="btn-secondary text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 whitespace-nowrap"
+              >
+                <Trash2 className="mr-2 h-4 w-4 flex-shrink-0" />
+                <span>Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

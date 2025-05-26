@@ -206,6 +206,43 @@ export class ImageGenerationService {
     jobStates.delete(jobId)
   }
 
+  static async updateJobName(jobId: string, name: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    console.log('Updating job name:', { jobId, name, userId: user.id })
+
+    // First check if the job exists and belongs to the user
+    const { data: existingJob, error: fetchError } = await supabase
+      .from('image_generation_jobs')
+      .select('id, name')
+      .eq('id', jobId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !existingJob) {
+      throw new Error('Job not found or you do not have permission to update it')
+    }
+
+    // Now update the job
+    const { data, error } = await supabase
+      .from('image_generation_jobs')
+      .update({ 
+        name,
+        template_name: `${name} Template`
+      })
+      .eq('id', jobId)
+      .eq('user_id', user.id)
+      .select()
+
+    if (error) {
+      console.error('Supabase update error:', error)
+      throw new Error(`Failed to update job name: ${error.message}`)
+    }
+
+    console.log('Job name updated successfully:', data)
+  }
+
   static async createTemplate(params: {
     name: string
     description?: string
