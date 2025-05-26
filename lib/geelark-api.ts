@@ -1,8 +1,18 @@
 import { supabaseAdmin } from './supabase/admin'
+import { createHash } from 'crypto'
 
 const API_BASE_URL = process.env.GEELARK_API_BASE_URL!
 const API_KEY = process.env.GEELARK_API_KEY!
 const APP_ID = process.env.GEELARK_APP_ID!
+
+// Use the same UUID generator as the working endpoint
+function generateUUID(): string {
+  return 'yxxyxxxxyxyxxyxxyxxxyxxxyxxyxxyx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  }).toUpperCase()
+}
 
 interface GeeLarkResponse<T> {
   code: number
@@ -35,13 +45,25 @@ export class GeeLarkAPI {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`
     
+    // Generate required headers for signature verification - matching working implementation
+    const timestamp = new Date().getTime().toString()
+    const traceId = generateUUID()
+    const nonce = traceId.substring(0, 6)
+    
+    // Generate signature: SHA256(appId + traceId + ts + nonce + apiKey)
+    const signString = APP_ID + traceId + timestamp + nonce + API_KEY
+    const sign = createHash('sha256').update(signString).digest('hex').toUpperCase()
+    
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
-          'X-App-ID': APP_ID,
           'Content-Type': 'application/json',
+          'appId': APP_ID,
+          'traceId': traceId,
+          'ts': timestamp,
+          'nonce': nonce,
+          'sign': sign,
           ...options.headers,
         },
       })
@@ -186,6 +208,15 @@ export class GeeLarkAPI {
     return await this.request<TaskData>(`/api/v1/tasks/${taskId}`)
   }
 
+  async queryTasks(taskIds: string[]): Promise<any> {
+    return await this.request('/open/v1/task/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: taskIds
+      })
+    })
+  }
+
   async getProfileStatus(profileId: string): Promise<ProfileStatus> {
     return await this.request<ProfileStatus>(`/api/v1/profiles/${profileId}/status`)
   }
@@ -200,6 +231,188 @@ export class GeeLarkAPI {
         updated_at: new Date().toISOString()
       })
       .eq('profile_id', profileId)
+  }
+
+  // Phone Management
+  async startPhones(phoneIds: string[]): Promise<any> {
+    return await this.request('/open/v1/phone/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: phoneIds
+      })
+    })
+  }
+
+  async stopPhones(phoneIds: string[]): Promise<any> {
+    return await this.request('/open/v1/phone/stop', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: phoneIds
+      })
+    })
+  }
+
+  // TikTok App Management
+  async getInstallableApps(profileId: string, searchName?: string): Promise<any> {
+    const data = await this.request('/open/v1/app/installable/list', {
+      method: 'POST',
+      body: JSON.stringify({
+        envId: profileId,
+        name: searchName || '',
+        page: 1,
+        pageSize: 100
+      })
+    })
+
+    return data
+  }
+
+  async installApp(profileId: string, appVersionId: string): Promise<void> {
+    await this.request('/open/v1/app/install', {
+      method: 'POST',
+      body: JSON.stringify({
+        envId: profileId,
+        appVersionId: appVersionId
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'App installation initiated',
+      meta: { profile_id: profileId, app_version_id: appVersionId }
+    })
+  }
+
+  async uninstallApp(profileId: string, appPackage: string): Promise<void> {
+    await this.request(`/open/v1/phone/${profileId}/app/uninstall`, {
+      method: 'POST',
+      body: JSON.stringify({
+        package_name: appPackage
+      })
+    })
+  }
+
+  async getInstalledApps(profileId: string): Promise<any> {
+    return await this.request('/open/v1/app/list', {
+      method: 'POST',
+      body: JSON.stringify({
+        envId: profileId,
+        page: 1,
+        pageSize: 100
+      })
+    })
+  }
+
+  // TikTok Automation
+  async loginTikTok(profileId: string, phoneNumber: string, otpCode?: string): Promise<TaskData> {
+    const data = await this.request<TaskData>('/open/v1/automation/tiktok/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        profile_id: profileId,
+        login_method: 'phone',
+        phone_number: phoneNumber,
+        otp_code: otpCode
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'TikTok login initiated',
+      meta: { profile_id: profileId, phone_number: phoneNumber, task_id: data.task_id }
+    })
+
+    return data
+  }
+
+  async startTikTokWarmup(profileId: string, accountId: string, options?: {
+    duration_minutes?: number
+    actions?: string[]
+  }): Promise<string> {
+    const data = await this.request<TaskData>('/open/v1/automation/tiktok/warmup', {
+      method: 'POST',
+      body: JSON.stringify({
+        profile_id: profileId,
+        duration_minutes: options?.duration_minutes || 30,
+        actions: options?.actions || ['browse', 'like', 'follow', 'comment', 'watch']
+      })
+    })
+
+    await supabaseAdmin.from('tasks').insert({
+      type: 'warmup',
+      geelark_task_id: data.task_id,
+      account_id: accountId,
+      status: 'running',
+      started_at: new Date().toISOString()
+    })
+
+    return data.task_id
+  }
+
+  async postTikTokCarousel(profileId: string, accountId: string, content: {
+    images: string[]
+    caption: string
+    hashtags?: string[]
+    music?: string
+  }): Promise<string> {
+    const data = await this.request<TaskData>('/open/v1/automation/tiktok/post/carousel', {
+      method: 'POST',
+      body: JSON.stringify({
+        profile_id: profileId,
+        media_type: 'carousel',
+        images: content.images,
+        caption: content.caption,
+        hashtags: content.hashtags || [],
+        music_id: content.music
+      })
+    })
+
+    await supabaseAdmin.from('tasks').insert({
+      type: 'post',
+      geelark_task_id: data.task_id,
+      account_id: accountId,
+      status: 'running',
+      started_at: new Date().toISOString(),
+      meta: { type: 'carousel', images_count: content.images.length }
+    })
+
+    return data.task_id
+  }
+
+  async postTikTokVideo(profileId: string, accountId: string, content: {
+    video_url: string
+    caption: string
+    hashtags?: string[]
+    music?: string
+  }): Promise<string> {
+    const data = await this.request<TaskData>('/open/v1/automation/tiktok/post/video', {
+      method: 'POST',
+      body: JSON.stringify({
+        profile_id: profileId,
+        media_type: 'video',
+        video_url: content.video_url,
+        caption: content.caption,
+        hashtags: content.hashtags || [],
+        music_id: content.music
+      })
+    })
+
+    await supabaseAdmin.from('tasks').insert({
+      type: 'post',
+      geelark_task_id: data.task_id,
+      account_id: accountId,
+      status: 'running',
+      started_at: new Date().toISOString(),
+      meta: { type: 'video' }
+    })
+
+    return data.task_id
+  }
+
+  // Profile Management
+  async getProfileList(): Promise<any[]> {
+    return await this.request('/open/v1/phone/list')
   }
 }
 

@@ -137,5 +137,63 @@ export async function GET(request: NextRequest) {
 
 // This endpoint can be called by a cron job
 export async function POST(request: NextRequest) {
-  return GET(request)
+  try {
+    const body = await request.json()
+    const { task_ids } = body
+
+    if (!Array.isArray(task_ids) || task_ids.length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid task IDs' },
+        { status: 400 }
+      )
+    }
+
+    // Query task status from GeeLark
+    const taskStatus = await geelarkApi.queryTasks(task_ids)
+
+    // Update local task records
+    const updatePromises = taskStatus.items?.map(async (task: any) => {
+      const status = task.status === 3 ? 'completed' : 
+                    task.status === 4 ? 'failed' : 
+                    task.status === 7 ? 'cancelled' :
+                    task.status === 2 ? 'running' : 'pending'
+
+      await supabaseAdmin
+        .from('tasks')
+        .update({
+          status,
+          completed_at: status === 'completed' || status === 'failed' ? new Date().toISOString() : null,
+          error_message: task.failDesc || null,
+          meta: {
+            geelark_status: task.status,
+            fail_code: task.failCode,
+            fail_desc: task.failDesc,
+            cost_seconds: task.cost
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('geelark_task_id', task.id)
+    }) || []
+
+    await Promise.all(updatePromises)
+
+    return NextResponse.json({
+      success: true,
+      tasks: taskStatus.items || []
+    })
+  } catch (error) {
+    console.error('Task status error:', error)
+    
+    await supabaseAdmin.from('logs').insert({
+      level: 'error',
+      component: 'api-task-status',
+      message: 'Failed to get task status',
+      meta: { error: String(error) }
+    })
+
+    return NextResponse.json(
+      { error: 'Failed to get task status' },
+      { status: 500 }
+    )
+  }
 }

@@ -1,97 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHash } from 'crypto'
+import { geelarkApi } from '@/lib/geelark-api'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
-const API_BASE_URL = process.env.GEELARK_API_BASE_URL!
-const API_KEY = process.env.GEELARK_API_KEY!
-const APP_ID = process.env.GEELARK_APP_ID!
-
-function generateUUID(): string {
-  return 'yxxyxxxxyxyxxyxxyxxxyxxxyxxyxxyx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0
-    const v = c === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  }).toUpperCase()
-}
-
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    if (!API_KEY || !API_BASE_URL || !APP_ID) {
-      return NextResponse.json(
-        { error: 'GeeLark credentials not configured' },
-        { status: 400 }
-      )
-    }
-
-    // Generate required authentication parameters
-    const timestamp = new Date().getTime().toString()
-    const traceId = generateUUID()
-    const nonce = traceId.substring(0, 6)
+    // Test 1: Get profile list
+    const profiles = await geelarkApi.getProfileList()
     
-    // Generate signature: SHA256(appId + traceId + ts + nonce + apiKey)
-    const signString = APP_ID + traceId + timestamp + nonce + API_KEY
-    const sign = createHash('sha256').update(signString).digest('hex').toUpperCase()
-
-    // GeeLark API call with proper authentication headers
-    const response = await fetch(`${API_BASE_URL}/open/v1/phone/list`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'appId': APP_ID,
-        'traceId': traceId,
-        'ts': timestamp,
-        'nonce': nonce,
-        'sign': sign,
-      },
-      body: JSON.stringify({
-        page: 1,
-        pageSize: 1
-      }),
-    })
-
-    const responseText = await response.text()
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `HTTP ${response.status}: ${responseText}` },
-        { status: 400 }
-      )
+    // Test 2: Get installable apps for the first profile if available
+    let installableApps = null
+    if (profiles && profiles.length > 0) {
+      installableApps = await geelarkApi.getInstallableApps(profiles[0].envId, 'tiktok')
     }
 
-    // Try to parse as JSON
-    let data
-    try {
-      data = JSON.parse(responseText)
-    } catch (parseError) {
-      return NextResponse.json(
-        { error: `Non-JSON response: ${responseText}` },
-        { status: 400 }
-      )
-    }
-
-    // Check for GeeLark success (code: 0 means success)
-    if (data.code !== 0) {
-      return NextResponse.json(
-        { error: `GeeLark error (${data.code}): ${data.msg || 'Unknown error'}` },
-        { status: 400 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'GeeLark authentication successful',
-      data: {
-        api_accessible: true,
-        app_id: APP_ID,
-        response_code: data.code,
-        trace_id: traceId,
-        phone_count: data.data?.total || 0,
-        response_preview: responseText.substring(0, 300)
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'api-test-auth',
+      message: 'GeeLark API test successful',
+      meta: { 
+        profile_count: profiles?.length || 0,
+        installable_apps_count: installableApps?.total || 0
       }
     })
 
+    return NextResponse.json({
+      success: true,
+      profiles: profiles || [],
+      installable_apps: installableApps || null,
+      message: 'GeeLark API connection successful'
+    })
   } catch (error) {
+    console.error('GeeLark API test error:', error)
+    
+    await supabaseAdmin.from('logs').insert({
+      level: 'error',
+      component: 'api-test-auth',
+      message: 'GeeLark API test failed',
+      meta: { error: String(error) }
+    })
+
     return NextResponse.json(
-      { error: `Network error: ${error}` },
+      { 
+        error: 'GeeLark API test failed',
+        details: String(error)
+      },
       { status: 500 }
     )
   }

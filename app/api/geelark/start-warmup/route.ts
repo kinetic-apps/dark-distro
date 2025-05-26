@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { account_ids } = body
+    const { account_ids, options } = body
 
     if (!Array.isArray(account_ids) || account_ids.length === 0) {
       return NextResponse.json(
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       .from('accounts')
       .select('*, phones(*)')
       .in('id', account_ids)
-      .eq('status', 'new')
+      .in('status', ['new', 'ready'])
 
     if (error) throw error
 
@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
 
         const profileId = account.phones[0].profile_id
 
-        // Start warm-up task
-        const taskId = await geelarkApi.startWarmupTask(profileId, account.id)
+        // Start TikTok warm-up task
+        const taskId = await geelarkApi.startTikTokWarmup(profileId, account.id, options)
 
         // Update account status
         await supabaseAdmin
@@ -47,8 +47,13 @@ export async function POST(request: NextRequest) {
           level: 'info',
           component: 'api-start-warmup',
           account_id: account.id,
-          message: 'Warm-up started',
-          meta: { task_id: taskId, profile_id: profileId }
+          message: 'TikTok warm-up started',
+          meta: { 
+            task_id: taskId, 
+            profile_id: profileId,
+            duration_minutes: options?.duration_minutes || 30,
+            actions: options?.actions || ['browse', 'like', 'follow', 'comment', 'watch']
+          }
         })
 
         return { account_id: account.id, task_id: taskId }
