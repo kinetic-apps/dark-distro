@@ -25,31 +25,25 @@ export function wrapTextReplacementPrompt(
     maintainLayout = true
   } = options
 
-  // Base instruction for text replacement
-  let prompt = `Replace any existing text in this image with: "${userText}"`
+  // Escape any special characters in the user text to ensure they're treated literally
+  const escapedText = userText
+    .replace(/\\/g, '\\\\')  // Escape backslashes first
+    .replace(/"/g, '\\"')    // Escape quotes
 
-  // Add style preservation instructions
-  if (preserveStyle) {
-    prompt += `. Maintain the original text styling, positioning, and visual hierarchy`
-  }
-
-  // Add font style preferences
-  const fontStyleMap = {
-    modern: 'Use clean, modern sans-serif typography',
-    bold: 'Use bold, impactful typography',
-    elegant: 'Use elegant, refined typography',
-    casual: 'Use casual, friendly typography'
-  }
+  // Create a very specific prompt that emphasizes exact style preservation
+  let prompt = `Replace ALL text in this image with exactly: "${escapedText}". `
   
-  prompt += `. ${fontStyleMap[fontStyle]}`
-
-  // Add layout preservation
-  if (maintainLayout) {
-    prompt += `. Keep the same text placement, size relationships, and overall composition. Ensure the new text fits naturally within the existing design elements`
-  }
-
-  // Add quality instructions
-  prompt += `. Ensure high quality, readable text that matches the image's aesthetic and maintains professional appearance`
+  // Strong emphasis on preserving original styling
+  prompt += `CRITICAL: You must preserve EXACTLY the same font family, font size, font weight, font style (italic/normal), letter spacing, line height, text color, text effects (shadows, outlines, gradients), and any other visual text properties from the original image. `
+  
+  // Positioning and layout
+  prompt += `Keep the exact same text positioning, alignment, and layout as the original. `
+  
+  // Additional preservation instructions
+  prompt += `Do not change any aspect of the text appearance except for the actual words/characters. The new text should look like it was originally designed with the same exact styling as the text being replaced. `
+  
+  // Background and design elements
+  prompt += `Maintain all background elements, graphics, and design components unchanged. Only replace the text content itself.`
 
   return prompt
 }
@@ -84,8 +78,8 @@ export function isRawTextInput(prompt: string): boolean {
 }
 
 /**
- * Smart prompt wrapper that detects if input needs wrapping
- * @param userInput - User's input (could be raw text or full prompt)
+ * Smart prompt wrapper that always wraps input for consistent text replacement
+ * @param userInput - User's input text to replace in the image
  * @param options - Formatting options
  * @returns Properly formatted prompt
  */
@@ -93,11 +87,7 @@ export function smartWrapPrompt(
   userInput: string, 
   options: PromptWrapperOptions = {}
 ): string {
-  // If it looks like raw text, wrap it
-  if (isRawTextInput(userInput)) {
-    return wrapTextReplacementPrompt(userInput, options)
-  }
-  
-  // Otherwise, assume it's already a formatted prompt
-  return userInput
+  // Always wrap the input to ensure consistent text replacement behavior
+  // This ensures special characters like ":", ";", etc. are handled properly
+  return wrapTextReplacementPrompt(userInput, options)
 } 

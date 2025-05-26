@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { 
   ArrowLeft, 
   Download, 
-  Loader2, 
   CheckCircle2,
   XCircle,
   Clock,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { GeneratedCarouselImage, ImageGenerationSettings } from '@/lib/types/image-generation'
+import { forceDownload, downloadMultipleFiles } from '@/lib/utils/download'
 
 export default function JobDetailsPage() {
   const params = useParams()
@@ -91,19 +91,21 @@ export default function JobDetailsPage() {
     }
   }
 
-  const downloadAll = () => {
-    images.forEach((image) => {
-      const link = document.createElement('a')
-      link.href = image.generated_image_url
-      link.download = `${job.name}_variant${image.carousel_index + 1}_image${image.image_index + 1}.png`
-      link.click()
-    })
+  const downloadAll = async () => {
+    const files = images.map((image) => ({
+      url: image.generated_image_url,
+      filename: `${job.name}_variant${image.carousel_index + 1}_image${image.image_index + 1}.jpg`
+    }))
+    await downloadMultipleFiles(files)
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-dark-500" />
+        <div className="relative">
+          <div className="h-12 w-12 rounded-full border-2 border-gray-200 dark:border-dark-600"></div>
+          <div className="absolute inset-0 h-12 w-12 rounded-full border-2 border-transparent border-t-blue-500 dark:border-t-blue-400 animate-spin"></div>
+        </div>
       </div>
     )
   }
@@ -176,7 +178,12 @@ export default function JobDetailsPage() {
       <div className="card-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {status === 'processing' && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
+            {status === 'processing' && (
+              <div className="relative">
+                <div className="h-5 w-5 rounded-full border-2 border-gray-200 dark:border-dark-600"></div>
+                <div className="absolute inset-0 h-5 w-5 rounded-full border-2 border-transparent border-t-blue-500 dark:border-t-blue-400 animate-spin"></div>
+              </div>
+            )}
             {status === 'completed' && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
             {status === 'failed' && <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />}
             {status === 'queued' && <Clock className="h-5 w-5 text-gray-400 dark:text-dark-500" />}
@@ -309,13 +316,12 @@ export default function JobDetailsPage() {
                       Carousel Variant {parseInt(variantIndex) + 1}
                     </h3>
                     <button
-                      onClick={() => {
-                        variantImages.forEach((image) => {
-                          const link = document.createElement('a')
-                          link.href = image.generated_image_url
-                          link.download = `${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.png`
-                          link.click()
-                        })
+                      onClick={async () => {
+                        const files = variantImages.map((image) => ({
+                          url: image.generated_image_url,
+                          filename: `${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.jpg`
+                        }))
+                        await downloadMultipleFiles(files)
                       }}
                       className="btn-secondary btn-sm"
                     >
@@ -336,14 +342,18 @@ export default function JobDetailsPage() {
                               className="w-48 h-48 object-cover rounded-lg"
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                              <a
-                                href={image.generated_image_url}
-                                download={`${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.png`}
+                              <button
                                 className="p-2 bg-white dark:bg-dark-700 rounded-md shadow-lg hover:shadow-xl transition-shadow"
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  await forceDownload(
+                                    image.generated_image_url,
+                                    `${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.jpg`
+                                  )
+                                }}
                               >
                                 <Download className="h-4 w-4" />
-                              </a>
+                              </button>
                             </div>
                             <div className="absolute bottom-1 left-1 bg-black dark:bg-dark-800 bg-opacity-75 dark:bg-opacity-90 text-white dark:text-dark-100 text-xs px-1.5 py-0.5 rounded">
                               {idx + 1}
@@ -376,14 +386,13 @@ export default function JobDetailsPage() {
                   </select>
                   
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const variantImages = imagesByVariant[selectedVariant] || []
-                      variantImages.forEach((image) => {
-                        const link = document.createElement('a')
-                        link.href = image.generated_image_url
-                        link.download = `${job.name}_carousel${selectedVariant + 1}_image${image.image_index + 1}.png`
-                        link.click()
-                      })
+                      const files = variantImages.map((image) => ({
+                        url: image.generated_image_url,
+                        filename: `${job.name}_carousel${selectedVariant + 1}_image${image.image_index + 1}.jpg`
+                      }))
+                      await downloadMultipleFiles(files)
                     }}
                     className="btn-secondary btn-sm"
                   >
@@ -412,14 +421,18 @@ export default function JobDetailsPage() {
                             {image.prompt_used}
                           </p>
                         </div>
-                        <a
-                          href={image.generated_image_url}
-                          download={`${job.name}_carousel${selectedVariant + 1}_image${image.image_index + 1}.png`}
+                        <button
+                          onClick={async () => {
+                            await forceDownload(
+                              image.generated_image_url,
+                              `${job.name}_carousel${selectedVariant + 1}_image${image.image_index + 1}.jpg`
+                            )
+                          }}
                           className="btn-secondary btn-sm ml-4"
                         >
                           <Download className="mr-1 h-3 w-3" />
                           Download
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -441,8 +454,22 @@ export default function JobDetailsPage() {
         <div className="card-lg">
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <div className="relative">
-              <div className="h-20 w-20 rounded-full border-4 border-gray-200 dark:border-dark-700"></div>
-              <div className="absolute inset-0 h-20 w-20 rounded-full border-4 border-blue-600 dark:border-blue-500 border-t-transparent animate-spin"></div>
+              {/* Outer ring */}
+              <div className="h-20 w-20 rounded-full border-2 border-gray-200 dark:border-dark-600"></div>
+              {/* Spinning gradient ring */}
+              <div className="absolute inset-0 h-20 w-20 rounded-full animate-spin">
+                <div className="h-full w-full rounded-full border-2 border-transparent"
+                  style={{
+                    borderTopColor: 'rgb(59, 130, 246)', // blue-500
+                    borderRightColor: 'rgb(147, 197, 253)', // blue-300
+                    background: 'conic-gradient(from 180deg at 50% 50%, transparent 0deg, transparent 270deg, rgba(59, 130, 246, 0.1) 270deg, rgba(59, 130, 246, 0.3) 360deg)'
+                  }}
+                />
+              </div>
+              {/* Center dot */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-2 w-2 rounded-full bg-blue-500 dark:bg-blue-400 animate-pulse"></div>
+              </div>
             </div>
             <p className="text-gray-900 dark:text-dark-100 font-medium">Generating your images...</p>
             <p className="text-sm text-gray-500 dark:text-dark-400">This typically takes 20-30 seconds per image</p>

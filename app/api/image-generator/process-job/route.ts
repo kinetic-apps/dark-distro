@@ -190,6 +190,8 @@ export async function POST(request: NextRequest) {
 
         // Wrap the prompt for text replacement
         const wrappedPrompt = smartWrapPrompt(prompts[imageIndex])
+        console.log(`Original prompt: "${prompts[imageIndex]}"`)
+        console.log(`Wrapped prompt: "${wrappedPrompt}"`)
         
         // Create form data for OpenAI
         const formData = new FormData()
