@@ -14,6 +14,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react'
 import { VariantAssignmentModal } from '@/components/variant-assignment-modal'
+import { ProfileStatus } from '@/components/profile-status'
 
 interface Profile {
   id: string
@@ -198,24 +199,10 @@ export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
                   )}
                 </td>
                 <td className="table-cell">
-                  {profile.phone ? (
-                    <div className="flex items-center">
-                      <div className={`h-2 w-2 rounded-full mr-2 ${
-                        profile.phone.status === 'online' ? 'bg-green-500' : 'bg-gray-300'
-                      }`} />
-                      <div>
-                        <p className="text-sm text-gray-900 dark:text-dark-100">
-                          {profile.phone.status}
-                        </p>
-                        {profile.phone.battery && (
-                          <p className="text-xs text-gray-500 dark:text-dark-400">
-                            {profile.phone.battery}% battery
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                  {profile.geelark_profile_id ? (
+                    <ProfileStatus profileId={profile.geelark_profile_id} />
                   ) : (
-                    <span className="text-sm text-gray-400">Offline</span>
+                    <span className="text-sm text-gray-400">No GeeLark profile</span>
                   )}
                 </td>
                 <td className="table-cell text-sm text-gray-500">

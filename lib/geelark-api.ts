@@ -252,6 +252,15 @@ export class GeeLarkAPI {
     })
   }
 
+  async getPhoneStatus(phoneIds: string[]): Promise<any> {
+    return await this.request('/open/v1/phone/status', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: phoneIds
+      })
+    })
+  }
+
   // TikTok App Management
   async getInstallableApps(profileId: string, searchName?: string): Promise<any> {
     const data = await this.request('/open/v1/app/installable/list', {

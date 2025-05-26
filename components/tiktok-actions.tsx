@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, Smartphone, LogIn, Activity, Image, Video, X, Power } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, Smartphone, LogIn, Activity, Image, Video, X, Power, RefreshCw } from 'lucide-react'
 
 interface TikTokActionsProps {
   accountId: string
@@ -13,6 +13,8 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
   const [isInstalling, setIsInstalling] = useState(false)
   const [isStartingPhone, setIsStartingPhone] = useState(false)
   const [isStoppingPhone, setIsStoppingPhone] = useState(false)
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false)
+  const [phoneStatus, setPhoneStatus] = useState<'started' | 'starting' | 'stopped' | 'expired' | 'unknown'>('unknown')
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showWarmupModal, setShowWarmupModal] = useState(false)
   const [showPostModal, setShowPostModal] = useState(false)
@@ -42,6 +44,43 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
     setTimeout(() => setNotification(null), 5000)
   }
 
+  // Check phone status on mount and periodically
+  useEffect(() => {
+    if (profileId) {
+      checkPhoneStatus()
+      // Check status every 30 seconds
+      const interval = setInterval(checkPhoneStatus, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [profileId])
+
+  const checkPhoneStatus = async () => {
+    if (!profileId) return
+
+    setIsCheckingStatus(true)
+    try {
+      const response = await fetch('/api/geelark/phone-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile_ids: [profileId]
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      const status = data.statuses?.[0]
+      if (status) {
+        setPhoneStatus(status.status || 'unknown')
+      }
+    } catch (error) {
+      console.error('Failed to check phone status:', error)
+    } finally {
+      setIsCheckingStatus(false)
+    }
+  }
+
   const handleStartPhone = async () => {
     if (!profileId) {
       showNotification('error', 'No profile ID available')
@@ -63,6 +102,9 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       if (!response.ok) throw new Error(data.error)
 
       showNotification('success', 'Phone started successfully')
+      setPhoneStatus('starting')
+      // Check status after a delay
+      setTimeout(checkPhoneStatus, 3000)
       onActionComplete?.()
     } catch (error) {
       showNotification('error', `Failed to start phone: ${error}`)
@@ -92,6 +134,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       if (!response.ok) throw new Error(data.error)
 
       showNotification('success', 'Phone stopped successfully')
+      setPhoneStatus('stopped')
       onActionComplete?.()
     } catch (error) {
       showNotification('error', `Failed to stop phone: ${error}`)
@@ -300,67 +343,99 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       )}
 
       <div className="flex flex-wrap gap-2">
-        {/* Start Phone */}
-        <button
-          onClick={handleStartPhone}
-          disabled={isStartingPhone || !profileId}
-          className="btn-secondary text-xs flex items-center gap-2"
-        >
-          {isStartingPhone ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Power className="h-4 w-4" />
-          )}
-          Start Phone
-        </button>
+        {/* Phone Status Indicator */}
+        <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-md text-xs">
+          <div className={`w-2 h-2 rounded-full ${
+            phoneStatus === 'started' ? 'bg-green-500' :
+            phoneStatus === 'starting' ? 'bg-yellow-500 animate-pulse' :
+            phoneStatus === 'stopped' ? 'bg-red-500' :
+            phoneStatus === 'expired' ? 'bg-gray-500' :
+            'bg-gray-400'
+          }`} />
+          <span className="text-gray-700 dark:text-gray-300">
+            {phoneStatus === 'started' ? 'Running' :
+             phoneStatus === 'starting' ? 'Starting...' :
+             phoneStatus === 'stopped' ? 'Stopped' :
+             phoneStatus === 'expired' ? 'Expired' :
+             'Unknown'}
+          </span>
+          <button
+            onClick={checkPhoneStatus}
+            disabled={isCheckingStatus}
+            className="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <RefreshCw className={`h-3 w-3 ${isCheckingStatus ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
 
-        {/* Stop Phone */}
-        <button
-          onClick={handleStopPhone}
-          disabled={isStoppingPhone || !profileId}
-          className="btn-secondary text-xs flex items-center gap-2"
-        >
-          {isStoppingPhone ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Power className="h-4 w-4 text-red-500" />
-          )}
-          Stop Phone
-        </button>
+        {/* Start/Stop Phone - Show based on status */}
+        {phoneStatus !== 'started' && phoneStatus !== 'starting' ? (
+          <button
+            onClick={handleStartPhone}
+            disabled={isStartingPhone || !profileId || phoneStatus === 'expired'}
+            className="btn-secondary text-xs flex items-center gap-2"
+          >
+            {isStartingPhone ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Power className="h-4 w-4" />
+            )}
+            Start Phone
+          </button>
+        ) : (
+          <button
+            onClick={handleStopPhone}
+            disabled={isStoppingPhone || !profileId}
+            className="btn-secondary text-xs flex items-center gap-2"
+          >
+            {isStoppingPhone ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Power className="h-4 w-4 text-red-500" />
+            )}
+            Stop Phone
+          </button>
+        )}
 
-        {/* Explore Apps (Debug) */}
-        <button
-          onClick={handleExploreApps}
-          disabled={!profileId}
-          className="btn-secondary text-xs flex items-center gap-2"
-        >
-          <Smartphone className="h-4 w-4" />
-          Explore Apps
-        </button>
-
-        {/* Install TikTok */}
-        <button
-          onClick={handleInstallTikTok}
-          disabled={isInstalling || !profileId}
-          className="btn-secondary text-xs flex items-center gap-2"
-        >
-          {isInstalling ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
+        {/* Explore Apps (Debug) - Only show when phone is running */}
+        {phoneStatus === 'started' && (
+          <button
+            onClick={handleExploreApps}
+            disabled={!profileId}
+            className="btn-secondary text-xs flex items-center gap-2"
+          >
             <Smartphone className="h-4 w-4" />
-          )}
-          Install TikTok
-        </button>
+            Explore Apps
+          </button>
+        )}
 
-        {/* Login Button */}
-        <button
-          onClick={() => setShowLoginModal(true)}
-          disabled={!profileId}
-          className="btn-secondary text-xs flex items-center gap-2"
-        >
-          <LogIn className="h-4 w-4" />
-          Login
-        </button>
+        {/* Install TikTok - Only show when phone is running */}
+        {phoneStatus === 'started' && (
+          <button
+            onClick={handleInstallTikTok}
+            disabled={isInstalling || !profileId}
+            className="btn-secondary text-xs flex items-center gap-2"
+          >
+            {isInstalling ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Smartphone className="h-4 w-4" />
+            )}
+            Install TikTok
+          </button>
+        )}
+
+        {/* Login Button - Only show when phone is running */}
+        {phoneStatus === 'started' && (
+          <button
+            onClick={() => setShowLoginModal(true)}
+            disabled={!profileId}
+            className="btn-secondary text-xs flex items-center gap-2"
+          >
+            <LogIn className="h-4 w-4" />
+            Login
+          </button>
+        )}
 
         {/* Warmup Button */}
         <button
