@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -37,6 +38,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-start justify-center bg-gray-50 dark:bg-dark-900 transition-colors pt-60">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/spectre.png"
+              alt="Spectre"
+              width={64}
+              height={64}
+              className="rounded-xl"
+            />
+          </div>
           <h1 className="text-3xl brand-title text-gray-900 dark:text-dark-100">SPECTRE</h1>
           <p className="mt-2 text-sm body-text dark:text-dark-400">
             Sign In

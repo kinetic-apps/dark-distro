@@ -50,7 +50,7 @@ export default function TemplatesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-dark-500" />
       </div>
     )
   }
@@ -80,9 +80,9 @@ export default function TemplatesPage() {
       {/* Templates Grid */}
       {templates.length === 0 ? (
         <div className="card-lg text-center py-16">
-          <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-base font-medium text-gray-900">No templates yet</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <FolderOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-dark-500" />
+          <h3 className="mt-4 text-base font-medium text-gray-900 dark:text-dark-100">No templates yet</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
             Templates are created automatically when you generate images
           </p>
           <button
@@ -105,8 +105,8 @@ export default function TemplatesPage() {
                     className="w-full h-full object-cover rounded-t-lg"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gray-100 rounded-t-lg flex items-center justify-center">
-                    <ImageIcon className="h-8 w-8 text-gray-400" />
+                  <div className="w-full h-full bg-gray-100 dark:bg-dark-700 rounded-t-lg flex items-center justify-center">
+                    <ImageIcon className="h-8 w-8 text-gray-400 dark:text-dark-500" />
                   </div>
                 )}
                 
@@ -116,8 +116,8 @@ export default function TemplatesPage() {
                     e.stopPropagation()
                     toggleFavorite(template.id)
                   }}
-                  className={`absolute top-2 right-2 p-2 rounded-md bg-white shadow-sm hover:shadow-md transition-all ${
-                    template.is_favorite ? 'text-yellow-500' : 'text-gray-400'
+                  className={`absolute top-2 right-2 p-2 rounded-md bg-white dark:bg-dark-700 shadow-sm hover:shadow-md transition-all ${
+                    template.is_favorite ? 'text-yellow-500' : 'text-gray-400 dark:text-dark-500'
                   }`}
                 >
                   <Star className={`h-4 w-4 ${template.is_favorite ? 'fill-current' : ''}`} />
@@ -127,13 +127,13 @@ export default function TemplatesPage() {
               {/* Content */}
               <div className="space-y-3">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 truncate">{template.name}</h3>
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-dark-100 truncate">{template.name}</h3>
                   {template.description && (
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{template.description}</p>
+                    <p className="text-xs text-gray-500 dark:text-dark-400 mt-1 line-clamp-2">{template.description}</p>
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-dark-400">
                   <span>{template.source_images.length} images</span>
                 </div>
                 

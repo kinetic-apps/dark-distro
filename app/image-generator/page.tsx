@@ -9,9 +9,13 @@ import {
   X,
   Briefcase,
   FileText,
-  Plus
+  Plus,
+  Maximize
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
+import { AntiShadowbanSettings } from '@/components/anti-shadowban-settings'
+import { DEFAULT_ANTI_SHADOWBAN_SETTINGS } from '@/lib/constants/anti-shadowban'
+import type { ImageGenerationSettings } from '@/lib/types/image-generation'
 
 interface ImageWithPrompt {
   file: File
@@ -25,6 +29,10 @@ export default function ImageGeneratorPage() {
   const [images, setImages] = useState<ImageWithPrompt[]>([])
   const [jobName, setJobName] = useState('')
   const [variants, setVariants] = useState(1)
+  const [settings, setSettings] = useState<ImageGenerationSettings>({
+    aspect_ratio: 'auto',
+    antiShadowban: DEFAULT_ANTI_SHADOWBAN_SETTINGS
+  })
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -32,7 +40,7 @@ export default function ImageGeneratorPage() {
       const newImages = files.map(file => ({
         file,
         previewUrl: URL.createObjectURL(file),
-        prompt: 'Create a variation of this image'
+        prompt: ''
       }))
       
       setImages([...images, ...newImages])
@@ -67,11 +75,16 @@ export default function ImageGeneratorPage() {
       // Prepare the prompts array in the same order as images
       const prompts = images.map(img => img.prompt)
       
-      // Create the job with prompts array
+      // Create the job with prompts array and settings
+      const jobData = {
+        prompts: prompts,
+        settings: settings
+      }
+      
       const job = await ImageGenerationService.createJob({
         name: jobName,
         template_name: `${jobName} Template`,
-        prompt: JSON.stringify(prompts), // Store prompts as JSON
+        prompt: JSON.stringify(jobData), // Store prompts and settings as JSON
         variants: variants,
         source_images: images.map(img => img.file)
       })
@@ -170,23 +183,23 @@ export default function ImageGeneratorPage() {
                         />
                         <button
                           onClick={() => removeImage(index)}
-                          className="absolute top-2 right-2 p-1.5 bg-white dark:bg-dark-800 rounded-full shadow-sm hover:shadow-md transition-shadow"
+                          className="absolute top-2 right-2 p-1.5 bg-white dark:bg-dark-700 rounded-full shadow-sm hover:shadow-md transition-shadow"
                         >
                           <X className="h-4 w-4 text-gray-600 dark:text-dark-300" />
                         </button>
-                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-sm">
+                        <div className="absolute bottom-2 left-2 bg-black dark:bg-dark-800 bg-opacity-75 dark:bg-opacity-90 text-white dark:text-dark-100 px-2 py-1 rounded text-sm">
                           Image {index + 1}
                         </div>
                       </div>
                       
                       <div>
-                        <label className="label text-xs">Prompt for this image</label>
+                        <label className="label text-xs">Text to replace in this image</label>
                         <textarea
                           value={image.prompt}
                           onChange={(e) => updateImagePrompt(index, e.target.value)}
                           rows={3}
-                          className="input text-sm resize-none"
-                          placeholder="Describe how to transform this specific image..."
+                          className="input text-sm resize-none placeholder:text-gray-400 dark:placeholder:text-dark-500"
+                          placeholder="New Product Launch"
                         />
                       </div>
                     </div>
@@ -202,7 +215,7 @@ export default function ImageGeneratorPage() {
                     onChange={handleFileSelect}
                     className="hidden"
                   />
-                  <div className="card h-full min-h-[320px] flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors">
+                  <div className="card h-full min-h-[320px] flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors">
                     <div className="text-center">
                       <Plus className="mx-auto h-8 w-8 text-gray-400 dark:text-dark-500" />
                       <p className="mt-2 text-sm text-gray-600 dark:text-dark-300">Add more images</p>
@@ -212,7 +225,7 @@ export default function ImageGeneratorPage() {
               </div>
               
               <div className="text-sm text-gray-500 dark:text-dark-400">
-                <p>Tip: Each image in your carousel can have its own unique prompt for targeted variations</p>
+                <p>Tip: Each image can have different replacement text. Just enter the text you want - no need for complex prompts!</p>
               </div>
             </div>
           )}
@@ -222,26 +235,58 @@ export default function ImageGeneratorPage() {
         {images.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <div className="card-lg">
-                <h3 className="text-base font-medium text-gray-900 dark:text-dark-100 mb-4">Generation Settings</h3>
+              <div className="card-lg space-y-6">
+                <h3 className="text-base font-medium text-gray-900 dark:text-dark-100">Generation Settings</h3>
                 
-                <div>
-                  <label className="label">Number of Carousel Variations</label>
-                  <select
-                    value={variants}
-                    onChange={(e) => setVariants(parseInt(e.target.value))}
-                    className="select w-full"
-                  >
-                    {[1, 2, 3, 4, 5].map(num => (
-                      <option key={num} value={num}>
-                        {num} complete carousel{num > 1 ? 's' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
-                    Each variation will create a full carousel with all {images.length} images
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Number of Carousel Variations</label>
+                    <select
+                      value={variants}
+                      onChange={(e) => setVariants(parseInt(e.target.value))}
+                      className="select w-full"
+                    >
+                      {[1, 2, 3, 4, 5].map(num => (
+                        <option key={num} value={num}>
+                          {num} complete carousel{num > 1 ? 's' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
+                      Each variation will create a full carousel
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="label">
+                      <Maximize className="inline h-3 w-3 mr-1" />
+                      Aspect Ratio
+                    </label>
+                    <select
+                      value={settings.aspect_ratio || 'auto'}
+                      onChange={(e) => setSettings({ ...settings, aspect_ratio: e.target.value as any })}
+                      className="select w-full"
+                    >
+                      <option value="auto">Auto (preserve original)</option>
+                      <option value="1:1">1:1 Square</option>
+                      <option value="3:2">3:2 Landscape</option>
+                      <option value="2:3">2:3 Portrait</option>
+                      <option value="16:9">16:9 Widescreen</option>
+                      <option value="9:16">9:16 Vertical (Stories)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
+                      Auto mode preserves each image's original aspect ratio
+                    </p>
+                  </div>
                 </div>
+              </div>
+              
+              {/* Anti-Shadowban Settings */}
+              <div className="mt-6">
+                <AntiShadowbanSettings
+                  settings={settings.antiShadowban!}
+                  onChange={(antiShadowban) => setSettings({ ...settings, antiShadowban })}
+                />
               </div>
             </div>
 
@@ -260,6 +305,18 @@ export default function ImageGeneratorPage() {
                   <div className="flex justify-between">
                     <dt className="text-gray-600 dark:text-dark-300">Total images</dt>
                     <dd className="font-medium text-gray-900 dark:text-dark-100">{images.length * variants}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600 dark:text-dark-300">Aspect ratio</dt>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100">
+                      {settings.aspect_ratio === 'auto' ? 'Auto' : settings.aspect_ratio}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600 dark:text-dark-300">Anti-shadowban</dt>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100 capitalize">
+                      {settings.antiShadowban?.preset || 'Standard'}
+                    </dd>
                   </div>
                 </dl>
                 

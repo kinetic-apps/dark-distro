@@ -11,10 +11,11 @@ import {
   Clock,
   Grid,
   List,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
-import type { GeneratedCarouselImage } from '@/lib/types/image-generation'
+import type { GeneratedCarouselImage, ImageGenerationSettings } from '@/lib/types/image-generation'
 
 export default function JobDetailsPage() {
   const params = useParams()
@@ -59,7 +60,7 @@ export default function JobDetailsPage() {
       if (status === 'processing') {
         loadJobData()
       }
-    }, 2000)
+    }, 1000) // Faster polling for better responsiveness
 
     return () => clearInterval(interval)
   }, [loadJobData, status])
@@ -75,6 +76,21 @@ export default function JobDetailsPage() {
     }
   }
 
+  const handleRetry = async () => {
+    if (!confirm('Are you sure you want to retry this job? This will regenerate all images.')) return
+    
+    try {
+      // Start processing in background - this will reset the job state in the database
+      await ImageGenerationService.processJobInBackground(jobId)
+      
+      // Immediately reload job data to get the updated state from database
+      await loadJobData()
+    } catch (error) {
+      console.error('Error retrying job:', error)
+      alert('Failed to retry job')
+    }
+  }
+
   const downloadAll = () => {
     images.forEach((image) => {
       const link = document.createElement('a')
@@ -87,7 +103,7 @@ export default function JobDetailsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-dark-500" />
       </div>
     )
   }
@@ -95,7 +111,7 @@ export default function JobDetailsPage() {
   if (!job) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500">Job not found</p>
+        <p className="text-gray-500 dark:text-dark-400">Job not found</p>
       </div>
     )
   }
@@ -117,7 +133,7 @@ export default function JobDetailsPage() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/image-generator/jobs')}
-              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-md transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
@@ -138,8 +154,16 @@ export default function JobDetailsPage() {
               </button>
             )}
             <button
+              onClick={handleRetry}
+              className="btn-secondary"
+              disabled={status === 'processing'}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </button>
+            <button
               onClick={handleDelete}
-              className="btn-secondary text-red-600 hover:bg-red-50"
+              className="btn-secondary text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
@@ -152,21 +176,21 @@ export default function JobDetailsPage() {
       <div className="card-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {status === 'processing' && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
-            {status === 'completed' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-            {status === 'failed' && <XCircle className="h-5 w-5 text-red-600" />}
-            {status === 'queued' && <Clock className="h-5 w-5 text-gray-400" />}
+            {status === 'processing' && <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />}
+            {status === 'completed' && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
+            {status === 'failed' && <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />}
+            {status === 'queued' && <Clock className="h-5 w-5 text-gray-400 dark:text-dark-500" />}
             
             <div>
               <p className="font-medium capitalize">{status}</p>
-              <p className="text-sm text-gray-600">{message}</p>
+              <p className="text-sm text-gray-600 dark:text-dark-300">{message}</p>
             </div>
           </div>
           
           {status === 'processing' && (
             <div className="text-right">
               <p className="text-sm font-medium">{progress}%</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-dark-400">
                 {images.length} of {job.variants * (images.length > 0 ? Math.ceil(images.length / job.variants) : 3)} images
               </p>
             </div>
@@ -175,24 +199,85 @@ export default function JobDetailsPage() {
 
         {/* Progress Bar */}
         {status === 'processing' && (
-          <div className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div className="mt-4 w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2 overflow-hidden">
             <div 
-              className="bg-blue-600 h-full transition-all duration-500 ease-out"
+              className="bg-blue-600 dark:bg-blue-500 h-full transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
         )}
       </div>
 
+      {/* Job Settings */}
+      {(() => {
+        try {
+          const jobData = JSON.parse(job.prompt)
+          const settings: ImageGenerationSettings | undefined = jobData.settings
+          
+          if (settings?.antiShadowban) {
+            return (
+              <div className="card-lg">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-dark-100 mb-3">Generation Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-dark-300">Aspect Ratio:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-dark-100">
+                      {settings.aspect_ratio === 'auto' ? 'Auto' : settings.aspect_ratio}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-dark-300">Anti-Shadowban:</span>
+                    <span className="ml-2 font-medium text-gray-900 dark:text-dark-100 capitalize">
+                      {settings.antiShadowban.preset}
+                    </span>
+                  </div>
+                  {settings.antiShadowban.preset === 'custom' && (
+                    <>
+                      <div>
+                        <span className="text-gray-600 dark:text-dark-300">Metadata:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-dark-100">
+                          {settings.antiShadowban.metadata.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 dark:text-dark-300">Borders:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-dark-100">
+                          {settings.antiShadowban.borders.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 dark:text-dark-300">Fractures:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-dark-100">
+                          {settings.antiShadowban.fractures.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 dark:text-dark-300">Micro-noise:</span>
+                        <span className="ml-2 font-medium text-gray-900 dark:text-dark-100">
+                          {settings.antiShadowban.microNoise.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          }
+        } catch {
+          // Ignore parsing errors for old jobs
+        }
+        return null
+      })()}
+
       {/* View Mode Toggle */}
       {images.length > 0 && (
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-medium text-gray-900">Generated Carousels</h2>
+          <h2 className="text-base font-medium text-gray-900 dark:text-dark-100">Generated Carousels</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-md transition-colors ${
-                viewMode === 'grid' ? 'bg-gray-100' : 'hover:bg-gray-50'
+                viewMode === 'grid' ? 'bg-gray-100 dark:bg-dark-700' : 'hover:bg-gray-50 dark:hover:bg-dark-800'
               }`}
               title="Grid view"
             >
@@ -201,7 +286,7 @@ export default function JobDetailsPage() {
             <button
               onClick={() => setViewMode('carousel')}
               className={`p-2 rounded-md transition-colors ${
-                viewMode === 'carousel' ? 'bg-gray-100' : 'hover:bg-gray-50'
+                viewMode === 'carousel' ? 'bg-gray-100 dark:bg-dark-700' : 'hover:bg-gray-50 dark:hover:bg-dark-800'
               }`}
               title="Carousel view"
             >
@@ -220,7 +305,7 @@ export default function JobDetailsPage() {
               {Object.entries(imagesByVariant).map(([variantIndex, variantImages]) => (
                 <div key={variantIndex} className="card-lg">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-900">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-dark-100">
                       Carousel Variant {parseInt(variantIndex) + 1}
                     </h3>
                     <button
@@ -254,17 +339,17 @@ export default function JobDetailsPage() {
                               <a
                                 href={image.generated_image_url}
                                 download={`${job.name}_carousel${parseInt(variantIndex) + 1}_image${image.image_index + 1}.png`}
-                                className="p-2 bg-white rounded-md shadow-lg hover:shadow-xl transition-shadow"
+                                className="p-2 bg-white dark:bg-dark-700 rounded-md shadow-lg hover:shadow-xl transition-shadow"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Download className="h-4 w-4" />
                               </a>
                             </div>
-                            <div className="absolute bottom-1 left-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">
+                            <div className="absolute bottom-1 left-1 bg-black dark:bg-dark-800 bg-opacity-75 dark:bg-opacity-90 text-white dark:text-dark-100 text-xs px-1.5 py-0.5 rounded">
                               {idx + 1}
                             </div>
                           </div>
-                          <p className="text-xs text-gray-500 text-center mt-1 line-clamp-1">
+                          <p className="text-xs text-gray-500 dark:text-dark-400 text-center mt-1 line-clamp-1">
                             {image.prompt_used}
                           </p>
                         </div>
@@ -281,7 +366,7 @@ export default function JobDetailsPage() {
                   <select
                     value={selectedVariant}
                     onChange={(e) => setSelectedVariant(Number(e.target.value))}
-                    className="px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    className="px-3 py-1.5 border border-gray-300 dark:border-dark-600 rounded-md text-sm dark:bg-dark-800 dark:text-dark-100"
                   >
                     {Array.from({ length: variantCount }, (_, i) => (
                       <option key={i} value={i}>
@@ -320,10 +405,10 @@ export default function JobDetailsPage() {
                       />
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-gray-900 dark:text-dark-100">
                             Image {image.image_index + 1} of {imagesByVariant[selectedVariant].length}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="text-xs text-gray-500 dark:text-dark-400 truncate">
                             {image.prompt_used}
                           </p>
                         </div>
@@ -347,7 +432,7 @@ export default function JobDetailsPage() {
       {/* Empty State */}
       {status === 'completed' && images.length === 0 && (
         <div className="card-lg text-center py-12">
-          <p className="text-gray-500">No images were generated</p>
+          <p className="text-gray-500 dark:text-dark-400">No images were generated</p>
         </div>
       )}
 
@@ -356,11 +441,11 @@ export default function JobDetailsPage() {
         <div className="card-lg">
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <div className="relative">
-              <div className="h-20 w-20 rounded-full border-4 border-gray-200"></div>
-              <div className="absolute inset-0 h-20 w-20 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+              <div className="h-20 w-20 rounded-full border-4 border-gray-200 dark:border-dark-700"></div>
+              <div className="absolute inset-0 h-20 w-20 rounded-full border-4 border-blue-600 dark:border-blue-500 border-t-transparent animate-spin"></div>
             </div>
-            <p className="text-gray-900 font-medium">Generating your images...</p>
-            <p className="text-sm text-gray-500">This typically takes 20-30 seconds per image</p>
+            <p className="text-gray-900 dark:text-dark-100 font-medium">Generating your images...</p>
+            <p className="text-sm text-gray-500 dark:text-dark-400">This typically takes 20-30 seconds per image</p>
           </div>
         </div>
       )}

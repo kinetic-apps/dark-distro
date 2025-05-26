@@ -61,28 +61,28 @@ export default function JobsPage() {
     switch (status) {
       case 'processing':
         return (
-          <div className="flex items-center gap-1.5 text-blue-700">
+          <div className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400">
             <Loader2 className="h-3 w-3 animate-spin" />
             <span className="text-xs font-medium">Processing</span>
           </div>
         )
       case 'completed':
         return (
-          <div className="flex items-center gap-1.5 text-green-700">
+          <div className="flex items-center gap-1.5 text-green-700 dark:text-green-400">
             <CheckCircle2 className="h-3 w-3" />
             <span className="text-xs font-medium">Completed</span>
           </div>
         )
       case 'failed':
         return (
-          <div className="flex items-center gap-1.5 text-red-700">
+          <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400">
             <XCircle className="h-3 w-3" />
             <span className="text-xs font-medium">Failed</span>
           </div>
         )
       default:
         return (
-          <div className="flex items-center gap-1.5 text-gray-600">
+          <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
             <Clock className="h-3 w-3" />
             <span className="text-xs font-medium">Queued</span>
           </div>
@@ -101,7 +101,7 @@ export default function JobsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-dark-500" />
       </div>
     )
   }
@@ -162,9 +162,9 @@ export default function JobsPage() {
       {/* Jobs List */}
       {filteredJobs.length === 0 ? (
         <div className="card-lg text-center py-12">
-          <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-sm font-medium text-gray-900">No jobs found</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <ImageIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-dark-500" />
+          <h3 className="mt-4 text-sm font-medium text-gray-900 dark:text-dark-100">No jobs found</h3>
+          <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
             {searchTerm || statusFilter !== 'all' 
               ? 'Try adjusting your filters'
               : 'Get started by creating your first job'}
@@ -190,17 +190,17 @@ export default function JobsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-dark-100 truncate">
                       {job.name}
                     </h3>
                     {getStatusBadge(job.status)}
                   </div>
                   
-                  <p className="mt-1 text-sm text-gray-600 truncate">
+                  <p className="mt-1 text-sm text-gray-600 dark:text-dark-300 truncate">
                     {job.prompt}
                   </p>
                   
-                  <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                  <div className="mt-2 flex items-center gap-4 text-xs text-gray-500 dark:text-dark-400">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       {format(new Date(job.created_at), 'MMM d, h:mm a')}
@@ -208,9 +208,9 @@ export default function JobsPage() {
                     
                     {job.status === 'processing' && job.progress > 0 && (
                       <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-1">
+                        <div className="w-20 bg-gray-200 dark:bg-dark-700 rounded-full h-1">
                           <div 
-                            className="bg-blue-600 h-1 rounded-full transition-all"
+                            className="bg-blue-600 dark:bg-blue-500 h-1 rounded-full transition-all"
                             style={{ width: `${job.progress}%` }}
                           />
                         </div>
@@ -227,7 +227,7 @@ export default function JobsPage() {
                 <div className="flex items-center gap-2 ml-4">
                   <button
                     onClick={(e) => handleDelete(e, job.id)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

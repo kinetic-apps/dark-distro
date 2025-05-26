@@ -6,6 +6,33 @@ import ConditionalLayout from "@/components/ConditionalLayout";
 export const metadata: Metadata = {
   title: "SPECTRE - Advanced Cloud Operations Control Center",
   description: "Advanced cloud phone management, proxy orchestration, and content distribution platform",
+  icons: {
+    icon: [
+      {
+        url: '/favicon.ico',
+        sizes: '32x32',
+        type: 'image/x-icon',
+      },
+      {
+        url: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        url: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+      }
+    ],
+    apple: [
+      {
+        url: '/spectre.png',
+        sizes: '180x180',
+        type: 'image/png',
+      }
+    ],
+    shortcut: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

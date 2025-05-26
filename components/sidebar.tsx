@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import Image from 'next/image'
 import { 
   Home, 
   Users, 
   Wifi, 
   MessageSquare, 
-  Image, 
+  Image as ImageIcon, 
   Send, 
   FileText,
   Settings,
@@ -23,7 +24,7 @@ const navigation = [
   { name: 'Profiles', href: '/profiles', icon: Users },
   { name: 'Proxies', href: '/proxies', icon: Wifi },
   { name: 'SMS', href: '/sms', icon: MessageSquare },
-  { name: 'Assets', href: '/assets', icon: Image },
+  { name: 'Assets', href: '/assets', icon: ImageIcon },
   { name: 'Image Gen', href: '/image-generator', icon: Wand2 },
   { name: 'Posts', href: '/posts', icon: Send },
   { name: 'Logs', href: '/logs', icon: FileText },
@@ -44,7 +45,16 @@ export function Sidebar() {
     <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 dark:bg-dark-850 dark:border-dark-700 transition-colors duration-200">
       <div className="flex h-full flex-col">
         <div className="flex h-16 items-center px-6 border-b border-gray-200 dark:border-dark-700">
-          <h1 className="text-xl brand-title text-gray-900 dark:text-dark-100">SPECTRE</h1>
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <Image
+              src="/spectre.png"
+              alt="Spectre"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
+            <h1 className="text-xl brand-title text-gray-900 dark:text-dark-100">SPECTRE</h1>
+          </Link>
         </div>
         
         <nav className="flex-1 space-y-1 px-3 py-4">
