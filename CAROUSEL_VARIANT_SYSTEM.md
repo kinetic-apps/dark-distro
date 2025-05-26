@@ -4,6 +4,13 @@
 
 The carousel variant system has been redesigned to properly organize and track image generation outputs for automated TikTok carousel posting. This system creates a hierarchical folder structure and provides APIs for Geelark integration.
 
+## Key Features
+
+- **High Volume Support**: Generate up to 500 carousel variants per job
+- **Efficient Processing**: Optimized for large-scale generation with progress tracking
+- **Smart UI**: Pagination and navigation controls for managing large variant sets
+- **Performance Monitoring**: Detailed logging and progress updates for long-running jobs
+
 ## Storage Structure
 
 ```
@@ -28,6 +35,36 @@ generated-carousels/
   - Traceable to source job and variant
   - Unique identifiers prevent collisions
   - Easy programmatic parsing
+
+## Performance Considerations
+
+### Large Job Handling (50+ variants)
+- **Progress Updates**: More frequent updates for better visibility
+- **Time Estimates**: ~30 seconds per image × number of images × variants
+- **UI Optimizations**: 
+  - Pagination for grid view (10 variants per page)
+  - Number input navigation for 20+ variants
+  - Warning messages for jobs over 50 variants
+
+### Example Time Estimates
+- 10 variants × 5 images = 50 images (~25 minutes)
+- 100 variants × 5 images = 500 images (~4 hours)
+- 500 variants × 5 images = 2,500 images (~21 hours)
+
+## UI Enhancements
+
+### Image Generator Page
+- **Variant Input**: Number input with quick select dropdown
+- **Range**: 1-500 variants supported
+- **Warnings**: Visual alerts for large jobs
+- **Time Estimates**: Dynamic calculation based on variant count
+
+### Job Details Page
+- **Grid View**: Paginated display for large variant sets
+- **Carousel View**: 
+  - Dropdown for ≤20 variants
+  - Number input with prev/next navigation for >20 variants
+- **Performance**: Optimized rendering for thousands of images
 
 ## Database Schema
 

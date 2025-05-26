@@ -6,7 +6,7 @@ export interface ImageGenerationJob {
   template_description?: string
   prompt: string
   variants: number
-  status: 'queued' | 'processing' | 'completed' | 'failed'
+  status: 'queued' | 'processing' | 'completed' | 'completed_partial' | 'failed'
   progress: number
   message?: string
   created_at: string

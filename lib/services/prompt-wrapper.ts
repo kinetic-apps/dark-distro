@@ -31,7 +31,7 @@ export function wrapTextReplacementPrompt(
     .replace(/"/g, '\\"')    // Escape quotes
 
   // Create an extremely specific prompt that leaves no room for interpretation
-  let prompt = `INSTRUCTION: Replace ONLY the text characters in this image with exactly: "${escapedText}". `
+  let prompt = `CRITICAL INSTRUCTION: Replace ONLY the text characters in this image with EXACTLY these characters: "${escapedText}". DO NOT change, add, or remove ANY characters - use PRECISELY: "${escapedText}". `
   
   // Ultra-specific preservation requirements
   prompt += `ABSOLUTE REQUIREMENTS - DO NOT CHANGE ANY OF THE FOLLOWING: `
@@ -59,7 +59,7 @@ export function wrapTextReplacementPrompt(
   prompt += `- Do NOT change colors even slightly - use EXACT same color values. `
   
   // Final emphasis
-  prompt += `SUMMARY: This is a pure character replacement task. Imagine you are selecting each character in a text editor and typing new characters while keeping all formatting intact. The result should be indistinguishable from the original except for the actual letters/numbers/symbols being different. Every single visual property must remain EXACTLY the same.`
+  prompt += `SUMMARY: This is a pure character replacement task. The new text MUST be EXACTLY "${escapedText}" - not similar, not close, but EXACTLY those characters in that exact order. Imagine you are selecting each character in a text editor and typing new characters while keeping all formatting intact. The result should be indistinguishable from the original except for the actual letters/numbers/symbols being different to show EXACTLY: "${escapedText}". Every single visual property must remain EXACTLY the same.`
 
   return prompt
 }

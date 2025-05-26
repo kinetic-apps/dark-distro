@@ -156,6 +156,34 @@ export class ImageGenerationService {
     }
   }
 
+  // Get logs for a job
+  static async getJobLogs(jobId: string): Promise<{
+    id: string
+    job_id: string
+    level: string
+    step: string
+    message: string
+    details: any
+    created_at: string
+  }[]> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data: logs, error } = await supabase
+      .from('image_generation_logs')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching logs:', error)
+      return []
+    }
+
+    return logs || []
+  }
+
   static async getRecentJobs(limit = 10): Promise<ImageGenerationJob[]> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')

@@ -332,20 +332,44 @@ export default function ImageGeneratorPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Number of Carousel Variations</label>
-                    <select
-                      value={variants}
-                      onChange={(e) => setVariants(parseInt(e.target.value))}
-                      className="select w-full"
-                    >
-                      {[1, 2, 3, 4, 5].map(num => (
-                        <option key={num} value={num}>
-                          {num} complete carousel{num > 1 ? 's' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
-                      Each variation will create a full carousel
-                    </p>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={variants}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value) || 1
+                            setVariants(Math.min(Math.max(value, 1), 500))
+                          }}
+                          min="1"
+                          max="500"
+                          className="input flex-1"
+                          placeholder="Enter number"
+                        />
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setVariants(parseInt(e.target.value))
+                            }
+                          }}
+                          className="select"
+                        >
+                          <option value="">Quick select</option>
+                          <option value="1">1 variant</option>
+                          <option value="5">5 variants</option>
+                          <option value="10">10 variants</option>
+                          <option value="25">25 variants</option>
+                          <option value="50">50 variants</option>
+                          <option value="100">100 variants</option>
+                          <option value="250">250 variants</option>
+                          <option value="500">500 variants</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-dark-400">
+                        Each variation will create a full carousel (max: 500)
+                      </p>
+                    </div>
                   </div>
                   
                   <div>
@@ -391,11 +415,11 @@ export default function ImageGeneratorPage() {
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-gray-600 dark:text-dark-300">Carousel variations</dt>
-                    <dd className="font-medium text-gray-900 dark:text-dark-100">{variants}</dd>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100">{variants.toLocaleString()}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-gray-600 dark:text-dark-300">Total images</dt>
-                    <dd className="font-medium text-gray-900 dark:text-dark-100">{images.length * variants}</dd>
+                    <dd className="font-medium text-gray-900 dark:text-dark-100">{(images.length * variants).toLocaleString()}</dd>
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-gray-600 dark:text-dark-300">Aspect ratio</dt>
@@ -411,6 +435,21 @@ export default function ImageGeneratorPage() {
                   </div>
                 </dl>
                 
+                {/* Warning for large jobs */}
+                {variants > 50 && (
+                  <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <p className="text-xs font-medium text-yellow-800 dark:text-yellow-200">
+                      Large job warning
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                      {variants > 100 
+                        ? `This will generate ${(images.length * variants).toLocaleString()} images and may take ${Math.ceil((images.length * variants * 30) / 60).toLocaleString()} minutes or more.`
+                        : `This job will take approximately ${Math.ceil((images.length * variants * 30) / 60)} minutes to complete.`
+                      }
+                    </p>
+                  </div>
+                )}
+                
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-dark-700">
                   <button
                     onClick={handleCreateJob}
@@ -425,12 +464,15 @@ export default function ImageGeneratorPage() {
                     ) : (
                       <>
                         <Sparkles className="mr-2 h-4 w-4" />
-                        Generate Carousels
+                        Generate {variants > 1 ? `${variants.toLocaleString()} Carousels` : 'Carousel'}
                       </>
                     )}
                   </button>
                   <p className="text-xs text-gray-500 dark:text-dark-400 text-center mt-3">
-                    ~30s per image × {images.length * variants} images
+                    {variants <= 10 
+                      ? `~30s per image × ${images.length * variants} images`
+                      : `Estimated time: ${Math.ceil((images.length * variants * 30) / 60).toLocaleString()} minutes`
+                    }
                   </p>
                 </div>
               </div>
