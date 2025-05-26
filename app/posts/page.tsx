@@ -66,15 +66,15 @@ export default async function PostsPage({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'queued':
-        return <Clock className="h-4 w-4 text-gray-400" />
+        return <Clock className="h-4 w-4 text-gray-400 dark:text-dark-500" />
       case 'processing':
-        return <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
+        return <RefreshCw className="h-4 w-4 text-blue-500 dark:text-blue-400 animate-spin" />
       case 'posted':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
       case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500" />
+        return <XCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
       case 'cancelled':
-        return <XCircle className="h-4 w-4 text-gray-400" />
+        return <XCircle className="h-4 w-4 text-gray-400 dark:text-dark-500" />
       default:
         return null
     }
@@ -118,14 +118,14 @@ export default async function PostsPage({
       </div>
 
       {params.action === 'launch' && (
-        <div className="card bg-blue-50 border-blue-200">
+        <div className="card bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/30">
           <div className="flex items-start">
-            <Send className="h-5 w-5 text-blue-600 mt-0.5 mr-3" />
+            <Send className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" />
             <div>
-              <h3 className="text-sm font-medium text-blue-900">
+              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300">
                 Launch Daily Campaign
               </h3>
-              <p className="text-sm text-blue-700 mt-1">
+              <p className="text-sm text-blue-700 dark:text-blue-400/80 mt-1">
                 This will automatically pair unused assets with all active profiles and create posts.
               </p>
               <button className="btn-primary mt-3">
@@ -262,7 +262,7 @@ export default async function PostsPage({
                       href={`https://www.tiktok.com/@${post.account?.tiktok_username}/video/${post.tiktok_post_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:text-blue-800 font-mono"
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-mono"
                     >
                       {post.tiktok_post_id.slice(-8)}
                     </a>

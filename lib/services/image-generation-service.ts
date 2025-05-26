@@ -211,6 +211,7 @@ export class ImageGenerationService {
     description?: string
     source_images: File[]
     default_prompt?: string
+    job_id?: string
   }): Promise<ImageGenerationTemplate> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('User not authenticated')
@@ -244,13 +245,35 @@ export class ImageGenerationService {
         source_images: imageUrls,
         thumbnail_url: imageUrls[0], // Use first image as thumbnail
         default_prompt: params.default_prompt,
-        user_id: user.id
+        user_id: user.id,
+        job_id: params.job_id
       })
       .select()
       .single()
 
     if (error) throw error
     return template
+  }
+
+  static async getTemplateByJobId(jobId: string): Promise<ImageGenerationTemplate | null> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const { data, error } = await supabase
+      .from('image_generation_templates')
+      .select('*')
+      .eq('job_id', jobId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') { // No rows returned
+        return null
+      }
+      throw error
+    }
+    
+    return data
   }
 
   static async getTemplates(): Promise<ImageGenerationTemplate[]> {

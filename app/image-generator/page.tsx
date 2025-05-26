@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   Upload,
   Loader2,
@@ -15,7 +15,7 @@ import {
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import { AntiShadowbanSettings } from '@/components/anti-shadowban-settings'
 import { DEFAULT_ANTI_SHADOWBAN_SETTINGS } from '@/lib/constants/anti-shadowban'
-import type { ImageGenerationSettings } from '@/lib/types/image-generation'
+import type { ImageGenerationSettings, ImageGenerationTemplate } from '@/lib/types/image-generation'
 
 interface ImageWithPrompt {
   file: File
@@ -25,7 +25,11 @@ interface ImageWithPrompt {
 
 export default function ImageGeneratorPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const templateId = searchParams.get('template')
+  
   const [isCreating, setIsCreating] = useState(false)
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
   const [images, setImages] = useState<ImageWithPrompt[]>([])
   const [jobName, setJobName] = useState('')
   const [variants, setVariants] = useState(1)
@@ -33,6 +37,83 @@ export default function ImageGeneratorPage() {
     aspect_ratio: 'auto',
     antiShadowban: DEFAULT_ANTI_SHADOWBAN_SETTINGS
   })
+
+  // Load template if template ID is provided
+  useEffect(() => {
+    if (templateId) {
+      loadTemplate(templateId)
+    }
+  }, [templateId])
+
+  const loadTemplate = async (id: string) => {
+    setIsLoadingTemplate(true)
+    try {
+      // Get all templates and find the one with matching ID
+      const templates = await ImageGenerationService.getTemplates()
+      const template = templates.find(t => t.id === id)
+      
+      if (!template) {
+        console.error('Template not found')
+        return
+      }
+
+      // Set job name from template
+      setJobName(template.name)
+
+      // Load source images from template
+      const loadedImages: ImageWithPrompt[] = []
+      
+      // Parse default prompt to get individual prompts if available
+      let prompts: string[] = []
+      try {
+        const promptData = JSON.parse(template.default_prompt || '{}')
+        if (promptData.prompts && Array.isArray(promptData.prompts)) {
+          prompts = promptData.prompts
+        }
+      } catch {
+        // If parsing fails, use empty prompts
+        prompts = new Array(template.source_images.length).fill('')
+      }
+
+      for (let i = 0; i < template.source_images.length; i++) {
+        const imageUrl = template.source_images[i]
+        
+        // Fetch the image
+        const response = await fetch(imageUrl)
+        const blob = await response.blob()
+        const file = new File([blob], `template_image_${i}.jpg`, { type: blob.type })
+        
+        loadedImages.push({
+          file,
+          previewUrl: imageUrl,
+          prompt: prompts[i] || ''
+        })
+      }
+
+      setImages(loadedImages)
+
+      // Parse and set settings if available from the prompt
+      try {
+        const promptData = JSON.parse(template.default_prompt || '{}')
+        if (promptData.settings) {
+          const templateSettings = promptData.settings as ImageGenerationSettings
+          if (templateSettings.aspect_ratio) {
+            setSettings(prev => ({ ...prev, aspect_ratio: templateSettings.aspect_ratio }))
+          }
+          if (templateSettings.antiShadowban) {
+            setSettings(prev => ({ ...prev, antiShadowban: templateSettings.antiShadowban }))
+          }
+        }
+      } catch {
+        // If parsing fails, use default settings
+      }
+    } catch (error) {
+      console.error('Error loading template:', error)
+      alert('Failed to load template')
+    } finally {
+      setIsLoadingTemplate(false)
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -105,6 +186,16 @@ export default function ImageGeneratorPage() {
 
   return (
     <div className="page-container">
+      {/* Loading Template Overlay */}
+      {isLoadingTemplate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-dark-800 rounded-lg p-6 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
+            <span className="text-gray-900 dark:text-dark-100">Loading template...</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="page-header">
         <h1 className="page-title">Carousel Generator</h1>

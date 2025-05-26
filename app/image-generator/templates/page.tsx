@@ -83,13 +83,13 @@ export default function TemplatesPage() {
           <FolderOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-dark-500" />
           <h3 className="mt-4 text-base font-medium text-gray-900 dark:text-dark-100">No templates yet</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
-            Templates are created automatically when you generate images
+            Save completed jobs as templates to reuse their configurations
           </p>
           <button
             onClick={() => router.push('/image-generator')}
             className="mt-4 btn-primary"
           >
-            Create Your First Template
+            Generate Your First Carousel
           </button>
         </div>
       ) : (

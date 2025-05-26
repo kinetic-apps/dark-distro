@@ -27,6 +27,7 @@ export interface ImageGenerationTemplate {
   is_favorite: boolean
   created_at: string
   user_id: string
+  job_id?: string
 }
 
 export interface GeneratedCarouselImage {

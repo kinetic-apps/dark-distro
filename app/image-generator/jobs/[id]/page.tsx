@@ -11,7 +11,9 @@ import {
   Grid,
   List,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Save,
+  FileText
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { GeneratedCarouselImage, ImageGenerationSettings } from '@/lib/types/image-generation'
@@ -30,6 +32,7 @@ export default function JobDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid')
   const [selectedVariant, setSelectedVariant] = useState<number>(0)
+  const [existingTemplate, setExistingTemplate] = useState<any>(null)
 
   const loadJobData = useCallback(async () => {
     try {
@@ -46,6 +49,16 @@ export default function JobDetailsPage() {
       setStatus(state.status)
       setMessage(state.message)
       setLoading(false)
+
+      // Check if a template already exists for this job
+      if (jobData.status === 'completed') {
+        try {
+          const template = await ImageGenerationService.getTemplateByJobId(jobId)
+          setExistingTemplate(template)
+        } catch (error) {
+          console.error('Error checking for existing template:', error)
+        }
+      }
     } catch (error) {
       console.error('Error loading job:', error)
       setLoading(false)
@@ -99,6 +112,49 @@ export default function JobDetailsPage() {
     await downloadMultipleFiles(files)
   }
 
+  const handleSaveAsTemplate = async () => {
+    try {
+      // Parse the job data to get source images
+      const { source_images: sourceImages } = JSON.parse(job.template_description || '{}')
+      if (!sourceImages || sourceImages.length === 0) {
+        alert('Cannot save as template: No source images found')
+        return
+      }
+
+      // Convert source image URLs to Files
+      const sourceFiles: File[] = []
+      for (let i = 0; i < sourceImages.length; i++) {
+        const response = await fetch(sourceImages[i])
+        const blob = await response.blob()
+        const file = new File([blob], `source_${i}.jpg`, { type: blob.type })
+        sourceFiles.push(file)
+      }
+
+      // Create the template - preserve the original prompt which includes settings
+      await ImageGenerationService.createTemplate({
+        name: job.template_name || job.name,
+        description: `Template created from job: ${job.name}`,
+        source_images: sourceFiles,
+        default_prompt: job.prompt, // This already contains prompts and settings as JSON
+        job_id: jobId
+      })
+
+      alert('Template saved successfully!')
+      
+      // Reload to update the button
+      await loadJobData()
+    } catch (error) {
+      console.error('Error saving template:', error)
+      alert('Failed to save template')
+    }
+  }
+
+  const handleViewTemplate = () => {
+    if (existingTemplate) {
+      router.push(`/image-generator?template=${existingTemplate.id}`)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -147,13 +203,32 @@ export default function JobDetailsPage() {
           
           <div className="flex items-center gap-2">
             {status === 'completed' && images.length > 0 && (
-              <button
-                onClick={downloadAll}
-                className="btn-secondary"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download All
-              </button>
+              <>
+                {existingTemplate ? (
+                  <button
+                    onClick={handleViewTemplate}
+                    className="btn-secondary"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Template
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSaveAsTemplate}
+                    className="btn-secondary"
+                  >
+                    <Save className="mr-2 h-4 w-4" />
+                    Save as Template
+                  </button>
+                )}
+                <button
+                  onClick={downloadAll}
+                  className="btn-secondary"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download All
+                </button>
+              </>
             )}
             <button
               onClick={handleRetry}
