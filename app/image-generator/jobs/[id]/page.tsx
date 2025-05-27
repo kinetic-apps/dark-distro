@@ -72,7 +72,7 @@ function AppleLoader() {
           
           {/* Center dot */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500" />
+            <div className="h-2 w-2 rounded-full bg-blue-500" />
           </div>
         </div>
       </div>
@@ -520,7 +520,7 @@ export default function JobDetailsPage() {
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2 overflow-hidden mb-3">
                   <div 
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-500 ease-out rounded-full"
+                    className="bg-blue-500 dark:bg-blue-600 h-full transition-all duration-500 ease-out rounded-full"
                     style={{ width: `${progress}%` }}
                   />
                 </div>

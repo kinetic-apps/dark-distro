@@ -379,6 +379,47 @@ export class ImageGenerationService {
     if (error) throw error
   }
 
+  static async deleteTemplate(templateId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Get template to delete source images from storage
+    const { data: template, error: fetchError } = await supabase
+      .from('image_generation_templates')
+      .select('source_images')
+      .eq('id', templateId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // Extract storage paths from URLs
+    if (template && template.source_images && template.source_images.length > 0) {
+      const paths = template.source_images
+        .map((url: string) => {
+          // Extract path from URL
+          const match = url.match(/generated-carousels\/(.+)$/)
+          return match ? match[1] : null
+        })
+        .filter((path: string | null) => path !== null) as string[]
+      
+      if (paths.length > 0) {
+        await supabase.storage
+          .from('generated-carousels')
+          .remove(paths)
+      }
+    }
+
+    // Delete template
+    const { error } = await supabase
+      .from('image_generation_templates')
+      .delete()
+      .eq('id', templateId)
+      .eq('user_id', user.id)
+
+    if (error) throw error
+  }
+
   static subscribeToJobUpdates(jobId: string, callback: (job: ImageGenerationJob) => void) {
     return supabase
       .channel(`job-${jobId}`)

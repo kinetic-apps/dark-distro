@@ -56,4 +56,66 @@ export async function downloadMultipleFiles(
       await new Promise(resolve => setTimeout(resolve, delayMs))
     }
   }
+}
+
+export async function downloadFile(url: string, filename: string) {
+  try {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Clean up
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (error) {
+    console.error('Error downloading file:', error)
+    throw error
+  }
+}
+
+export async function downloadFilesAsZip(
+  files: { url: string; filename: string }[],
+  zipFilename: string
+) {
+  try {
+    // Dynamic import JSZip to avoid loading it unless needed
+    const JSZip = (await import('jszip')).default
+    const zip = new JSZip()
+    
+    // Download all files and add to zip
+    const downloadPromises = files.map(async (file) => {
+      try {
+        const response = await fetch(file.url)
+        const blob = await response.blob()
+        zip.file(file.filename, blob)
+      } catch (error) {
+        console.error(`Error downloading ${file.filename}:`, error)
+      }
+    })
+    
+    await Promise.all(downloadPromises)
+    
+    // Generate zip file
+    const zipBlob = await zip.generateAsync({ type: 'blob' })
+    const downloadUrl = window.URL.createObjectURL(zipBlob)
+    
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = zipFilename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Clean up
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (error) {
+    console.error('Error creating zip file:', error)
+    throw error
+  }
 } 

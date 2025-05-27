@@ -18,7 +18,7 @@ export class GoogleAuthService {
   private static instance: GoogleAuthService
   private clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!
   private redirectUri = typeof window !== 'undefined' 
-    ? `${window.location.origin}/api/auth/google/callback`
+    ? `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/auth/google/callback`
     : ''
   
   // Scopes needed for Google Drive and user profile

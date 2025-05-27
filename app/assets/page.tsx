@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
+import { downloadFile, downloadFilesAsZip } from '@/lib/utils/download'
 import { 
   Image as ImageIcon, 
   Play, 
@@ -236,6 +237,40 @@ export default function AssetsPage() {
     }
   }
 
+  const downloadSlide = async (slide: VariantSlide) => {
+    await downloadFile(slide.image_url, slide.filename)
+  }
+
+  const downloadVariant = async (variant: CarouselVariant, job: ImageGenerationJob) => {
+    if (!variant.slides || variant.slides.length === 0) return
+    
+    const files = variant.slides.map(slide => ({
+      url: slide.image_url,
+      filename: slide.filename
+    }))
+    
+    const zipFilename = `${job.name}_variant_${variant.variant_index + 1}.zip`
+    await downloadFilesAsZip(files, zipFilename)
+  }
+
+  const downloadJob = async (job: ImageGenerationJob) => {
+    if (!job.carousel_variants || job.carousel_variants.length === 0) return
+    
+    const files: { url: string; filename: string }[] = []
+    
+    job.carousel_variants.forEach(variant => {
+      variant.slides?.forEach(slide => {
+        files.push({
+          url: slide.image_url,
+          filename: `variant_${variant.variant_index + 1}/${slide.filename}`
+        })
+      })
+    })
+    
+    const zipFilename = `${job.name}_all_variants.zip`
+    await downloadFilesAsZip(files, zipFilename)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -368,6 +403,17 @@ export default function AssetsPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
+                            downloadVariant(variant, job)
+                          }}
+                          className="btn-secondary text-sm"
+                          title="Download variant as ZIP"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
                             setDriveExportModal({
                               isOpen: true,
                               job: job,
@@ -408,16 +454,19 @@ export default function AssetsPage() {
                         {variant.slides?.map((slide) => (
                           <div 
                             key={slide.id}
-                            className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded overflow-hidden relative group"
+                            className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded overflow-hidden relative group cursor-pointer"
+                            onClick={() => downloadSlide(slide)}
+                            title={`Download ${slide.filename}`}
                           >
                             <img
                               src={slide.image_url}
                               alt={slide.alt_text || `Slide ${slide.slide_order}`}
                               className="w-full h-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex flex-col items-center justify-center gap-1">
+                              <Download className="text-white h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                               <span className="text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                                {slide.slide_order}
+                                Slide {slide.slide_order}
                               </span>
                             </div>
                           </div>
@@ -427,7 +476,14 @@ export default function AssetsPage() {
                 ))}
                 
                 {/* Export entire job button */}
-                <div className="flex justify-end pt-2">
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => downloadJob(job)}
+                    className="btn-secondary text-sm"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Download All
+                  </button>
                   <button
                     onClick={() => setDriveExportModal({
                       isOpen: true,
@@ -469,12 +525,16 @@ export default function AssetsPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {selectedVariant.slides?.map((slide) => (
                   <div key={slide.id} className="space-y-2">
-                    <div className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded-lg overflow-hidden">
+                    <div className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded-lg overflow-hidden relative group cursor-pointer"
+                         onClick={() => downloadSlide(slide)}>
                       <img
                         src={slide.image_url}
                         alt={slide.alt_text || `Slide ${slide.slide_order}`}
                         className="w-full h-full object-cover"
                       />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center">
+                        <Download className="text-white h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-medium text-gray-900 dark:text-dark-100">
@@ -500,13 +560,10 @@ export default function AssetsPage() {
                 )}
                 <button
                   onClick={() => {
-                    // Download all slides
-                    selectedVariant.slides?.forEach((slide, index) => {
-                      const link = document.createElement('a')
-                      link.href = slide.image_url
-                      link.download = slide.filename
-                      link.click()
-                    })
+                    const job = jobs.find(j => j.carousel_variants?.some(v => v.id === selectedVariant.id))
+                    if (job) {
+                      downloadVariant(selectedVariant, job)
+                    }
                   }}
                   className="btn-secondary"
                 >

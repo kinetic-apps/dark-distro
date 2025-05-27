@@ -7,7 +7,9 @@ import {
   Star,
   Plus,
   Loader2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { ImageGenerationTemplate } from '@/lib/types/image-generation'
@@ -16,6 +18,16 @@ export default function TemplatesPage() {
   const router = useRouter()
   const [templates, setTemplates] = useState<ImageGenerationTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    templateId: string | null
+    templateName: string
+  }>({
+    isOpen: false,
+    templateId: null,
+    templateName: ''
+  })
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadTemplates()
@@ -45,6 +57,31 @@ export default function TemplatesPage() {
 
   const useTemplate = (template: ImageGenerationTemplate) => {
     router.push(`/image-generator?template=${template.id}`)
+  }
+
+  const handleDeleteClick = (e: React.MouseEvent, template: ImageGenerationTemplate) => {
+    e.stopPropagation()
+    setDeleteConfirm({
+      isOpen: true,
+      templateId: template.id,
+      templateName: template.name
+    })
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.templateId) return
+
+    setIsDeleting(true)
+    try {
+      await ImageGenerationService.deleteTemplate(deleteConfirm.templateId)
+      setTemplates(templates.filter(t => t.id !== deleteConfirm.templateId))
+      setDeleteConfirm({ isOpen: false, templateId: null, templateName: '' })
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      alert('Failed to delete template. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   if (loading) {
@@ -110,18 +147,27 @@ export default function TemplatesPage() {
                   </div>
                 )}
                 
-                {/* Favorite Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleFavorite(template.id)
-                  }}
-                  className={`absolute top-2 right-2 p-2 rounded-md bg-white dark:bg-dark-700 shadow-sm hover:shadow-md transition-all ${
-                    template.is_favorite ? 'text-yellow-500' : 'text-gray-400 dark:text-dark-500'
-                  }`}
-                >
-                  <Star className={`h-4 w-4 ${template.is_favorite ? 'fill-current' : ''}`} />
-                </button>
+                {/* Action Buttons */}
+                <div className="absolute top-2 right-2 flex gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleFavorite(template.id)
+                    }}
+                    className={`p-2 rounded-md bg-white dark:bg-dark-700 shadow-sm hover:shadow-md transition-all ${
+                      template.is_favorite ? 'text-yellow-500' : 'text-gray-400 dark:text-dark-500'
+                    }`}
+                  >
+                    <Star className={`h-4 w-4 ${template.is_favorite ? 'fill-current' : ''}`} />
+                  </button>
+                  
+                  <button
+                    onClick={(e) => handleDeleteClick(e, template)}
+                    className="p-2 rounded-md bg-white dark:bg-dark-700 shadow-sm hover:shadow-md transition-all text-gray-400 dark:text-dark-500 hover:text-red-500 dark:hover:text-red-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               
               {/* Content */}
@@ -146,6 +192,58 @@ export default function TemplatesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setDeleteConfirm({ isOpen: false, templateId: null, templateName: '' })} />
+            
+            <div className="relative transform overflow-hidden rounded-lg bg-white dark:bg-dark-800 px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+              <div className="sm:flex sm:items-start">
+                <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20 sm:mx-0 sm:h-10 sm:w-10">
+                  <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                  <h3 className="text-base font-semibold leading-6 text-gray-900 dark:text-dark-100">
+                    Delete Template
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500 dark:text-dark-400">
+                      Are you sure you want to delete "{deleteConfirm.templateName}"? This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDeleteConfirm}
+                  className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setDeleteConfirm({ isOpen: false, templateId: null, templateName: '' })}
+                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white dark:bg-dark-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-dark-100 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-dark-600 hover:bg-gray-50 dark:hover:bg-dark-600 sm:mt-0 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
