@@ -53,6 +53,14 @@ interface Profile {
     battery: number | null
     last_heartbeat: string | null
   }
+  tasks?: Array<{
+    id: string
+    type: string
+    status: string
+    created_at: string
+    completed_at: string | null
+    started_at: string | null
+  }>
 }
 
 interface ProfilesTableProps {
@@ -346,17 +354,43 @@ export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-dark-400">
                     <div className="space-y-1">
                       <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{profile.phone?.last_heartbeat 
-                    ? formatRelativeTime(profile.phone.last_heartbeat)
-                    : 'Never'
-                        }</span>
+                        <Activity className="h-3 w-3" />
+                        <span>{(() => {
+                          // Get the most recent task
+                          const latestTask = profile.tasks?.sort((a, b) => 
+                            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                          )[0]
+                          
+                          if (!latestTask) return 'Never'
+                          
+                          // Use completed_at if available, otherwise started_at, otherwise created_at
+                          const taskTime = latestTask.completed_at || latestTask.started_at || latestTask.created_at
+                          return formatRelativeTime(taskTime)
+                        })()}</span>
                       </div>
                       <div className="text-xs text-gray-400 dark:text-dark-500">
-                        Created {formatRelativeTime(profile.created_at)}
+                        {(() => {
+                          const latestTask = profile.tasks?.sort((a, b) => 
+                            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                          )[0]
+                          
+                          if (!latestTask) return 'No tasks yet'
+                          
+                          const taskTypeLabel = latestTask.type === 'warmup' ? 'Warmup' : 
+                                               latestTask.type === 'post' ? 'Post' : 
+                                               latestTask.type === 'tiktok_login' ? 'Login' :
+                                               latestTask.type === 'tiktok_edit' ? 'Edit Profile' :
+                                               latestTask.type
+                          
+                          const statusLabel = latestTask.status === 'completed' ? '✓' :
+                                            latestTask.status === 'failed' ? '✗' :
+                                            latestTask.status === 'running' ? '⟳' : ''
+                          
+                          return `${taskTypeLabel} ${statusLabel}`
+                        })()}
                       </div>
                     </div>
-                </td>
+                  </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">
                     {profile.geelark_profile_id && (

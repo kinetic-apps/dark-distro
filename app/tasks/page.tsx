@@ -32,6 +32,7 @@ export default function TasksPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
   const fetchTasks = async () => {
     const supabase = createClient()
@@ -49,10 +50,12 @@ export default function TasksPage() {
 
   useEffect(() => {
     fetchTasks()
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchTasks, 10000)
-    return () => clearInterval(interval)
-  }, [])
+    
+    if (autoRefresh) {
+      const interval = setInterval(fetchTasks, 10000)
+      return () => clearInterval(interval)
+    }
+  }, [autoRefresh])
 
   const refreshTaskStatuses = async () => {
     setIsRefreshing(true)
@@ -199,6 +202,16 @@ export default function TasksPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          <label className="flex items-center text-sm text-gray-600 dark:text-dark-300">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-100 dark:focus:ring-dark-400"
+            />
+            Auto-refresh
+          </label>
+          
           <button
             onClick={refreshTaskStatuses}
             disabled={isRefreshing}

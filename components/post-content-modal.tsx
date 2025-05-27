@@ -102,8 +102,9 @@ export default function PostContentModal({
           })
 
           if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.error || 'Failed to post')
+            const errorData = await response.json()
+            console.error('Post failed:', errorData)
+            throw new Error(errorData.error || `Failed to post (${response.status})`)
           }
 
           return await response.json()

@@ -13,7 +13,7 @@ import {
   Smartphone
 } from 'lucide-react'
 import Link from 'next/link'
-import { SyncProfilesButton } from '@/components/sync-profiles-button'
+import { ProfilesHeader } from '@/components/profiles-header'
 import { ProfileSearch } from '@/components/profile-search'
 
 export default async function ProfilesPage({
@@ -29,7 +29,15 @@ export default async function ProfilesPage({
     .select(`
       *,
       proxy:proxies!proxy_id(*),
-      phone:phones!fk_account(*)
+      phone:phones!fk_account(*),
+      tasks!fk_account(
+        id,
+        type,
+        status,
+        created_at,
+        completed_at,
+        started_at
+      )
     `)
     .order('created_at', { ascending: false })
 
@@ -87,14 +95,7 @@ export default async function ProfilesPage({
           </p>
         </div>
         
-        <div className="flex gap-2">
-          <SyncProfilesButton />
-          
-          <Link href="/profiles/new" className="btn-primary">
-            <Plus className="h-4 w-4 mr-2" />
-            New Profile
-          </Link>
-        </div>
+        <ProfilesHeader />
       </div>
 
       {/* Statistics Cards */}

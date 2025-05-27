@@ -3,13 +3,44 @@ import { geelarkApi } from '@/lib/geelark-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
+  let body: any = {}
+  let account_id: string | undefined
+  
   try {
-    const body = await request.json()
-    const { account_id, video_url, caption, hashtags, music } = body
+    body = await request.json()
+    const { account_id: aid, video_url, caption, hashtags, music } = body
+    account_id = aid
+
+    // Log the incoming request
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'api-post-video',
+      account_id,
+      message: 'Video post request received',
+      meta: { 
+        account_id,
+        video_url,
+        has_caption: !!caption,
+        has_hashtags: !!hashtags,
+        has_music: !!music
+      }
+    })
 
     if (!account_id || !video_url) {
+      const errorMsg = 'Account ID and video URL are required'
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'api-post-video',
+        account_id,
+        message: errorMsg,
+        meta: { 
+          validation_error: true,
+          account_id,
+          video_url
+        }
+      })
       return NextResponse.json(
-        { error: 'Account ID and video URL are required' },
+        { error: errorMsg },
         { status: 400 }
       )
     }
@@ -17,25 +48,74 @@ export async function POST(request: NextRequest) {
     // Fetch account with profile
     const { data: account, error } = await supabaseAdmin
       .from('accounts')
-      .select('*, phones(*)')
+      .select('*')
       .eq('id', account_id)
       .single()
 
     if (error || !account) {
+      const errorMsg = `Account not found: ${account_id}`
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'api-post-video',
+        account_id,
+        message: errorMsg,
+        meta: { 
+          db_error: error,
+          account_id
+        }
+      })
       return NextResponse.json(
-        { error: 'Account not found' },
+        { error: errorMsg },
         { status: 404 }
       )
     }
 
-    if (!account.phones?.[0]?.profile_id) {
+    // Get phone record separately to avoid join issues
+    const { data: phones } = await supabaseAdmin
+      .from('phones')
+      .select('*')
+      .eq('account_id', account_id)
+
+    // Use geelark_profile_id from account or phone record
+    const profileId = account.geelark_profile_id || phones?.[0]?.profile_id
+
+    if (!profileId) {
+      const errorMsg = 'No profile ID found for this account'
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'api-post-video',
+        account_id,
+        message: errorMsg,
+        meta: { 
+          account,
+          phone: phones?.[0]
+        }
+      })
       return NextResponse.json(
-        { error: 'No profile associated with this account' },
+        { error: errorMsg },
         { status: 400 }
       )
     }
 
-    const profileId = account.phones[0].profile_id
+    // Check if TikTok is installed
+    const isTikTokInstalled = await geelarkApi.isTikTokInstalled(profileId)
+    if (!isTikTokInstalled) {
+      const errorMsg = 'TikTok is not installed on this profile'
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'api-post-video',
+        account_id,
+        message: errorMsg,
+        meta: { 
+          profile_id: profileId,
+          checked_tiktok: true
+        }
+      })
+      return NextResponse.json(
+        { error: errorMsg },
+        { status: 400 }
+      )
+    }
 
     // Post video
     const taskId = await geelarkApi.postTikTokVideo(profileId, account_id, {
@@ -46,10 +126,13 @@ export async function POST(request: NextRequest) {
     })
 
     // Create post record
-    await supabaseAdmin.from('posts').insert({
+    const { error: postError } = await supabaseAdmin.from('posts').insert({
       account_id,
       type: 'video',
       status: 'pending',
+      asset_path: video_url,
+      caption: caption || '',
+      hashtags: hashtags || [],
       content: {
         video_url,
         caption,
@@ -57,8 +140,22 @@ export async function POST(request: NextRequest) {
         music
       },
       task_id: taskId,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     })
+
+    if (postError) {
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'api-post-video',
+        account_id,
+        message: 'Failed to create post record',
+        meta: { 
+          error: postError,
+          task_id: taskId
+        }
+      })
+    }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
@@ -68,8 +165,7 @@ export async function POST(request: NextRequest) {
       meta: {
         task_id: taskId,
         profile_id: profileId,
-        has_music: !!music,
-        hashtags_count: hashtags?.length || 0
+        has_music: !!music
       }
     })
 
@@ -86,15 +182,23 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Post video error:', error)
     
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
     await supabaseAdmin.from('logs').insert({
       level: 'error',
       component: 'api-post-video',
-      message: 'Failed to post video',
-      meta: { error: String(error) }
+      account_id,
+      message: `Failed to post video: ${errorMessage}`,
+      meta: { 
+        error: errorMessage,
+        stack: errorStack,
+        request_body: body
+      }
     })
 
     return NextResponse.json(
-      { error: 'Failed to post video' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

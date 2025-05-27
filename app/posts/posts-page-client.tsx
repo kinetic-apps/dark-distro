@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Play } from 'lucide-react'
 import Link from 'next/link'
 import BulkPostLauncher from '@/components/bulk-post-launcher'
+import TaskStatusUpdater from '@/components/task-status-updater'
+import { useRouter } from 'next/navigation'
 
 interface PostsPageClientProps {
   children: React.ReactNode
@@ -11,6 +13,18 @@ interface PostsPageClientProps {
 
 export default function PostsPageClient({ children }: PostsPageClientProps) {
   const [showBulkLauncher, setShowBulkLauncher] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        router.refresh()
+      }, 10000) // Refresh every 10 seconds
+      
+      return () => clearInterval(interval)
+    }
+  }, [autoRefresh, router])
 
   return (
     <>
@@ -24,6 +38,16 @@ export default function PostsPageClient({ children }: PostsPageClientProps) {
           </div>
           
           <div className="flex gap-3">
+            <label className="flex items-center text-sm text-gray-600 dark:text-dark-300">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-100 dark:focus:ring-dark-400"
+              />
+              Auto-refresh
+            </label>
+            <TaskStatusUpdater />
             <Link href="/assets" className="btn-secondary">
               Browse Assets
             </Link>

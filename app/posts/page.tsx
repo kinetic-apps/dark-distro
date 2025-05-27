@@ -19,7 +19,7 @@ async function getPosts(searchParams: { status?: string }) {
     .from('posts')
     .select(`
       *,
-      account:accounts!posts_account_id_fkey(
+      account:accounts!fk_account(
         id,
         tiktok_username,
         geelark_profile_id
@@ -40,6 +40,7 @@ async function getPosts(searchParams: { status?: string }) {
       const counts: Record<string, number> = {
         all: data?.length || 0,
         queued: 0,
+        pending: 0,
         processing: 0,
         posted: 0,
         failed: 0,
@@ -47,7 +48,9 @@ async function getPosts(searchParams: { status?: string }) {
       }
       
       data?.forEach(item => {
-        counts[item.status]++
+        if (item.status && counts.hasOwnProperty(item.status)) {
+          counts[item.status]++
+        }
       })
       
       return counts
@@ -67,6 +70,7 @@ export default async function PostsPage({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'queued':
+      case 'pending':
         return <Clock className="h-4 w-4 text-gray-400 dark:text-dark-500" />
       case 'processing':
         return <RefreshCw className="h-4 w-4 text-blue-500 dark:text-blue-400 animate-spin" />
@@ -84,6 +88,7 @@ export default async function PostsPage({
   const getStatusBadge = (status: string) => {
     const classes = {
       queued: 'status-neutral',
+      pending: 'status-neutral',
       processing: 'status-warning',
       posted: 'status-active',
       failed: 'status-error',
@@ -91,7 +96,7 @@ export default async function PostsPage({
     }
     
     return (
-      <span className={classes[status as keyof typeof classes]}>
+      <span className={classes[status as keyof typeof classes] || 'status-neutral'}>
         {status}
       </span>
     )
@@ -123,6 +128,16 @@ export default async function PostsPage({
             }`}
           >
             Queued ({statusCounts.queued})
+          </Link>
+          <Link
+            href="/posts?status=pending"
+            className={`px-3 py-1.5 text-sm font-medium rounded-md ${
+              params.status === 'pending'
+                ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
+                : 'text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100'
+            }`}
+          >
+            Pending ({statusCounts.pending})
           </Link>
           <Link
             href="/posts?status=processing"
@@ -190,10 +205,11 @@ export default async function PostsPage({
                 <td className="table-cell">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-dark-100">
-                      {post.asset_path.replace('.mp4', '')}
+                      {post.type === 'carousel' ? `Carousel (${post.content?.images_count || 0} images)` : 
+                       post.type === 'video' ? 'Video' : post.type}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-dark-400 truncate max-w-xs">
-                      {post.caption}
+                      {post.caption || 'No caption'}
                     </p>
                   </div>
                 </td>

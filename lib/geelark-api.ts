@@ -265,6 +265,7 @@ export class GeeLarkAPI {
                 task.status === 7 ? 'cancelled' :
                 task.status === 2 ? 'running' : 'pending',
         result: {
+          geelark_status: task.status,  // Include the actual Geelark status code
           failCode: task.failCode,
           failDesc: task.failDesc,
           cost: task.cost
@@ -422,6 +423,24 @@ export class GeeLarkAPI {
         pageSize: 100
       })
     })
+  }
+
+  async isTikTokInstalled(profileId: string): Promise<boolean> {
+    try {
+      const response = await this.getInstalledApps(profileId)
+      const tiktokPackageName = 'com.zhiliaoapp.musically'
+      
+      if (response.items && Array.isArray(response.items)) {
+        return response.items.some((app: any) => 
+          app.packageName === tiktokPackageName && app.installStatus === 1
+        )
+      }
+      
+      return false
+    } catch (error) {
+      console.error('Error checking TikTok installation:', error)
+      return false
+    }
   }
 
   // TikTok Automation

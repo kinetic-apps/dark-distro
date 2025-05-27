@@ -4,30 +4,46 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET(request: NextRequest) {
   try {
-    // Fetch all running tasks
-    const { data: runningTasks, error } = await supabaseAdmin
+    // Fetch all running tasks AND recently completed tasks (within last hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    
+    const { data: tasksToCheck, error } = await supabaseAdmin
       .from('tasks')
       .select('*')
-      .eq('status', 'running')
+      .or(`status.eq.running,and(status.in.(completed,failed,cancelled),completed_at.gte.${oneHourAgo})`)
 
     if (error) throw error
 
     const results = await Promise.allSettled(
-      runningTasks.map(async (task) => {
+      tasksToCheck.map(async (task) => {
         if (!task.geelark_task_id) return
 
         try {
           const taskStatus = await geelarkApi.getTaskStatus(task.geelark_task_id)
+          
+          // Always update the geelark_status in meta
+          const updatedMeta = {
+            ...task.meta,
+            geelark_status: taskStatus.result?.geelark_status || taskStatus.status === 'completed' ? 3 : 
+                           taskStatus.status === 'failed' ? 4 : 
+                           taskStatus.status === 'cancelled' ? 7 : 
+                           taskStatus.status === 'running' ? 2 : 1,
+            result: taskStatus.result
+          }
 
           // Update task status
-          if (taskStatus.status !== 'running') {
+          if (taskStatus.status !== task.status || task.meta?.geelark_status !== updatedMeta.geelark_status) {
             await supabaseAdmin
               .from('tasks')
               .update({
-                status: taskStatus.status === 'completed' ? 'completed' : 'failed',
-                ended_at: new Date().toISOString(),
+                status: taskStatus.status === 'completed' ? 'completed' : 
+                       taskStatus.status === 'failed' ? 'failed' :
+                       taskStatus.status === 'cancelled' ? 'cancelled' :
+                       taskStatus.status === 'running' ? 'running' : 'pending',
+                completed_at: taskStatus.status !== 'running' && taskStatus.status !== 'pending' ? new Date().toISOString() : task.completed_at,
                 message: taskStatus.result?.message || null,
-                meta: { ...task.meta, result: taskStatus.result }
+                meta: updatedMeta,
+                updated_at: new Date().toISOString()
               })
               .eq('id', task.id)
 
@@ -106,6 +122,8 @@ export async function GET(request: NextRequest) {
                 column_name: 'error_count'
               })
             }
+
+            return { task_id: task.id, status: taskStatus.status }
           } else if (task.type === 'warmup' && taskStatus.status === 'running') {
             // Calculate time-based progress for running warmup tasks
             const startTime = new Date(task.started_at || task.created_at).getTime()
@@ -154,7 +172,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      checked: runningTasks.length,
+      checked: tasksToCheck.length,
       updated
     })
   } catch (error) {
