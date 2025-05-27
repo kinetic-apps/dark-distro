@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatRelativeTime } from '@/lib/utils'
 import { Activity, AlertCircle, CheckCircle, Users } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { useSidebar } from '@/lib/context/sidebar-context'
+import { cn } from '@/lib/utils'
 
 export function TopBar() {
   const [stats, setStats] = useState({
@@ -13,6 +15,7 @@ export function TopBar() {
     recentErrors: 0,
     lastSync: new Date().toISOString()
   })
+  const { isCollapsed } = useSidebar()
 
   useEffect(() => {
     const supabase = createClient()
@@ -49,7 +52,10 @@ export function TopBar() {
   }, [])
 
   return (
-    <div className="fixed top-0 left-64 right-0 z-40 bg-white border-b border-gray-200 dark:bg-dark-850 dark:border-dark-700 transition-colors duration-200">
+    <div className={cn(
+      "fixed top-0 right-0 z-40 bg-white border-b border-gray-200 dark:bg-dark-850 dark:border-dark-700 transition-all duration-300 ease-in-out",
+      isCollapsed ? "left-16" : "left-64"
+    )}>
       <div className="h-16 px-6 flex items-center">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center space-x-6 text-sm">

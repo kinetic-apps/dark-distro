@@ -36,6 +36,7 @@ A Next.js 14 web application for managing advanced cloud phone operations with G
 - Batch campaign management
 - Task queue management
 - Success/failure tracking
+- Agency workflow for creator-based content organization
 
 ### Monitoring & Logs
 - Comprehensive logging system

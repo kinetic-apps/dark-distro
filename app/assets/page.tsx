@@ -19,9 +19,11 @@ import {
   User,
   ChevronRight,
   ChevronDown,
-  Upload
+  Upload,
+  Users
 } from 'lucide-react'
 import GoogleDriveExportModal from '@/components/GoogleDriveExportModal'
+import AgencyWorkflowModal from '@/components/AgencyWorkflowModal'
 import { GoogleAuthService } from '@/lib/services/google-auth'
 import { useSearchParams } from 'next/navigation'
 
@@ -81,6 +83,9 @@ export default function AssetsPage() {
     job: null as any,
     variant: null as any
   })
+  
+  // Agency workflow state
+  const [showAgencyWorkflow, setShowAgencyWorkflow] = useState(false)
 
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -283,10 +288,27 @@ export default function AssetsPage() {
         
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowAgencyWorkflow(true)}
+            className="btn-secondary"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Agency Export
+          </button>
+          <button
             onClick={() => setView(view === 'grid' ? 'list' : 'grid')}
             className="btn-secondary"
           >
-            {view === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+            {view === 'grid' ? (
+              <>
+                <List className="h-4 w-4 mr-2" />
+                List
+              </>
+            ) : (
+              <>
+                <Grid className="h-4 w-4 mr-2" />
+                Grid
+              </>
+            )}
           </button>
           <button
             onClick={fetchJobs}
@@ -333,7 +355,68 @@ export default function AssetsPage() {
             Generate some carousels from the Image Generator
           </p>
         </div>
+      ) : view === 'grid' ? (
+        // Grid View
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {jobs.map((job) => (
+            <div key={job.id} className="card hover:shadow-lg transition-shadow">
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-dark-100">{job.name}</h3>
+                    <p className="text-sm text-gray-500 dark:text-dark-400 mt-1">
+                      {job.carousel_variants?.length || 0} variants
+                    </p>
+                  </div>
+                  <Folder className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                </div>
+                
+                {/* Preview thumbnails */}
+                <div className="grid grid-cols-3 gap-1 mb-3">
+                  {job.carousel_variants?.slice(0, 6).map((variant, idx) => (
+                    <div key={variant.id} className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded overflow-hidden">
+                      {variant.slides?.[0] && (
+                        <img
+                          src={variant.slides[0].image_url}
+                          alt={`Preview ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  ))}
+                  {job.carousel_variants && job.carousel_variants.length > 6 && (
+                    <div className="col-span-3 text-center text-xs text-gray-500 dark:text-dark-400 mt-1">
+                      +{job.carousel_variants.length - 6} more variants
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-gray-500 dark:text-dark-400">
+                  <span>{formatRelativeTime(job.created_at)}</span>
+                  <span>{job.template_name}</span>
+                </div>
+                
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => toggleJobExpansion(job.id)}
+                    className="btn-secondary text-sm flex-1"
+                  >
+                    View Details
+                  </button>
+                  <button
+                    onClick={() => downloadJob(job)}
+                    className="btn-secondary text-sm"
+                    title="Download all variants"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        // List View
         <div className="space-y-4">
           {jobs.map((job) => (
             <div key={job.id} className="card">
@@ -582,6 +665,12 @@ export default function AssetsPage() {
         onClose={() => setDriveExportModal({ isOpen: false, job: null, variant: null })}
         job={driveExportModal.job}
         variant={driveExportModal.variant}
+      />
+      
+      {/* Agency Workflow Modal */}
+      <AgencyWorkflowModal
+        isOpen={showAgencyWorkflow}
+        onClose={() => setShowAgencyWorkflow(false)}
       />
     </div>
   )

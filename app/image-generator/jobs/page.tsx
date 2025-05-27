@@ -13,11 +13,13 @@ import {
   Loader2,
   Trash2,
   Image as ImageIcon,
-  Calendar
+  Calendar,
+  Users
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { ImageGenerationJob } from '@/lib/types/image-generation'
 import { format } from 'date-fns'
+import AgencyWorkflowModal from '@/components/AgencyWorkflowModal'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -25,6 +27,7 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showAgencyWorkflow, setShowAgencyWorkflow] = useState(false)
 
   useEffect(() => {
     loadJobs()
@@ -118,13 +121,22 @@ export default function JobsPage() {
             </p>
           </div>
           
-          <button
-            onClick={() => router.push('/image-generator')}
-            className="btn-primary"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Job
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowAgencyWorkflow(true)}
+              className="btn-secondary"
+            >
+              <Users className="mr-2 h-4 w-4" />
+              Agency Export
+            </button>
+            <button
+              onClick={() => router.push('/image-generator')}
+              className="btn-primary"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Job
+            </button>
+          </div>
         </div>
       </div>
 
@@ -238,6 +250,12 @@ export default function JobsPage() {
           ))}
         </div>
       )}
+
+      {/* Agency Workflow Modal */}
+      <AgencyWorkflowModal
+        isOpen={showAgencyWorkflow}
+        onClose={() => setShowAgencyWorkflow(false)}
+      />
     </div>
   )
 } 

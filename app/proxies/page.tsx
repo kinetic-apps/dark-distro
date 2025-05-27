@@ -11,6 +11,7 @@ import {
 import { ImportProxiesButton } from '@/components/import-proxies-button'
 import { RotateProxyButton } from '@/components/rotate-proxy-button'
 import { SyncProxiesButton } from '@/components/sync-proxies-button'
+import { DeleteProxyButton } from '@/components/delete-proxy-button'
 
 async function getProxies() {
   const supabase = await createClient()
@@ -218,7 +219,14 @@ export default async function ProxiesPage() {
                   {formatRelativeTime(proxy.last_rotated)}
                 </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  <RotateProxyButton proxyId={proxy.id} proxyType={proxy.type} />
+                  <div className="flex items-center justify-end space-x-2">
+                    <RotateProxyButton proxyId={proxy.id} proxyType={proxy.type} />
+                    <DeleteProxyButton 
+                      proxyId={proxy.id} 
+                      proxyLabel={proxy.label} 
+                      isAssigned={!!proxy.assigned_account_id} 
+                    />
+                  </div>
                 </td>
               </tr>
             ))}
