@@ -3,16 +3,17 @@ import { NextResponse } from 'next/server'
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
+    const { id } = await params
     
     // First check if the proxy exists and get its details
     const { data: proxy, error: fetchError } = await supabase
       .from('proxies')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
     
     if (fetchError || !proxy) {
@@ -34,7 +35,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('proxies')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
     
     if (deleteError) {
       console.error('Error deleting proxy:', deleteError)
