@@ -155,6 +155,7 @@ export default function JobDetailsPage() {
   const VARIANTS_PER_PAGE = 10
   const [isSavingTemplate, setIsSavingTemplate] = useState(false)
   const [templateSaveProgress, setTemplateSaveProgress] = useState('')
+  const [isRetrying, setIsRetrying] = useState(false)
 
   const loadJobData = useCallback(async () => {
     try {
@@ -278,14 +279,45 @@ export default function JobDetailsPage() {
   }
 
   const handleRetry = async () => {
-    if (!confirm('Are you sure you want to retry this job? This will regenerate all images.')) return
+    if (!confirm('Are you sure you want to retry this job? This will create a new job with the same settings.')) return
     
+    setIsRetrying(true)
     try {
-      await ImageGenerationService.processJobInBackground(jobId)
-      await loadJobData()
+      // Parse the original job data
+      const { source_images: sourceImages } = JSON.parse(job.template_description || '{}')
+      if (!sourceImages || sourceImages.length === 0) {
+        alert('Cannot retry: No source images found')
+        setIsRetrying(false)
+        return
+      }
+
+      // Download source images to create File objects
+      const sourceFiles: File[] = []
+      for (let i = 0; i < sourceImages.length; i++) {
+        const response = await fetch(sourceImages[i])
+        const blob = await response.blob()
+        const file = new File([blob], `source_${i}.jpg`, { type: blob.type })
+        sourceFiles.push(file)
+      }
+
+      // Create a new job with the same parameters
+      const newJob = await ImageGenerationService.createJob({
+        name: `${job.name} (Retry)`,
+        template_name: job.template_name,
+        source_images: sourceFiles,
+        prompt: job.prompt,
+        variants: job.variants
+      })
+
+      // Process the new job
+      await ImageGenerationService.processJobInBackground(newJob.id)
+
+      // Redirect to the new job page
+      router.push(`/image-generator/jobs/${newJob.id}`)
     } catch (error) {
       console.error('Error retrying job:', error)
       alert('Failed to retry job')
+      setIsRetrying(false)
     }
   }
 
@@ -575,10 +607,19 @@ export default function JobDetailsPage() {
             <button
               onClick={handleRetry}
               className="btn-secondary"
-              disabled={status === 'processing'}
+              disabled={status === 'processing' || isRetrying}
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
+              {isRetrying ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-gray-600 dark:border-gray-300 border-t-transparent rounded-full animate-spin mr-2" />
+                  Creating new job...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry
+                </>
+              )}
             </button>
             <button
               onClick={handleDelete}

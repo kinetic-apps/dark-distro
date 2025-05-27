@@ -9,10 +9,69 @@ import {
   Loader2,
   Image as ImageIcon,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Layers,
+  Clock,
+  TrendingUp,
+  FileText,
+  Palette
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { ImageGenerationTemplate } from '@/lib/types/image-generation'
+
+// Metric Card Component
+function MetricCard({ 
+  title, 
+  value, 
+  subtitle, 
+  icon: Icon, 
+  trend,
+  status
+}: {
+  title: string
+  value: string | number
+  subtitle?: string
+  icon: any
+  trend?: { value: number, positive: boolean }
+  status?: 'success' | 'warning' | 'error' | 'neutral'
+}) {
+  const statusColors = {
+    success: 'text-green-600 dark:text-green-400',
+    warning: 'text-yellow-600 dark:text-yellow-400',
+    error: 'text-red-600 dark:text-red-400',
+    neutral: 'text-gray-600 dark:text-gray-400'
+  }
+
+  return (
+    <div className="card-lg group hover:shadow-lg transition-all duration-200">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-600 dark:text-dark-400">{title}</p>
+          <div className="mt-2 flex items-baseline gap-2">
+            <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">
+              {value}
+            </p>
+            {trend && (
+              <span className={`flex items-center text-xs font-medium ${
+                trend.positive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              }`}>
+                {trend.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingUp className="h-3 w-3 rotate-180" />}
+                {trend.value}%
+              </span>
+            )}
+          </div>
+          {subtitle && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-dark-400">{subtitle}</p>
+          )}
+        </div>
+        <div className={`rounded-lg p-2 bg-gray-50 dark:bg-dark-800 group-hover:bg-gray-100 dark:group-hover:bg-dark-700 transition-colors ${status ? statusColors[status] : ''}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function TemplatesPage() {
   const router = useRouter()
@@ -84,6 +143,14 @@ export default function TemplatesPage() {
     }
   }
 
+  // Calculate metrics
+  const metrics = {
+    totalTemplates: templates.length,
+    favoriteTemplates: templates.filter(t => t.is_favorite).length,
+    totalImages: templates.reduce((acc, t) => acc + t.source_images.length, 0),
+    avgImagesPerTemplate: templates.length > 0 ? Math.round(templates.reduce((acc, t) => acc + t.source_images.length, 0) / templates.length) : 0
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -93,14 +160,17 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div>
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Enhanced Header */}
       <div className="page-header">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="page-title">Templates</h1>
+            <h1 className="page-title flex items-center gap-2">
+              <Palette className="h-6 w-6" />
+              Templates
+            </h1>
             <p className="page-description">
-              Reuse successful image generation configurations
+              Save and reuse successful carousel generation configurations
             </p>
           </div>
           
@@ -114,11 +184,74 @@ export default function TemplatesPage() {
         </div>
       </div>
 
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          title="Total Templates"
+          value={metrics.totalTemplates}
+          subtitle="Saved configurations"
+          icon={FileText}
+          status="neutral"
+        />
+        <MetricCard
+          title="Favorites"
+          value={metrics.favoriteTemplates}
+          subtitle="Quick access"
+          icon={Star}
+          status={metrics.favoriteTemplates > 0 ? 'success' : 'neutral'}
+        />
+        <MetricCard
+          title="Total Images"
+          value={metrics.totalImages}
+          subtitle="Across all templates"
+          icon={Layers}
+          trend={{ value: 8, positive: true }}
+          status="neutral"
+        />
+        <MetricCard
+          title="Avg Images"
+          value={metrics.avgImagesPerTemplate}
+          subtitle="Per template"
+          icon={Sparkles}
+          status="neutral"
+        />
+      </div>
+
+      {/* Quick Stats Bar */}
+      {templates.length > 0 && (
+        <div className="bg-gray-50 dark:bg-dark-800 rounded-lg p-4 border border-gray-200 dark:border-dark-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-2xl font-semibold text-purple-600 dark:text-purple-400">{metrics.favoriteTemplates}</p>
+                <p className="text-xs text-gray-600 dark:text-dark-400">Starred</p>
+              </div>
+              <div className="h-8 w-px bg-gray-300 dark:bg-dark-600" />
+              <div>
+                <p className="text-2xl font-semibold text-blue-600 dark:text-blue-400">{templates.length}</p>
+                <p className="text-xs text-gray-600 dark:text-dark-400">Total Templates</p>
+              </div>
+              <div className="h-8 w-px bg-gray-300 dark:bg-dark-600" />
+              <div>
+                <p className="text-2xl font-semibold text-green-600 dark:text-green-400">{metrics.totalImages}</p>
+                <p className="text-xs text-gray-600 dark:text-dark-400">Source Images</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-dark-400">
+              <Clock className="inline h-3 w-3 mr-1" />
+              Templates help you quickly recreate successful carousel styles
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Templates Grid */}
       {templates.length === 0 ? (
         <div className="card-lg text-center py-16">
-          <FolderOpen className="mx-auto h-12 w-12 text-gray-400 dark:text-dark-500" />
-          <h3 className="mt-4 text-base font-medium text-gray-900 dark:text-dark-100">No templates yet</h3>
+          <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 dark:bg-dark-800 flex items-center justify-center mb-4">
+            <FolderOpen className="h-8 w-8 text-gray-400 dark:text-dark-500" />
+          </div>
+          <h3 className="text-base font-medium text-gray-900 dark:text-dark-100">No templates yet</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-dark-400">
             Save completed jobs as templates to reuse their configurations
           </p>
@@ -126,15 +259,16 @@ export default function TemplatesPage() {
             onClick={() => router.push('/image-generator')}
             className="mt-4 btn-primary"
           >
+            <Sparkles className="mr-2 h-4 w-4" />
             Generate Your First Carousel
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {templates.map((template) => (
-            <div key={template.id} className="card hover:shadow-sm transition-shadow">
+            <div key={template.id} className="card-lg hover:shadow-md transition-all group">
               {/* Thumbnail */}
-              <div className="aspect-square relative mb-3 -m-4 mb-3">
+              <div className="aspect-square relative -m-6 mb-4">
                 {template.thumbnail_url ? (
                   <img
                     src={template.thumbnail_url}
@@ -142,19 +276,19 @@ export default function TemplatesPage() {
                     className="w-full h-full object-cover rounded-t-lg"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gray-100 dark:bg-dark-700 rounded-t-lg flex items-center justify-center">
-                    <ImageIcon className="h-8 w-8 text-gray-400 dark:text-dark-500" />
+                  <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-dark-700 dark:to-dark-800 rounded-t-lg flex items-center justify-center">
+                    <ImageIcon className="h-12 w-12 text-gray-400 dark:text-dark-500" />
                   </div>
                 )}
                 
                 {/* Action Buttons */}
-                <div className="absolute top-2 right-2 flex gap-1">
+                <div className="absolute top-3 right-3 flex gap-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       toggleFavorite(template.id)
                     }}
-                    className={`p-2 rounded-md bg-white dark:bg-dark-700 shadow-sm hover:shadow-md transition-all ${
+                    className={`p-2.5 rounded-lg bg-white/90 dark:bg-dark-700/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all ${
                       template.is_favorite ? 'text-yellow-500' : 'text-gray-400 dark:text-dark-500'
                     }`}
                   >
@@ -163,11 +297,21 @@ export default function TemplatesPage() {
                   
                   <button
                     onClick={(e) => handleDeleteClick(e, template)}
-                    className="p-2 rounded-md bg-white dark:bg-dark-700 shadow-sm hover:shadow-md transition-all text-gray-400 dark:text-dark-500 hover:text-red-500 dark:hover:text-red-400"
+                    className="p-2.5 rounded-lg bg-white/90 dark:bg-dark-700/90 backdrop-blur-sm shadow-sm hover:shadow-md transition-all text-gray-400 dark:text-dark-500 hover:text-red-500 dark:hover:text-red-400"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
+
+                {/* Favorite Badge */}
+                {template.is_favorite && (
+                  <div className="absolute top-3 left-3">
+                    <div className="bg-yellow-500 text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
+                      <Star className="h-3 w-3 fill-current" />
+                      Favorite
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Content */}
@@ -180,13 +324,21 @@ export default function TemplatesPage() {
                 </div>
                 
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-dark-400">
-                  <span>{template.source_images.length} images</span>
+                  <div className="flex items-center gap-1">
+                    <Layers className="h-3 w-3" />
+                    <span>{template.source_images.length} images</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    <span>Quick start</span>
+                  </div>
                 </div>
                 
                 <button
                   onClick={() => useTemplate(template)}
-                  className="btn-secondary btn-sm w-full"
+                  className="btn-secondary btn-sm w-full group-hover:btn-primary transition-all"
                 >
+                  <Sparkles className="mr-1.5 h-3 w-3" />
                   Use Template
                 </button>
               </div>

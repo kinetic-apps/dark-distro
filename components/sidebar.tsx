@@ -17,12 +17,16 @@ import {
   Camera,
   ListChecks,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Briefcase,
+  Palette,
+  UserCheck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/lib/context/sidebar-context'
+import { useState } from 'react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
@@ -31,8 +35,17 @@ const navigation = [
   { name: 'Screenshots', href: '/screenshots', icon: Camera },
   { name: 'Proxies', href: '/proxies', icon: Wifi },
   { name: 'SMS', href: '/sms', icon: MessageSquare },
+  { name: 'TikTok Creds', href: '/tiktok-credentials', icon: UserCheck },
   { name: 'Assets', href: '/assets', icon: ImageIcon },
-  { name: 'Image Gen', href: '/image-generator', icon: Wand2 },
+  { 
+    name: 'Image Gen', 
+    href: '/image-generator', 
+    icon: Wand2,
+    subItems: [
+      { name: 'Jobs', href: '/image-generator/jobs', icon: Briefcase },
+      { name: 'Templates', href: '/image-generator/templates', icon: Palette }
+    ]
+  },
   { name: 'Posts', href: '/posts', icon: Send },
   { name: 'Logs', href: '/logs', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
@@ -43,6 +56,7 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { isCollapsed, setIsCollapsed } = useSidebar()
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -90,41 +104,79 @@ export function Sidebar() {
               (item.href !== '/' && pathname.startsWith(item.href))
             
             return (
-              <Link
+              <div 
                 key={item.name}
-                href={item.href}
-                className={cn(
-                  'group flex items-center px-3 py-2 text-sm transition-all duration-300 rounded-md body-text relative',
-                  isActive
-                    ? 'bg-gray-100 text-gray-900 font-medium dark:bg-dark-700 dark:text-dark-100'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-dark-100',
-                  isCollapsed && "justify-center"
-                )}
-                title={isCollapsed ? item.name : undefined}
+                className="relative"
+                onMouseEnter={() => setHoveredItem(item.name)}
+                onMouseLeave={() => setHoveredItem(null)}
               >
-                <item.icon
+                <Link
+                  href={item.href}
                   className={cn(
-                    'h-5 w-5 flex-shrink-0 transition-all duration-300',
+                    'group flex items-center px-3 py-2 text-sm transition-all duration-300 rounded-md body-text relative',
                     isActive
-                      ? 'text-gray-900 dark:text-dark-100'
-                      : 'text-gray-400 group-hover:text-gray-600 dark:text-dark-500 dark:group-hover:text-dark-300',
-                    !isCollapsed && 'mr-3'
+                      ? 'bg-gray-100 text-gray-900 font-medium dark:bg-dark-700 dark:text-dark-100'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-800 dark:hover:text-dark-100',
+                    isCollapsed && "justify-center"
                   )}
-                />
-                <span className={cn(
-                  "transition-all duration-300",
-                  isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
-                )}>
-                  {item.name}
-                </span>
-                
-                {/* Tooltip for collapsed state */}
-                {isCollapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-dark-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-50">
+                  title={isCollapsed ? item.name : undefined}
+                >
+                  <item.icon
+                    className={cn(
+                      'h-5 w-5 flex-shrink-0 transition-all duration-300',
+                      isActive
+                        ? 'text-gray-900 dark:text-dark-100'
+                        : 'text-gray-400 group-hover:text-gray-600 dark:text-dark-500 dark:group-hover:text-dark-300',
+                      !isCollapsed && 'mr-3'
+                    )}
+                  />
+                  <span className={cn(
+                    "transition-all duration-300",
+                    isCollapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100"
+                  )}>
                     {item.name}
+                  </span>
+                  
+                  {/* Tooltip for collapsed state */}
+                  {isCollapsed && !item.subItems && (
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-dark-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-50">
+                      {item.name}
+                    </div>
+                  )}
+                </Link>
+
+                {/* Submenu */}
+                {item.subItems && hoveredItem === item.name && (
+                  <div className={cn(
+                    "absolute top-0 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md shadow-lg py-1 min-w-[160px] z-50",
+                    isCollapsed ? "left-full ml-2" : "left-full -ml-1"
+                  )}>
+                    {!isCollapsed && (
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider">
+                        {item.name}
+                      </div>
+                    )}
+                    {item.subItems.map((subItem) => {
+                      const isSubActive = pathname === subItem.href
+                      return (
+                        <Link
+                          key={subItem.name}
+                          href={subItem.href}
+                          className={cn(
+                            "flex items-center px-3 py-2 text-sm transition-colors",
+                            isSubActive
+                              ? "bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-dark-100"
+                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-700 dark:hover:text-dark-100"
+                          )}
+                        >
+                          <subItem.icon className="h-4 w-4 mr-2 text-gray-400 dark:text-dark-500" />
+                          {subItem.name}
+                        </Link>
+                      )
+                    })}
                   </div>
                 )}
-              </Link>
+              </div>
             )
           })}
         </nav>

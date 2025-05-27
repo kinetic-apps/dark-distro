@@ -258,6 +258,8 @@ export default function SettingsPage() {
   const [runningAll, setRunningAll] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showCredentials, setShowCredentials] = useState(false)
+  const [authMethod, setAuthMethod] = useState<'daisysms' | 'tiktok'>('daisysms')
+  const [savingAuthMethod, setSavingAuthMethod] = useState(false)
   const [metrics, setMetrics] = useState<SystemMetrics>({
     database: { status: 'unknown', latency: 0, connections: 0 },
     apis: {
@@ -284,9 +286,43 @@ export default function SettingsPage() {
 
   useEffect(() => {
     checkSystemHealth()
+    fetchAuthMethod()
     const interval = setInterval(checkSystemHealth, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  const fetchAuthMethod = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'geelark_auth_method')
+        .single()
+
+      if (data?.value) {
+        setAuthMethod(data.value)
+      }
+    } catch (error) {
+      console.error('Error fetching auth method:', error)
+    }
+  }
+
+  const updateAuthMethod = async (method: 'daisysms' | 'tiktok') => {
+    setSavingAuthMethod(true)
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .update({ value: JSON.stringify(method) })
+        .eq('key', 'geelark_auth_method')
+
+      if (error) throw error
+      setAuthMethod(method)
+    } catch (error) {
+      console.error('Error updating auth method:', error)
+    } finally {
+      setSavingAuthMethod(false)
+    }
+  }
 
   const checkSystemHealth = async () => {
     try {
@@ -827,6 +863,84 @@ export default function SettingsPage() {
                 </Link>
               </div>
             </div>
+          </div>
+
+          {/* Authentication Method Toggle */}
+          <div className="card-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Key className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-medium text-gray-900 dark:text-dark-100">GeeLark Authentication Method</h3>
+            </div>
+            
+            <p className="text-xs text-gray-600 dark:text-dark-400 mb-4">
+              Choose how GeeLark automations authenticate with TikTok accounts
+            </p>
+
+            <div className="space-y-2">
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="authMethod"
+                    value="daisysms"
+                    checked={authMethod === 'daisysms'}
+                    onChange={() => updateAuthMethod('daisysms')}
+                    disabled={savingAuthMethod}
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-dark-100">DaisySMS Phone Numbers</p>
+                    <p className="text-xs text-gray-600 dark:text-dark-400">Use phone numbers from SMS rentals</p>
+                  </div>
+                </div>
+                <MessageSquare className="h-4 w-4 text-gray-400" />
+              </label>
+
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="authMethod"
+                    value="tiktok"
+                    checked={authMethod === 'tiktok'}
+                    onChange={() => updateAuthMethod('tiktok')}
+                    disabled={savingAuthMethod}
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-dark-100">TikTok Credentials</p>
+                    <p className="text-xs text-gray-600 dark:text-dark-400">Use email/password combinations</p>
+                  </div>
+                </div>
+                <Lock className="h-4 w-4 text-gray-400" />
+              </label>
+            </div>
+
+            {savingAuthMethod && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600 dark:text-dark-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Saving preference...
+              </div>
+            )}
+
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-xs text-blue-800 dark:text-blue-200 flex items-start gap-1">
+                <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                <span>
+                  {authMethod === 'daisysms' 
+                    ? 'Automations will use phone numbers from the phones table for authentication.'
+                    : 'Automations will use email/password combinations from the TikTok credentials table.'}
+                </span>
+              </p>
+            </div>
+
+            <Link
+              href="/tiktok-credentials"
+              className="mt-3 inline-flex items-center text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Manage TikTok Credentials
+              <ChevronRight className="h-3 w-3 ml-1" />
+            </Link>
           </div>
 
           {/* Environment Info */}

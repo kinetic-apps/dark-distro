@@ -69,7 +69,7 @@ interface ImageGenerationJob {
 export default function AssetsPage() {
   const [jobs, setJobs] = useState<ImageGenerationJob[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [view, setView] = useState<'grid' | 'list'>('list')
   const [selectedVariant, setSelectedVariant] = useState<CarouselVariant | null>(null)
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState({

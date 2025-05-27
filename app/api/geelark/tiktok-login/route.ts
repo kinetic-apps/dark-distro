@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { account_id, profile_id, login_method = 'email', email, password, phone_number, otp_code } = body
+    const { account_id, profile_id, login_method = 'auto', email, password, phone_number, otp_code } = body
 
     if (!account_id || !profile_id) {
       return NextResponse.json(
@@ -15,9 +15,69 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check authentication method setting if login_method is 'auto'
+    let effectiveLoginMethod = login_method
+    let autoEmail = email
+    let autoPassword = password
+
+    if (login_method === 'auto') {
+      // Get the authentication method from settings
+      const { data: settingData } = await supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'geelark_auth_method')
+        .single()
+
+      const authMethod = settingData?.value?.replace(/"/g, '') || 'daisysms'
+
+      if (authMethod === 'tiktok') {
+        // Fetch available TikTok credentials
+        const { data: credentials } = await supabaseAdmin
+          .from('tiktok_credentials')
+          .select('*')
+          .eq('status', 'active')
+          .order('last_used_at', { ascending: true, nullsFirst: true })
+          .limit(1)
+
+        if (!credentials || credentials.length === 0) {
+          return NextResponse.json(
+            { error: 'No available TikTok credentials found' },
+            { status: 404 }
+          )
+        }
+
+        const credential = credentials[0]
+        autoEmail = credential.email
+        autoPassword = credential.password
+        effectiveLoginMethod = 'email'
+
+        // Update last_used_at
+        await supabaseAdmin
+          .from('tiktok_credentials')
+          .update({ last_used_at: new Date().toISOString() })
+          .eq('id', credential.id)
+
+        await supabaseAdmin.from('logs').insert({
+          level: 'info',
+          component: 'api-tiktok-login',
+          message: 'Using TikTok credentials from database',
+          meta: { account_id, credential_id: credential.id, email: credential.email }
+        })
+      } else {
+        // Use DaisySMS phone method (not implemented in this example)
+        return NextResponse.json(
+          { error: 'DaisySMS phone authentication is not implemented yet' },
+          { status: 501 }
+        )
+      }
+    }
+
     // Handle email/password login
-    if (login_method === 'email') {
-      if (!email || !password) {
+    if (effectiveLoginMethod === 'email') {
+      const loginEmail = autoEmail || email
+      const loginPassword = autoPassword || password
+
+      if (!loginEmail || !loginPassword) {
         return NextResponse.json(
           { error: 'Email and password are required for email login' },
           { status: 400 }
@@ -25,7 +85,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Initiate TikTok login with email/password
-      const taskData = await geelarkApi.loginTikTok(profile_id, email, password)
+      const taskData = await geelarkApi.loginTikTok(profile_id, loginEmail, loginPassword)
 
       // Store login attempt
       await supabaseAdmin.from('tasks').insert({
@@ -36,7 +96,7 @@ export async function POST(request: NextRequest) {
         started_at: new Date().toISOString(),
         meta: {
           login_method: 'email',
-          email
+          email: loginEmail
         }
       })
 
@@ -44,7 +104,7 @@ export async function POST(request: NextRequest) {
         level: 'info',
         component: 'api-tiktok-login',
         message: 'TikTok email login initiated',
-        meta: { account_id, profile_id, email }
+        meta: { account_id, profile_id, email: loginEmail }
       })
 
       return NextResponse.json({
