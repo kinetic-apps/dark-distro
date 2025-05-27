@@ -10,6 +10,7 @@ import {
   Filter
 } from 'lucide-react'
 import Link from 'next/link'
+import PostsPageClient from './posts-page-client'
 
 async function getPosts(searchParams: { status?: string }) {
   const supabase = await createClient()
@@ -97,44 +98,8 @@ export default async function PostsPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Posts</h1>
-          <p className="page-description">
-            Manage content distribution campaigns
-          </p>
-        </div>
-        
-        <div className="flex gap-3">
-          <Link href="/assets" className="btn-secondary">
-            Browse Assets
-          </Link>
-          <button className="btn-primary">
-            <Play className="h-4 w-4 mr-2" />
-            Launch Daily Campaign
-          </button>
-        </div>
-      </div>
-
-      {params.action === 'launch' && (
-        <div className="card bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/30">
-          <div className="flex items-start">
-            <Send className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-3" />
-            <div>
-              <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300">
-                Launch Daily Campaign
-              </h3>
-              <p className="text-sm text-blue-700 dark:text-blue-400/80 mt-1">
-                This will automatically pair unused assets with all active profiles and create posts.
-              </p>
-              <button className="btn-primary mt-3">
-                Confirm Launch
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <PostsPageClient>
+      <>
 
       <div className="flex items-center gap-2">
         <Filter className="h-4 w-4 text-gray-400" />
@@ -294,6 +259,7 @@ export default async function PostsPage({
           </tbody>
         </table>
       </div>
-    </div>
+      </>
+    </PostsPageClient>
   )
 }

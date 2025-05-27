@@ -1,9 +1,16 @@
 import { supabaseAdmin } from './supabase/admin'
 import { createHash } from 'crypto'
 
-const API_BASE_URL = process.env.GEELARK_API_BASE_URL!
-const API_KEY = process.env.GEELARK_API_KEY!
-const APP_ID = process.env.GEELARK_APP_ID!
+const API_BASE_URL = process.env.GEELARK_API_BASE_URL || 'https://openapi.geelark.com'
+const API_KEY = process.env.GEELARK_API_KEY || ''
+const APP_ID = process.env.GEELARK_APP_ID || ''
+
+// Log configuration for debugging
+console.log('GeeLark API Configuration:', {
+  API_BASE_URL,
+  API_KEY: API_KEY ? '***' + API_KEY.slice(-4) : 'NOT SET',
+  APP_ID: APP_ID || 'NOT SET'
+})
 
 // Use the same UUID generator as the working endpoint
 function generateUUID(): string {
@@ -49,7 +56,7 @@ interface CreateProfileData {
 
 interface TaskData {
   task_id: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
   result?: any
 }
 
@@ -86,14 +93,24 @@ export class GeeLarkAPI {
         },
       })
 
-      if (!response.ok) {
-        throw new Error(`GeeLark API error: ${response.status} ${response.statusText}`)
+      const responseText = await response.text()
+      let data: GeeLarkResponse<T>
+      
+      try {
+        data = JSON.parse(responseText) as GeeLarkResponse<T>
+      } catch (parseError) {
+        console.error('Failed to parse GeeLark response:', responseText)
+        throw new Error(`Invalid JSON response from GeeLark API: ${responseText}`)
       }
 
-      const data = await response.json() as GeeLarkResponse<T>
+      if (!response.ok) {
+        console.error('GeeLark API HTTP error:', response.status, response.statusText, data)
+        throw new Error(`GeeLark API error: ${response.status} ${response.statusText} - ${data?.msg || 'Unknown error'}`)
+      }
       
       if (data.code !== 0) {
-        throw new Error(`GeeLark API error: ${data.msg}`)
+        console.error('GeeLark API error response:', data)
+        throw new Error(`GeeLark API error: ${data.msg} (code: ${data.code})`)
       }
 
       return data.data
@@ -102,7 +119,7 @@ export class GeeLarkAPI {
         level: 'error',
         component: 'geelark-api',
         message: `API request failed: ${error}`,
-        meta: { endpoint, error: String(error) }
+        meta: { endpoint, error: String(error), url }
       })
       throw error
     }
@@ -110,6 +127,7 @@ export class GeeLarkAPI {
 
   async createProfile(deviceInfo?: {
     androidVersion?: number
+    proxyId?: string  // Add support for GeeLark proxy ID
     proxyConfig?: {
       typeId: number
       server: string
@@ -149,8 +167,12 @@ export class GeeLarkAPI {
       language: deviceInfo?.language || 'default'
     }
 
-    // Add proxy configuration if provided
-    if (deviceInfo?.proxyConfig) {
+    // Add proxy ID if provided (takes precedence over proxy config)
+    if (deviceInfo?.proxyId) {
+      requestBody.proxyId = deviceInfo.proxyId
+      console.log('Using GeeLark proxy ID:', deviceInfo.proxyId)
+    } else if (deviceInfo?.proxyConfig) {
+      // Add proxy configuration if provided
       requestBody.proxyConfig = deviceInfo.proxyConfig
       console.log('Proxy config being sent:', JSON.stringify(deviceInfo.proxyConfig, null, 2))
     }
@@ -184,7 +206,9 @@ export class GeeLarkAPI {
         profile_id: successDetail.id,
         profile_name: successDetail.profileName,
         serial_no: successDetail.envSerialNo,
-        equipment_info: successDetail.equipmentInfo
+        equipment_info: successDetail.equipmentInfo,
+        proxy_id: deviceInfo?.proxyId,
+        has_proxy_config: !!deviceInfo?.proxyConfig
       }
     })
 
@@ -223,62 +247,32 @@ export class GeeLarkAPI {
     })
   }
 
-  async startWarmupTask(profileId: string, accountId: string): Promise<string> {
-    const data = await this.request<TaskData>('/api/v1/tasks', {
-      method: 'POST',
-      body: JSON.stringify({
-        profile_id: profileId,
-        task_type: 'automation',
-        template_name: 'ai-warmup',
-        params: {
-          duration_minutes: 30,
-          actions: ['browse', 'like', 'follow', 'comment']
-        }
-      })
-    })
-
-    await supabaseAdmin.from('tasks').insert({
-      type: 'warmup',
-      geelark_task_id: data.task_id,
-      account_id: accountId,
-      status: 'running',
-      started_at: new Date().toISOString()
-    })
-
-    return data.task_id
-  }
-
-  async postVideo(profileId: string, accountId: string, video: {
-    url: string
-    caption: string
-    hashtags?: string[]
-  }): Promise<string> {
-    const data = await this.request<TaskData>('/api/v1/tasks', {
-      method: 'POST',
-      body: JSON.stringify({
-        profile_id: profileId,
-        task_type: 'post',
-        params: {
-          video_url: video.url,
-          caption: video.caption,
-          hashtags: video.hashtags || []
-        }
-      })
-    })
-
-    await supabaseAdmin.from('tasks').insert({
-      type: 'post',
-      geelark_task_id: data.task_id,
-      account_id: accountId,
-      status: 'running',
-      started_at: new Date().toISOString()
-    })
-
-    return data.task_id
-  }
+  // These methods are deprecated - use the TikTok-specific methods instead
+  // async startWarmupTask - use startTikTokWarmup
+  // async postVideo - use postTikTokVideo
 
   async getTaskStatus(taskId: string): Promise<TaskData> {
-    return await this.request<TaskData>(`/api/v1/tasks/${taskId}`)
+    // GeeLark doesn't have a single task status endpoint, need to use query endpoint
+    const response = await this.queryTasks([taskId])
+    
+    if (response.items && response.items.length > 0) {
+      const task = response.items[0]
+      // Map GeeLark status to our TaskData format
+      return {
+        task_id: task.id,
+        status: task.status === 3 ? 'completed' : 
+                task.status === 4 ? 'failed' : 
+                task.status === 7 ? 'cancelled' :
+                task.status === 2 ? 'running' : 'pending',
+        result: {
+          failCode: task.failCode,
+          failDesc: task.failDesc,
+          cost: task.cost
+        }
+      }
+    }
+    
+    throw new Error(`Task ${taskId} not found`)
   }
 
   async queryTasks(taskIds: string[]): Promise<any> {
@@ -432,21 +426,40 @@ export class GeeLarkAPI {
 
   // TikTok Automation
   async loginTikTok(profileId: string, account: string, password: string): Promise<{ taskId: string }> {
+    console.log('Starting TikTok login:', { profileId, account: account.substring(0, 3) + '***' })
+    
+    const requestBody = {
+      name: `tiktok_login_${Date.now()}`,
+      remark: `Login for ${account}`,
+      scheduleAt: Math.floor(Date.now() / 1000),
+      id: profileId,
+      account: account,
+      password: password
+    }
+    
+    console.log('TikTok login request (FULL DEBUG):', requestBody)
+    
     const data = await this.request<{ taskId: string }>('/open/v1/rpa/task/tiktokLogin', {
       method: 'POST',
-      body: JSON.stringify({
-        scheduleAt: Math.floor(Date.now() / 1000),
-        id: profileId,
-        account: account,
-        password: password
-      })
+      body: JSON.stringify(requestBody)
     })
+
+    if (!data.taskId) {
+      throw new Error('No task ID returned from login request')
+    }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'geelark-api',
       message: 'TikTok login initiated',
-      meta: { profile_id: profileId, account: account, task_id: data.taskId }
+      meta: { 
+        profile_id: profileId, 
+        account: account, 
+        task_id: data.taskId,
+        password_length: password.length,
+        password_first_char: password.charAt(0),
+        password_last_char: password.charAt(password.length - 1)
+      }
     })
 
     return data
@@ -457,29 +470,71 @@ export class GeeLarkAPI {
     action?: 'browse video' | 'search video' | 'search profile'
     keywords?: string[]
   }): Promise<string> {
+    console.log('Starting TikTok warmup:', { profileId, accountId, options })
+    
+    const requestBody: {
+      planName: string
+      taskType: number
+      list: Array<{
+        scheduleAt: number
+        envId: string
+        action: string
+        duration: number
+        keywords?: string[]
+      }>
+    } = {
+      planName: `warmup_${accountId}_${Date.now()}`,
+      taskType: 2, // Warmup
+      list: [{
+        scheduleAt: Math.floor(Date.now() / 1000),
+        envId: profileId,
+        action: options?.action || 'browse video',
+        duration: options?.duration_minutes || 30
+      }]
+    }
+    
+    // Add keywords only if provided and action requires them
+    if (options?.keywords && options.keywords.length > 0 && options.action !== 'browse video') {
+      requestBody.list[0].keywords = options.keywords
+    }
+    
+    console.log('Warmup request body:', JSON.stringify(requestBody, null, 2))
+    
     const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
       method: 'POST',
-      body: JSON.stringify({
-        planName: `warmup_${accountId}_${Date.now()}`,
-        taskType: 2, // Warmup
-        list: [{
-          scheduleAt: Math.floor(Date.now() / 1000),
-          envId: profileId,
-          action: options?.action || 'browse video',
-          keywords: options?.keywords,
-          duration: options?.duration_minutes || 30
-        }]
-      })
+      body: JSON.stringify(requestBody)
     })
+
+    if (!data.taskIds || data.taskIds.length === 0) {
+      throw new Error('No task ID returned from warmup request')
+    }
 
     const taskId = data.taskIds[0]
 
     await supabaseAdmin.from('tasks').insert({
       type: 'warmup',
+      task_type: 'warmup',  // Required field
       geelark_task_id: taskId,
-      account_id: accountId,
+      account_id: accountId,  // Use account_id instead of profile_id
       status: 'running',
-      started_at: new Date().toISOString()
+      started_at: new Date().toISOString(),
+      meta: {
+        duration_minutes: options?.duration_minutes || 30,
+        action: options?.action || 'browse video',
+        profile_id: profileId  // Store profile_id in meta
+      }
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'TikTok warmup task created',
+      meta: { 
+        profile_id: profileId,
+        task_id: taskId,
+        duration: options?.duration_minutes || 30,
+        action: options?.action || 'browse video'
+      }
     })
 
     return taskId
@@ -512,6 +567,7 @@ export class GeeLarkAPI {
 
     await supabaseAdmin.from('tasks').insert({
       type: 'post',
+      task_type: 'post',  // Required field
       geelark_task_id: taskId,
       account_id: accountId,
       status: 'running',
@@ -548,6 +604,7 @@ export class GeeLarkAPI {
 
     await supabaseAdmin.from('tasks').insert({
       type: 'post',
+      task_type: 'post',  // Required field
       geelark_task_id: taskId,
       account_id: accountId,
       status: 'running',

@@ -1,59 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('app_settings')
       .select('value')
       .eq('key', 'geelark_auth_method')
       .single()
 
-    if (error) {
-      console.error('Error fetching auth method:', error)
-      return NextResponse.json({ method: 'daisysms' }) // Default fallback
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw error
     }
 
-    return NextResponse.json({ method: data.value || 'daisysms' })
+    const authMethod = data?.value?.replace(/"/g, '') || 'daisysms'
+
+    return NextResponse.json({ authMethod })
   } catch (error) {
-    console.error('Error in auth-method GET:', error)
-    return NextResponse.json({ method: 'daisysms' }, { status: 500 })
+    console.error('Error fetching auth method:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch auth method' },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { method } = await request.json()
+    const body = await request.json()
+    const { authMethod } = body
 
-    if (!['daisysms', 'tiktok'].includes(method)) {
+    if (!authMethod || !['daisysms', 'tiktok'].includes(authMethod)) {
       return NextResponse.json(
-        { error: 'Invalid authentication method' },
+        { error: 'Invalid auth method' },
         { status: 400 }
       )
     }
 
-    const supabase = await createClient()
-
-    const { error } = await supabase
+    // Check if setting exists
+    const { data: existing } = await supabaseAdmin
       .from('app_settings')
-      .update({ value: JSON.stringify(method) })
+      .select('id')
       .eq('key', 'geelark_auth_method')
+      .single()
 
-    if (error) {
-      console.error('Error updating auth method:', error)
-      return NextResponse.json(
-        { error: 'Failed to update authentication method' },
-        { status: 500 }
-      )
+    if (existing) {
+      // Update existing setting
+      const { error } = await supabaseAdmin
+        .from('app_settings')
+        .update({ 
+          value: JSON.stringify(authMethod),
+          updated_at: new Date().toISOString()
+        })
+        .eq('key', 'geelark_auth_method')
+
+      if (error) throw error
+    } else {
+      // Create new setting
+      const { error } = await supabaseAdmin
+        .from('app_settings')
+        .insert({
+          key: 'geelark_auth_method',
+          value: JSON.stringify(authMethod),
+          description: 'Authentication method for GeeLark TikTok login'
+        })
+
+      if (error) throw error
     }
 
-    return NextResponse.json({ success: true, method })
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'api-settings',
+      message: 'Auth method updated',
+      meta: { authMethod }
+    })
+
+    return NextResponse.json({ success: true, authMethod })
   } catch (error) {
-    console.error('Error in auth-method POST:', error)
+    console.error('Error updating auth method:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to update auth method' },
       { status: 500 }
     )
   }

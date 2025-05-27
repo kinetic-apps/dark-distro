@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Smartphone, LogIn, Activity, Image, Video, X, Power, RefreshCw } from 'lucide-react'
 import { ScreenshotViewer } from './screenshot-viewer'
+import { useNotification } from '@/lib/context/notification-context'
 
 interface TikTokActionsProps {
   accountId: string
@@ -20,8 +21,8 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
   const [showWarmupModal, setShowWarmupModal] = useState(false)
   const [showPostModal, setShowPostModal] = useState(false)
   const [showAppsModal, setShowAppsModal] = useState(false)
-  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null)
   const [appExplorationResults, setAppExplorationResults] = useState<any>(null)
+  const { notify } = useNotification()
   
   // Login form state
   const [email, setEmail] = useState('')
@@ -30,6 +31,9 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
   
   // Warmup options
   const [warmupDuration, setWarmupDuration] = useState('30')
+  const [warmupAction, setWarmupAction] = useState<'browse video' | 'search video' | 'search profile'>('browse video')
+  const [warmupKeywords, setWarmupKeywords] = useState('')
+  const [selectedNiche, setSelectedNiche] = useState('')
   const [isWarmingUp, setIsWarmingUp] = useState(false)
   
   // Post content state
@@ -39,11 +43,6 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
   const [videoUrl, setVideoUrl] = useState('')
   const [imageUrls, setImageUrls] = useState('')
   const [isPosting, setIsPosting] = useState(false)
-
-  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
-    setNotification({ type, message })
-    setTimeout(() => setNotification(null), 5000)
-  }
 
   // Check phone status on mount and periodically
   useEffect(() => {
@@ -84,7 +83,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
 
   const handleStartPhone = async () => {
     if (!profileId) {
-      showNotification('error', 'No profile ID available')
+      notify('error', 'No profile ID available')
       return
     }
 
@@ -102,13 +101,13 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      showNotification('success', 'Phone started successfully')
+      notify('success', 'Phone started successfully')
       setPhoneStatus('starting')
       // Check status after a delay
       setTimeout(checkPhoneStatus, 3000)
       onActionComplete?.()
     } catch (error) {
-      showNotification('error', `Failed to start phone: ${error}`)
+      notify('error', `Failed to start phone: ${error}`)
     } finally {
       setIsStartingPhone(false)
     }
@@ -116,7 +115,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
 
   const handleStopPhone = async () => {
     if (!profileId) {
-      showNotification('error', 'No profile ID available')
+      notify('error', 'No profile ID available')
       return
     }
 
@@ -134,11 +133,11 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      showNotification('success', 'Phone stopped successfully')
+      notify('success', 'Phone stopped successfully')
       setPhoneStatus('stopped')
       onActionComplete?.()
     } catch (error) {
-      showNotification('error', `Failed to stop phone: ${error}`)
+      notify('error', `Failed to stop phone: ${error}`)
     } finally {
       setIsStoppingPhone(false)
     }
@@ -146,7 +145,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
 
   const handleExploreApps = async () => {
     if (!profileId) {
-      showNotification('error', 'No profile ID available')
+      notify('error', 'No profile ID available')
       return
     }
 
@@ -165,15 +164,15 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       console.log('App exploration results:', data)
       setAppExplorationResults(data)
       setShowAppsModal(true)
-      showNotification('info', `Found ${data.tiktok_apps?.length || 0} TikTok variants`)
+      notify('info', `Found ${data.tiktok_apps?.length || 0} TikTok variants`)
     } catch (error) {
-      showNotification('error', `Failed to explore apps: ${error}`)
+      notify('error', `Failed to explore apps: ${error}`)
     }
   }
 
   const handleInstallTikTok = async () => {
     if (!profileId) {
-      showNotification('error', 'No profile ID available')
+      notify('error', 'No profile ID available')
       return
     }
 
@@ -193,10 +192,10 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      showNotification('success', 'TikTok v39.1.0 installed successfully')
+      notify('success', 'TikTok v39.1.0 installed successfully')
       onActionComplete?.()
     } catch (error) {
-      showNotification('error', `Failed to install TikTok: ${error}`)
+      notify('error', `Failed to install TikTok: ${error}`)
     } finally {
       setIsInstalling(false)
     }
@@ -204,12 +203,12 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
 
   const handleLogin = async () => {
     if (!profileId) {
-      showNotification('error', 'No profile ID available')
+      notify('error', 'No profile ID available')
       return
     }
 
     if (!email || !password) {
-      showNotification('error', 'Email and password are required')
+      notify('error', 'Email and password are required')
       return
     }
 
@@ -230,14 +229,14 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      showNotification('success', 'TikTok login initiated')
+      notify('success', 'TikTok login initiated')
       
       setEmail('')
       setPassword('')
       setShowLoginModal(false)
       onActionComplete?.()
     } catch (error) {
-      showNotification('error', `Failed to login: ${error}`)
+      notify('error', `Failed to login: ${error}`)
     } finally {
       setIsLoggingIn(false)
     }
@@ -246,26 +245,43 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
   const handleWarmup = async () => {
     setIsWarmingUp(true)
     try {
+      // Prepare keywords array
+      const keywordsArray = warmupKeywords
+        .split(',')
+        .map(k => k.trim())
+        .filter(k => k.length > 0)
+
+      const options: any = {
+        duration_minutes: parseInt(warmupDuration),
+        action: warmupAction
+      }
+
+      // Only add keywords for search actions
+      if (warmupAction !== 'browse video' && keywordsArray.length > 0) {
+        options.keywords = keywordsArray
+      }
+
       const response = await fetch('/api/geelark/start-warmup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           account_ids: [accountId],
-          options: {
-            duration_minutes: parseInt(warmupDuration),
-            action: 'browse video'
-          }
+          options
         })
       })
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      showNotification('success', `Warmup started for ${warmupDuration} minutes`)
+      const actionText = warmupAction === 'browse video' ? 'browsing videos' :
+                        warmupAction === 'search video' ? 'searching videos' :
+                        'searching profiles'
+      
+      notify('success', `Warmup started: ${actionText} for ${warmupDuration} minutes`)
       setShowWarmupModal(false)
       onActionComplete?.()
     } catch (error) {
-      showNotification('error', `Failed to start warmup: ${error}`)
+      notify('error', `Failed to start warmup: ${error}`)
     } finally {
       setIsWarmingUp(false)
     }
@@ -316,7 +332,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
 
-      showNotification('success', `${postType === 'carousel' ? 'Carousel' : 'Video'} post initiated`)
+      notify('success', `${postType === 'carousel' ? 'Carousel' : 'Video'} post initiated`)
       
       // Reset form
       setCaption('')
@@ -326,7 +342,7 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       setShowPostModal(false)
       onActionComplete?.()
     } catch (error) {
-      showNotification('error', `Failed to post: ${error}`)
+      notify('error', `Failed to post: ${error}`)
     } finally {
       setIsPosting(false)
     }
@@ -334,17 +350,6 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
 
   return (
     <>
-      {/* Notification */}
-      {notification && (
-        <div className={`fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-          notification.type === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-100' :
-          notification.type === 'info' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-100' :
-          'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100'
-        }`}>
-          {notification.message}
-        </div>
-      )}
-
       <div className="flex flex-wrap gap-2">
         {/* Phone Status Indicator */}
         <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-md text-xs">
@@ -519,36 +524,153 @@ export function TikTokActions({ accountId, profileId, onActionComplete }: TikTok
       {/* Warmup Modal */}
       {showWarmupModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Start Warmup</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Configure Warmup</h3>
               <button onClick={() => setShowWarmupModal(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Run automated warmup activities on TikTok
+              Customize your TikTok warmup strategy
             </p>
             <div className="space-y-4">
+              {/* Action Type */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Duration (minutes)</label>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Action Type</label>
+                <select
+                  value={warmupAction}
+                  onChange={(e) => {
+                    setWarmupAction(e.target.value as any)
+                    // Clear keywords if switching to browse
+                    if (e.target.value === 'browse video') {
+                      setWarmupKeywords('')
+                      setSelectedNiche('')
+                    }
+                  }}
+                  className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="browse video">Browse Videos (Random)</option>
+                  <option value="search video">Search Videos (Targeted)</option>
+                  <option value="search profile">Search Profiles (Targeted)</option>
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {warmupAction === 'browse video' && 'Randomly browse TikTok videos without specific targeting'}
+                  {warmupAction === 'search video' && 'Search for videos using specific keywords or niches'}
+                  {warmupAction === 'search profile' && 'Search for user profiles in your target niche'}
+                </p>
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Duration</label>
                 <select
                   value={warmupDuration}
                   onChange={(e) => setWarmupDuration(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                 >
+                  <option value="10">10 minutes (Quick)</option>
                   <option value="15">15 minutes</option>
-                  <option value="30">30 minutes</option>
+                  <option value="30">30 minutes (Recommended)</option>
+                  <option value="45">45 minutes</option>
                   <option value="60">1 hour</option>
-                  <option value="120">2 hours</option>
+                  <option value="90">1.5 hours</option>
+                  <option value="120">2 hours (Extended)</option>
                 </select>
               </div>
+
+              {/* Niche Presets - Only show for search actions */}
+              {warmupAction !== 'browse video' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Quick Niche Selection</label>
+                  <select
+                    value={selectedNiche}
+                    onChange={(e) => {
+                      setSelectedNiche(e.target.value)
+                      // Set predefined keywords based on niche
+                      const nicheKeywords: Record<string, string> = {
+                        fitness: 'fitness, workout, gym, health, exercise, training',
+                        cooking: 'cooking, recipes, food, chef, kitchen, meal prep',
+                        tech: 'technology, gadgets, tech review, innovation, AI, coding',
+                        fashion: 'fashion, style, outfit, clothing, trends, ootd',
+                        gaming: 'gaming, gamer, gameplay, esports, video games, streaming',
+                        beauty: 'beauty, makeup, skincare, cosmetics, tutorial, routine',
+                        travel: 'travel, vacation, destination, adventure, explore, tourism',
+                        music: 'music, songs, artist, concert, playlist, musician',
+                        comedy: 'comedy, funny, humor, jokes, memes, entertainment',
+                        education: 'education, learning, tutorial, howto, tips, knowledge',
+                        pets: 'pets, dogs, cats, animals, puppy, kitten',
+                        art: 'art, drawing, painting, artist, creative, artwork'
+                      }
+                      if (e.target.value && nicheKeywords[e.target.value]) {
+                        setWarmupKeywords(nicheKeywords[e.target.value])
+                      }
+                    }}
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  >
+                    <option value="">Custom Keywords</option>
+                    <option value="fitness">Fitness & Health</option>
+                    <option value="cooking">Cooking & Food</option>
+                    <option value="tech">Technology</option>
+                    <option value="fashion">Fashion & Style</option>
+                    <option value="gaming">Gaming</option>
+                    <option value="beauty">Beauty & Makeup</option>
+                    <option value="travel">Travel</option>
+                    <option value="music">Music</option>
+                    <option value="comedy">Comedy & Entertainment</option>
+                    <option value="education">Education & Learning</option>
+                    <option value="pets">Pets & Animals</option>
+                    <option value="art">Art & Design</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Keywords - Only show for search actions */}
+              {warmupAction !== 'browse video' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
+                    Keywords (comma separated)
+                  </label>
+                  <textarea
+                    placeholder={warmupAction === 'search video' 
+                      ? "e.g., fitness, workout, gym, health" 
+                      : "e.g., fitness coach, personal trainer, nutritionist"}
+                    value={warmupKeywords}
+                    onChange={(e) => setWarmupKeywords(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {warmupAction === 'search video' 
+                      ? "Enter keywords related to your niche to find relevant videos" 
+                      : "Enter profile types or usernames to search for"}
+                  </p>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-sm">
+                <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">Warmup Summary:</p>
+                <ul className="text-gray-600 dark:text-gray-400 space-y-1 text-xs">
+                  <li>• Action: {warmupAction === 'browse video' ? 'Random browsing' : 
+                               warmupAction === 'search video' ? 'Targeted video search' : 
+                               'Profile search'}</li>
+                  <li>• Duration: {warmupDuration} minutes</li>
+                  {warmupAction !== 'browse video' && warmupKeywords && (
+                    <li>• Keywords: {warmupKeywords.split(',').length} terms</li>
+                  )}
+                  {selectedNiche && (
+                    <li>• Niche: {selectedNiche.charAt(0).toUpperCase() + selectedNiche.slice(1)}</li>
+                  )}
+                </ul>
+              </div>
+
               <button
                 onClick={handleWarmup}
-                disabled={isWarmingUp}
+                disabled={isWarmingUp || (warmupAction !== 'browse video' && !warmupKeywords.trim())}
                 className="btn-primary w-full"
               >
-                {isWarmingUp ? 'Starting...' : 'Start Warmup'}
+                {isWarmingUp ? 'Starting Warmup...' : 'Start Warmup'}
               </button>
             </div>
           </div>

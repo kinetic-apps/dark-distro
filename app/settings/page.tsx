@@ -310,12 +310,15 @@ export default function SettingsPage() {
   const updateAuthMethod = async (method: 'daisysms' | 'tiktok') => {
     setSavingAuthMethod(true)
     try {
-      const { error } = await supabase
-        .from('app_settings')
-        .update({ value: JSON.stringify(method) })
-        .eq('key', 'geelark_auth_method')
+      const response = await fetch('/api/settings/auth-method', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authMethod: method })
+      })
 
-      if (error) throw error
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      
       setAuthMethod(method)
     } catch (error) {
       console.error('Error updating auth method:', error)

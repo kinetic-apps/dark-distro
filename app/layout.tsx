@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/lib/context/ThemeContext";
+import { NotificationProvider } from "@/lib/context/notification-context";
 import ConditionalLayout from "@/components/ConditionalLayout";
 
 export const metadata: Metadata = {
@@ -44,11 +45,13 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <ThemeProvider>
-          <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-200">
-            <ConditionalLayout>
-              {children}
-            </ConditionalLayout>
-          </div>
+          <NotificationProvider>
+            <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-200">
+              <ConditionalLayout>
+                {children}
+              </ConditionalLayout>
+            </div>
+          </NotificationProvider>
         </ThemeProvider>
       </body>
     </html>

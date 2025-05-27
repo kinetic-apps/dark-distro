@@ -10,6 +10,8 @@ export async function POST(request: NextRequest) {
       device_info, 
       assign_proxy, 
       proxy_type,
+      proxy_id,        // GeeLark proxy ID
+      proxy_config,    // Manual/Dynamic proxy configuration
       android_version,
       group_name,
       tags,
@@ -17,21 +19,62 @@ export async function POST(request: NextRequest) {
       charge_mode,
       language,
       surface_brand,
-      surface_model
+      surface_model,
+      remark
     } = body
 
-    // Always get a proxy since GeeLark seems to require it
+    // Prepare GeeLark profile creation parameters
+    const profileParams: any = {
+      androidVersion: android_version,
+      groupName: group_name,
+      tagsName: tags,
+      region: region,
+      chargeMode: charge_mode,
+      language: language,
+      surfaceBrandName: surface_brand,
+      surfaceModelName: surface_model,
+      remark: remark
+    }
+
+    // Handle proxy configuration
     let proxyData = null
-    let proxyConfig = undefined
 
-    // Determine proxy type - default to sim if not specified
-    const useProxyType = proxy_type || 'sim'
+    if (proxy_id) {
+      // Using GeeLark proxy by ID
+      profileParams.proxyId = proxy_id
+      
+      // We don't have the proxy details in our database for GeeLark proxies
+      // Create a placeholder record
+      proxyData = {
+        id: null,
+        type: 'geelark',
+        label: `GeeLark Proxy ${proxy_id}`,
+        geelark_proxy_id: proxy_id
+      }
+    } else if (proxy_config) {
+      // Using manual or dynamic proxy configuration
+      profileParams.proxyConfig = proxy_config
+      
+      // Create a record in our database for tracking
+      const proxyLabel = proxy_config.typeId >= 20 
+        ? `Dynamic-${['IPIDEA', 'IPHTML', 'kookeey', 'Lumatuo'][proxy_config.typeId - 20]}`
+        : `Manual-${proxy_config.server}:${proxy_config.port}`
+      
+      proxyData = {
+        id: null,
+        type: proxy_config.typeId >= 20 ? 'dynamic' : 'manual',
+        label: proxyLabel,
+        meta: proxy_config
+      }
+    } else if (assign_proxy) {
+      // Auto-assign proxy from local database
+      const useProxyType = proxy_type || 'sim'
 
-    if (useProxyType === 'sticky') {
+      if (useProxyType === 'sticky') {
         // Create new sticky proxy
         const proxyCredentials = soaxApi.getStickyPoolProxy()
         
-      const { data: newProxy } = await supabaseAdmin
+        const { data: newProxy } = await supabaseAdmin
           .from('proxies')
           .insert({
             label: `Sticky-${Date.now()}`,
@@ -41,25 +84,21 @@ export async function POST(request: NextRequest) {
             username: proxyCredentials.username,
             password: proxyCredentials.password,
             session_id: proxyCredentials.sessionId,
-          health: 'unknown'
+            health: 'unknown'
           })
           .select()
           .single()
         
-      proxyData = newProxy
+        proxyData = newProxy
 
-      // Use the exact proxy password without modification
-      // The SOAX format might be required as-is
-      const proxyPassword = proxyCredentials.password
-
-      // Configure proxy for GeeLark profile creation
-      proxyConfig = {
-        typeId: 3, // Try HTTPS
-        server: proxyCredentials.host,
-        port: proxyCredentials.port,
-        username: proxyCredentials.username,
-        password: proxyPassword
-      }
+        // Configure proxy for GeeLark profile creation
+        profileParams.proxyConfig = {
+          typeId: 1, // SOCKS5
+          server: proxyCredentials.host,
+          port: proxyCredentials.port,
+          username: proxyCredentials.username,
+          password: proxyCredentials.password
+        }
       } else {
         // Find available SIM proxy
         const { data: availableProxy } = await supabaseAdmin
@@ -70,61 +109,45 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .single()
         
-      if (!availableProxy) {
-        throw new Error('No available SIM proxies. Please add more proxies or use sticky proxy type.')
-      }
+        if (!availableProxy) {
+          throw new Error('No available SIM proxies. Please add more proxies or use sticky proxy type.')
+        }
 
-      proxyData = availableProxy
+        proxyData = availableProxy
 
-      // Use the exact proxy password without modification
-      // The SOAX format might be required as-is
-      const proxyPassword = availableProxy.password
-
-      console.log('Available proxy:', {
-        host: availableProxy.host,
-        port: availableProxy.port,
-        username: availableProxy.username,
-        password: availableProxy.password,
-        passwordLength: availableProxy.password.length,
-        passwordChars: availableProxy.password.split('').map((c: string) => `${c} (${c.charCodeAt(0)})`).join(', ')
-      })
-
-      // Configure proxy for GeeLark
-      proxyConfig = {
-        typeId: 3, // Try HTTPS
-        server: availableProxy.host,
-        port: availableProxy.port,
-        username: availableProxy.username,
-        password: proxyPassword
+        // Configure proxy for GeeLark
+        profileParams.proxyConfig = {
+          typeId: 1, // SOCKS5
+          server: availableProxy.host,
+          port: availableProxy.port,
+          username: availableProxy.username,
+          password: availableProxy.password
+        }
       }
     }
 
-    // Create GeeLark profile WITH proxy
-    const profileResponse = await geelarkApi.createProfile({
-      androidVersion: android_version,
-      proxyConfig: proxyConfig,
-      groupName: group_name,
-      tagsName: tags,
-      region: region,
-      chargeMode: charge_mode,
-      language: language,
-      surfaceBrandName: surface_brand,
-      surfaceModelName: surface_model
-    })
+    // Create GeeLark profile
+    const profileResponse = await geelarkApi.createProfile(profileParams)
 
     const profileData = profileResponse.details[0]
 
     // Create account record
+    const accountData: any = {
+      geelark_profile_id: profileData.id,
+      status: 'new',
+      warmup_done: false,
+      warmup_progress: 0,
+      error_count: 0
+    }
+
+    // Only add proxy_id if we have a database proxy record
+    if (proxyData && proxyData.id) {
+      accountData.proxy_id = proxyData.id
+    }
+
     const { data: account, error: accountError } = await supabaseAdmin
       .from('accounts')
-      .insert({
-        geelark_profile_id: profileData.id,
-        status: 'new',
-        warmup_done: false,
-        warmup_progress: 0,
-        error_count: 0,
-        proxy_id: proxyData.id
-      })
+      .insert(accountData)
       .select()
       .single()
 
@@ -142,27 +165,33 @@ export async function POST(request: NextRequest) {
         imei: profileData.equipmentInfo.imei,
         phone_number: profileData.equipmentInfo.phoneNumber,
         country: profileData.equipmentInfo.countryName,
-        timezone: profileData.equipmentInfo.timeZone
+        timezone: profileData.equipmentInfo.timeZone,
+        meta: {
+          proxy_info: proxyData,
+          remark: remark
+        }
       })
 
-    // Update proxy assignment
-        await supabaseAdmin
-      .from('proxies')
-      .update({ assigned_account_id: account.id })
-      .eq('id', proxyData.id)
+    // Update proxy assignment if we have a database proxy
+    if (proxyData && proxyData.id) {
+      await supabaseAdmin
+        .from('proxies')
+        .update({ assigned_account_id: account.id })
+        .eq('id', proxyData.id)
+    }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'api-create-profile',
-      message: 'Profile created successfully with proxy',
+      message: 'Profile created successfully',
       meta: { 
         account_id: account.id, 
         profile_id: profileData.id,
         profile_name: profileData.profileName,
         serial_no: profileData.envSerialNo,
-        proxy_id: proxyData.id,
-        proxy_type: proxyData.type,
-        proxy_host: proxyData.host
+        proxy_type: proxyData?.type || 'none',
+        proxy_source: proxy_id ? 'geelark' : proxy_config ? 'manual/dynamic' : 'auto',
+        remark: remark
       }
     })
 
@@ -173,11 +202,11 @@ export async function POST(request: NextRequest) {
       profile_name: profileData.profileName,
       serial_no: profileData.envSerialNo,
       equipment_info: profileData.equipmentInfo,
-      proxy: {
+      proxy: proxyData ? {
         id: proxyData.id,
         type: proxyData.type,
         label: proxyData.label
-      }
+      } : null
     })
   } catch (error) {
     console.error('Create profile error:', error)

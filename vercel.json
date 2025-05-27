@@ -5,6 +5,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/geelark/update-warmup-progress",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/proxies/rotate-all",
       "schedule": "30 0 * * *"
     }

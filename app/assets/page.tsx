@@ -24,6 +24,8 @@ import {
 } from 'lucide-react'
 import GoogleDriveExportModal from '@/components/GoogleDriveExportModal'
 import AgencyWorkflowModal from '@/components/AgencyWorkflowModal'
+import PostContentModal from '@/components/post-content-modal'
+import VideoUploadModal from '@/components/video-upload-modal'
 import { GoogleAuthService } from '@/lib/services/google-auth'
 import { useSearchParams } from 'next/navigation'
 
@@ -86,6 +88,15 @@ export default function AssetsPage() {
   
   // Agency workflow state
   const [showAgencyWorkflow, setShowAgencyWorkflow] = useState(false)
+  
+  // Post content modal state
+  const [postModal, setPostModal] = useState({
+    isOpen: false,
+    variant: null as CarouselVariant | null
+  })
+  
+  // Video upload modal state
+  const [showVideoUpload, setShowVideoUpload] = useState(false)
 
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -288,6 +299,13 @@ export default function AssetsPage() {
         
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowVideoUpload(true)}
+            className="btn-primary"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Upload Video
+          </button>
+          <button
             onClick={() => setShowAgencyWorkflow(true)}
             className="btn-secondary"
           >
@@ -475,25 +493,25 @@ export default function AssetsPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                assignVariantToProfile(variant)
+                                setPostModal({ isOpen: true, variant })
                               }}
-                              className="btn-secondary text-sm"
+                              className="btn-primary text-sm"
                             >
                               <Send className="h-3 w-3 mr-1" />
-                              Assign
+                              Post to TikTok
                             </button>
-                                                  )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            downloadVariant(variant, job)
-                          }}
-                          className="btn-secondary text-sm"
-                          title="Download variant as ZIP"
-                        >
-                          <Download className="h-3 w-3 mr-1" />
-                          Download
-                        </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              downloadVariant(variant, job)
+                            }}
+                            className="btn-secondary text-sm"
+                            title="Download variant as ZIP"
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Download
+                          </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -671,6 +689,20 @@ export default function AssetsPage() {
       <AgencyWorkflowModal
         isOpen={showAgencyWorkflow}
         onClose={() => setShowAgencyWorkflow(false)}
+      />
+      
+      {/* Post Content Modal */}
+      <PostContentModal
+        isOpen={postModal.isOpen}
+        onClose={() => setPostModal({ isOpen: false, variant: null })}
+        contentType="carousel"
+        content={{ variant: postModal.variant }}
+      />
+      
+      {/* Video Upload Modal */}
+      <VideoUploadModal
+        isOpen={showVideoUpload}
+        onClose={() => setShowVideoUpload(false)}
       />
     </div>
   )

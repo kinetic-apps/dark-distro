@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       // Store login attempt
       await supabaseAdmin.from('tasks').insert({
         type: 'login',
+        task_type: 'login',  // Required field
         geelark_task_id: taskData.taskId,
         account_id,
         status: 'running',

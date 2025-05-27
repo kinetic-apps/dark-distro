@@ -240,6 +240,14 @@ export default function TikTokCredentialsPage() {
     return statusClasses[status as keyof typeof statusClasses] || 'status-neutral'
   }
 
+  // Calculate stats
+  const stats = {
+    total: credentials.length,
+    active: credentials.filter(c => c.status === 'active').length,
+    inactive: credentials.filter(c => c.status === 'inactive').length,
+    suspended: credentials.filter(c => c.status === 'suspended').length
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -252,6 +260,65 @@ export default function TikTokCredentialsPage() {
             {showPasswords ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
             {showPasswords ? 'Hide' : 'Show'} Passwords
           </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Total Credentials</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
+                {stats.total}
+              </p>
+            </div>
+            <div className="rounded-lg bg-gray-100 p-3 dark:bg-dark-700">
+              <FileSpreadsheet className="h-6 w-6 text-gray-600 dark:text-dark-300" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Active</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
+                {stats.active}
+              </p>
+            </div>
+            <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/20">
+              <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Inactive</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
+                {stats.inactive}
+              </p>
+            </div>
+            <div className="rounded-lg bg-gray-100 p-3 dark:bg-gray-700/20">
+              <AlertCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-dark-400">Suspended</p>
+              <p className="mt-2 text-3xl font-semibold text-gray-900 dark:text-dark-100">
+                {stats.suspended}
+              </p>
+            </div>
+            <div className="rounded-lg bg-red-100 p-3 dark:bg-red-900/20">
+              <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -284,95 +351,111 @@ export default function TikTokCredentialsPage() {
       {/* List Tab */}
       {activeTab === 'list' && (
         <div className="space-y-4">
-          <div className="card-lg">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex-1 max-w-sm">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search credentials..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="input pl-10"
-                  />
-                </div>
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex-1 max-w-sm">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search credentials..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input pl-10"
+                />
               </div>
-              <button
-                onClick={() => {
-                  setEditingCredential(null)
-                  setManualForm({ email: '', password: '', creator_name: '', creator_id: '' })
-                  setIsManualDialogOpen(true)
-                }}
-                className="btn-primary"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Credential
-              </button>
             </div>
+            <button
+              onClick={() => {
+                setEditingCredential(null)
+                setManualForm({ email: '', password: '', creator_name: '', creator_id: '' })
+                setIsManualDialogOpen(true)
+              }}
+              className="btn-primary"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Credential
+            </button>
+          </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-                <thead className="bg-gray-50 dark:bg-dark-800">
+          <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+              <thead className="bg-gray-50 dark:bg-dark-800">
+                <tr>
+                  <th scope="col" className="table-header">Email</th>
+                  <th scope="col" className="table-header">Password</th>
+                  <th scope="col" className="table-header">Creator</th>
+                  <th scope="col" className="table-header">Status</th>
+                  <th scope="col" className="table-header">Last Used</th>
+                  <th scope="col" className="relative px-6 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
+                {loading ? (
                   <tr>
-                    <th className="table-header">Email</th>
-                    <th className="table-header">Password</th>
-                    <th className="table-header">Creator</th>
-                    <th className="table-header">Status</th>
-                    <th className="table-header">Last Used</th>
-                    <th className="table-header">Actions</th>
+                    <td colSpan={6} className="table-cell text-center py-8">
+                      <div className="text-gray-500 dark:text-dark-400">Loading...</div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200 dark:bg-dark-850 dark:divide-dark-700">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={6} className="table-cell text-center">Loading...</td>
-                    </tr>
-                  ) : filteredCredentials.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="table-cell text-center">No credentials found</td>
-                    </tr>
-                  ) : (
-                    filteredCredentials.map((cred) => (
-                      <tr key={cred.id}>
-                        <td className="table-cell font-medium">{cred.email}</td>
-                        <td className="table-cell">
+                ) : filteredCredentials.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="table-cell text-center py-8">
+                      <div className="text-gray-500 dark:text-dark-400">No credentials found</div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCredentials.map((cred) => (
+                    <tr key={cred.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
+                      <td className="table-cell">
+                        <div className="font-medium text-gray-900 dark:text-dark-100">{cred.email}</div>
+                      </td>
+                      <td className="table-cell">
+                        <span className="font-mono text-sm">
                           {showPasswords ? cred.password : '••••••••'}
-                        </td>
-                        <td className="table-cell">
+                        </span>
+                      </td>
+                      <td className="table-cell">
+                        {cred.creator_name || cred.creator_id ? (
                           <div>
-                            {cred.creator_name && <div className="font-medium">{cred.creator_name}</div>}
-                            {cred.creator_id && <div className="text-xs text-gray-500 dark:text-dark-400">ID: {cred.creator_id}</div>}
+                            {cred.creator_name && (
+                              <p className="text-sm text-gray-900 dark:text-dark-100">{cred.creator_name}</p>
+                            )}
+                            {cred.creator_id && (
+                              <p className="text-xs text-gray-500 dark:text-dark-400">ID: {cred.creator_id}</p>
+                            )}
                           </div>
-                        </td>
-                        <td className="table-cell">
-                          <span className={getStatusBadge(cred.status)}>{cred.status}</span>
-                        </td>
-                        <td className="table-cell">
-                          {cred.last_used_at ? new Date(cred.last_used_at).toLocaleDateString() : 'Never'}
-                        </td>
-                        <td className="table-cell">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit(cred)}
-                              className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(cred.id!)}
-                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-dark-500">-</span>
+                        )}
+                      </td>
+                      <td className="table-cell">
+                        <span className={getStatusBadge(cred.status)}>{cred.status}</span>
+                      </td>
+                      <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
+                        {cred.last_used_at ? new Date(cred.last_used_at).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleEdit(cred)}
+                            className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100 p-1"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(cred.id!)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-1"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -440,32 +523,50 @@ export default function TikTokCredentialsPage() {
                 </div>
 
                 {previewData.valid.length > 0 && (
-                  <div className="card">
-                    <h3 className="font-medium mb-4">Preview Valid Records</h3>
-                    <div className="overflow-x-auto">
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Preview Valid Records</h3>
+                    <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
                       <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-                        <thead>
+                        <thead className="bg-gray-50 dark:bg-dark-800">
                           <tr>
-                            <th className="table-header">Email</th>
-                            <th className="table-header">Password</th>
-                            <th className="table-header">Creator</th>
+                            <th scope="col" className="table-header">Email</th>
+                            <th scope="col" className="table-header">Password</th>
+                            <th scope="col" className="table-header">Creator</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200 dark:divide-dark-700">
+                        <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
                           {previewData.valid.slice(0, 5).map((cred, idx) => (
-                            <tr key={idx}>
-                              <td className="table-cell">{cred.email}</td>
-                              <td className="table-cell">{showPasswords ? cred.password : '••••••••'}</td>
+                            <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-dark-800">
                               <td className="table-cell">
-                                {cred.creator_name || '-'}
-                                {cred.creator_id && <span className="text-xs text-gray-500 ml-2">(ID: {cred.creator_id})</span>}
+                                <div className="font-medium text-gray-900 dark:text-dark-100">{cred.email}</div>
+                              </td>
+                              <td className="table-cell">
+                                <span className="font-mono text-sm">
+                                  {showPasswords ? cred.password : '••••••••'}
+                                </span>
+                              </td>
+                              <td className="table-cell">
+                                {cred.creator_name || cred.creator_id ? (
+                                  <div>
+                                    {cred.creator_name && (
+                                      <p className="text-sm text-gray-900 dark:text-dark-100">{cred.creator_name}</p>
+                                    )}
+                                    {cred.creator_id && (
+                                      <p className="text-xs text-gray-500 dark:text-dark-400">ID: {cred.creator_id}</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400 dark:text-dark-500">-</span>
+                                )}
                               </td>
                             </tr>
                           ))}
                           {previewData.valid.length > 5 && (
                             <tr>
-                              <td colSpan={3} className="table-cell text-center text-gray-500">
-                                ... and {previewData.valid.length - 5} more records
+                              <td colSpan={3} className="table-cell text-center py-4">
+                                <div className="text-sm text-gray-500 dark:text-dark-400">
+                                  ... and {previewData.valid.length - 5} more records
+                                </div>
                               </td>
                             </tr>
                           )}

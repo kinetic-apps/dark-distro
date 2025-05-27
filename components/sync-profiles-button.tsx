@@ -3,15 +3,15 @@
 import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '@/lib/context/notification-context'
 
 export function SyncProfilesButton() {
   const [isLoading, setIsLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
   const router = useRouter()
+  const { notify } = useNotification()
 
   const handleSync = async () => {
     setIsLoading(true)
-    setMessage(null)
 
     try {
       const response = await fetch('/api/geelark/sync-profiles', {
@@ -27,38 +27,53 @@ export function SyncProfilesButton() {
         throw new Error(data.error || 'Sync failed')
       }
 
-      setMessage(data.message)
+      // Show detailed sync results
+      notify('success', data.message)
       
-      // Refresh the page to show new profiles
+      if (data.auto_cleanup) {
+        notify('info', 'Database automatically cleaned up since no cloud phones exist in GeeLark')
+      }
+      
+      if (data.stats) {
+        const { imported, updated, deleted, errors } = data.stats
+        
+        if (imported > 0) {
+          notify('info', `Imported ${imported} new profile${imported !== 1 ? 's' : ''} from GeeLark`)
+        }
+        
+        if (updated > 0) {
+          notify('info', `Updated ${updated} existing profile${updated !== 1 ? 's' : ''}`)
+        }
+        
+        if (deleted > 0 && !data.auto_cleanup) {
+          notify('info', `Removed ${deleted} profile${deleted !== 1 ? 's' : ''} no longer in GeeLark`)
+        }
+        
+        if (errors > 0) {
+          notify('error', `${errors} error${errors !== 1 ? 's' : ''} occurred during sync`)
+        }
+      }
+      
+      // Refresh the page to show updated profiles
       setTimeout(() => {
         router.refresh()
-        setMessage(null)
       }, 2000)
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      notify('error', error instanceof Error ? error.message : 'Unknown sync error')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="relative inline-block">
-      <button
-        onClick={handleSync}
-        disabled={isLoading}
-        className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-        {isLoading ? 'Syncing...' : 'Sync from GeeLark'}
-      </button>
-      
-      {message && (
-        <div className={`absolute top-full mt-2 left-0 right-0 p-2 text-sm rounded-md whitespace-nowrap ${
-          message.includes('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-        }`}>
-          {message}
-        </div>
-      )}
-    </div>
+    <button
+      onClick={handleSync}
+      disabled={isLoading}
+      className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+      title="Sync profiles with GeeLark - imports new profiles and removes deleted ones"
+    >
+      <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+      {isLoading ? 'Syncing...' : 'Sync from GeeLark'}
+    </button>
   )
 } 

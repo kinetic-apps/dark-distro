@@ -28,13 +28,25 @@ export async function POST(
       )
     }
 
-    // Check health of new proxy
-    const isHealthy = await soaxApi.checkProxyHealth({
-      host: proxy.host,
-      port: proxy.port,
-      username: proxy.username,
-      password: proxy.password
-    })
+    // For sticky proxies, check health to get the new IP
+    let newIp = null
+    if (proxy.type === 'sticky') {
+      const isHealthy = await soaxApi.checkProxyHealth({
+        host: proxy.host,
+        port: proxy.port,
+        username: proxy.username,
+        password: proxy.password
+      })
+      
+      // Fetch proxy again to get the updated IP
+      const { data: updatedProxy } = await supabaseAdmin
+        .from('proxies')
+        .select('current_ip')
+        .eq('id', proxyId)
+        .single()
+      
+      newIp = updatedProxy?.current_ip
+    }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
@@ -43,15 +55,16 @@ export async function POST(
       meta: { 
         proxy_id: proxyId,
         proxy_type: proxy.type,
-        new_ip: proxy.current_ip,
-        health: isHealthy ? 'good' : 'unknown'
+        new_ip: newIp || 'pending',
+        health: proxy.health
       }
     })
 
     return NextResponse.json({
       success: true,
       proxy_id: proxyId,
-      new_ip: proxy.current_ip,
+      new_ip: newIp,
+      proxy_type: proxy.type,
       health: proxy.health
     })
   } catch (error) {

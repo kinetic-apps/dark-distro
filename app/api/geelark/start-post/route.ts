@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     if (urlError) throw urlError
 
     // Start post task
-    const taskId = await geelarkApi.postVideo(profileId, post.account_id, {
-      url: signedUrlData.signedUrl,
+    const taskId = await geelarkApi.postTikTokVideo(profileId, post.account_id, {
+      video_url: signedUrlData.signedUrl,
       caption: post.caption || '',
       hashtags: post.hashtags || []
     })

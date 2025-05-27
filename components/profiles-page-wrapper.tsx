@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { ProfilesTable } from '@/components/tables/profiles-table'
 import { ProfileBulkActions } from '@/components/profile-bulk-actions'
 import { AssignProxyModal } from '@/components/assign-proxy-modal'
+import { BulkDeleteModal } from '@/components/bulk-delete-modal'
+import { useNotification } from '@/lib/context/notification-context'
 
 interface ProfilesPageWrapperProps {
   profiles: any[]
@@ -12,7 +14,11 @@ interface ProfilesPageWrapperProps {
 export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
   const [bulkAction, setBulkAction] = useState<{ action: string; ids: string[] } | null>(null)
   const [showProxyModal, setShowProxyModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [pendingProxyAssignment, setPendingProxyAssignment] = useState<string[]>([])
+  const [pendingDeletion, setPendingDeletion] = useState<{ ids: string[], names: string[] }>({ ids: [], names: [] })
+  const [isProcessing, setIsProcessing] = useState(false)
+  const { notify } = useNotification()
 
   const handleBulkAction = (action: string, ids: string[]) => {
     console.log('Bulk action triggered:', action, ids)
@@ -20,6 +26,13 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     if (action === 'assign-proxy') {
       setPendingProxyAssignment(ids)
       setShowProxyModal(true)
+    } else if (action === 'delete' || action === 'delete-from-geelark') {
+      // Get profile names for the confirmation modal
+      const selectedProfiles = profiles.filter(p => ids.includes(p.id))
+      const profileNames = selectedProfiles.map(p => p.tiktok_username || 'Unnamed Profile')
+      
+      setPendingDeletion({ ids, names: profileNames })
+      setShowDeleteModal(true)
     } else {
       setBulkAction({ action, ids })
     }
@@ -27,8 +40,8 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
 
   const handleProxyAssignment = async (proxyType: string) => {
     setShowProxyModal(false)
+    setIsProcessing(true)
     
-    // Make the API call
     try {
       const response = await fetch('/api/profiles/assign-proxy', {
         method: 'POST',
@@ -47,11 +60,7 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
         throw new Error(data.error || 'Assignment failed')
       }
 
-      // Show success message
-      setBulkAction({ 
-        action: 'proxy-assigned', 
-        ids: pendingProxyAssignment 
-      })
+      notify('success', `Successfully assigned ${proxyType} proxy to ${pendingProxyAssignment.length} profile${pendingProxyAssignment.length > 1 ? 's' : ''}`)
 
       // Refresh the page after a delay
       setTimeout(() => {
@@ -60,10 +69,56 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
 
     } catch (error) {
       console.error('Proxy assignment error:', error)
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      notify('error', error instanceof Error ? error.message : 'Failed to assign proxy')
+    } finally {
+      setIsProcessing(false)
+      setPendingProxyAssignment([])
     }
+  }
+
+  const handleBulkDelete = async (deleteFromGeelark: boolean) => {
+    setShowDeleteModal(false)
+    setIsProcessing(true)
     
-    setPendingProxyAssignment([])
+    try {
+      const response = await fetch('/api/profiles/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          profileIds: pendingDeletion.ids,
+          deleteFromGeelark 
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Delete failed')
+      }
+
+      notify('success', data.message)
+
+      // Show errors if any
+      if (data.errors && data.errors.length > 0) {
+        data.errors.slice(0, 3).forEach((error: string) => {
+          notify('error', error)
+        })
+      }
+
+      // Refresh the page after a delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+      notify('error', error instanceof Error ? error.message : 'Failed to delete profiles')
+    } finally {
+      setIsProcessing(false)
+      setPendingDeletion({ ids: [], names: [] })
+    }
   }
 
   return (
@@ -77,14 +132,11 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
         <ProfileBulkActions
           action={bulkAction.action}
           profileIds={bulkAction.ids}
-          onComplete={() => setBulkAction(null)}
+          onComplete={() => {
+            setBulkAction(null)
+            notify('success', 'Bulk action completed successfully')
+          }}
         />
-      )}
-
-      {bulkAction?.action === 'proxy-assigned' && (
-        <div className="fixed bottom-4 right-4 p-4 rounded-lg shadow-lg z-50 bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400">
-          Proxy assignment completed successfully!
-        </div>
       )}
 
       {showProxyModal && (
@@ -94,6 +146,18 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
           onCancel={() => {
             setShowProxyModal(false)
             setPendingProxyAssignment([])
+          }}
+        />
+      )}
+
+      {showDeleteModal && (
+        <BulkDeleteModal
+          profileIds={pendingDeletion.ids}
+          profileNames={pendingDeletion.names}
+          onConfirm={handleBulkDelete}
+          onCancel={() => {
+            setShowDeleteModal(false)
+            setPendingDeletion({ ids: [], names: [] })
           }}
         />
       )}

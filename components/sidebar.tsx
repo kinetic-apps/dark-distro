@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useSidebar } from '@/lib/context/sidebar-context'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
@@ -57,10 +57,40 @@ export function Sidebar() {
   const supabase = createClient()
   const { isCollapsed, setIsCollapsed } = useSidebar()
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/auth/login')
+  }
+
+  const handleMouseEnter = (itemName: string) => {
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+    setHoveredItem(itemName)
+  }
+
+  const handleMouseLeave = () => {
+    // Add a delay before closing the submenu
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredItem(null)
+    }, 300) // 300ms delay
+  }
+
+  const handleSubmenuMouseEnter = () => {
+    // Clear the timeout when entering the submenu
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+  }
+
+  const handleSubmenuMouseLeave = () => {
+    // Close the submenu when leaving it
+    setHoveredItem(null)
   }
 
   return (
@@ -107,8 +137,8 @@ export function Sidebar() {
               <div 
                 key={item.name}
                 className="relative"
-                onMouseEnter={() => setHoveredItem(item.name)}
-                onMouseLeave={() => setHoveredItem(null)}
+                onMouseEnter={() => handleMouseEnter(item.name)}
+                onMouseLeave={handleMouseLeave}
               >
                 <Link
                   href={item.href}
@@ -147,33 +177,39 @@ export function Sidebar() {
 
                 {/* Submenu */}
                 {item.subItems && hoveredItem === item.name && (
-                  <div className={cn(
-                    "absolute top-0 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md shadow-lg py-1 min-w-[160px] z-50",
-                    isCollapsed ? "left-full ml-2" : "left-full -ml-1"
-                  )}>
+                  <div 
+                    className={cn(
+                      "absolute top-0 bg-white dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-md shadow-lg min-w-[160px] z-50 overflow-hidden",
+                      isCollapsed ? "left-full ml-2" : "left-full -ml-1"
+                    )}
+                    onMouseEnter={handleSubmenuMouseEnter}
+                    onMouseLeave={handleSubmenuMouseLeave}
+                  >
                     {!isCollapsed && (
-                      <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider">
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-dark-400 uppercase tracking-wider border-b border-gray-200 dark:border-dark-700">
                         {item.name}
                       </div>
                     )}
-                    {item.subItems.map((subItem) => {
-                      const isSubActive = pathname === subItem.href
-                      return (
-                        <Link
-                          key={subItem.name}
-                          href={subItem.href}
-                          className={cn(
-                            "flex items-center px-3 py-2 text-sm transition-colors",
-                            isSubActive
-                              ? "bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-dark-100"
-                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-700 dark:hover:text-dark-100"
-                          )}
-                        >
-                          <subItem.icon className="h-4 w-4 mr-2 text-gray-400 dark:text-dark-500" />
-                          {subItem.name}
-                        </Link>
-                      )
-                    })}
+                    <div className={cn(isCollapsed ? "py-1" : "py-1")}>
+                      {item.subItems.map((subItem, index) => {
+                        const isSubActive = pathname === subItem.href
+                        return (
+                          <Link
+                            key={subItem.name}
+                            href={subItem.href}
+                            className={cn(
+                              "flex items-center px-3 py-2 text-sm transition-colors",
+                              isSubActive
+                                ? "bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-dark-100"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-dark-300 dark:hover:bg-dark-700 dark:hover:text-dark-100"
+                            )}
+                          >
+                            <subItem.icon className="h-4 w-4 mr-2 text-gray-400 dark:text-dark-500" />
+                            {subItem.name}
+                          </Link>
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

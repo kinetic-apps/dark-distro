@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, RefreshCw, X, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Loader2, RefreshCw, X, RotateCcw, CheckCircle, AlertCircle, Clock, ExternalLink } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 
 interface Task {
@@ -10,6 +10,7 @@ interface Task {
   type: string
   geelark_task_id: string
   account_id: string
+  profile_id?: string
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
   started_at: string
   completed_at: string | null
@@ -17,6 +18,12 @@ interface Task {
   accounts?: {
     id: string
     tiktok_username: string | null
+  }
+  geelark_status?: {
+    status: number
+    failCode?: number
+    failDesc?: string
+    cost?: number
   }
 }
 
@@ -62,6 +69,8 @@ export default function TasksPage() {
         })
 
         if (response.ok) {
+          const data = await response.json()
+          console.log('Task status response:', data)
           await fetchTasks()
         }
       }
@@ -137,6 +146,26 @@ export default function TasksPage() {
     return (
       <span className={classes[status]}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    )
+  }
+
+  const getGeeLarkStatusBadge = (geelarkStatus?: number) => {
+    if (!geelarkStatus) return null
+    
+    const statusMap: { [key: number]: { label: string, class: string } } = {
+      1: { label: 'Waiting', class: 'status-neutral' },
+      2: { label: 'In Progress', class: 'status-info' },
+      3: { label: 'Completed', class: 'status-active' },
+      4: { label: 'Failed', class: 'status-error' },
+      7: { label: 'Cancelled', class: 'status-neutral' }
+    }
+
+    const status = statusMap[geelarkStatus] || { label: `Status ${geelarkStatus}`, class: 'status-neutral' }
+    
+    return (
+      <span className={status.class}>
+        {status.label}
       </span>
     )
   }
@@ -221,7 +250,9 @@ export default function TasksPage() {
               </th>
               <th scope="col" className="table-header">Type</th>
               <th scope="col" className="table-header">Account</th>
-              <th scope="col" className="table-header">Status</th>
+              <th scope="col" className="table-header">Local Status</th>
+              <th scope="col" className="table-header">GeeLark Status</th>
+              <th scope="col" className="table-header">Task ID</th>
               <th scope="col" className="table-header">Started</th>
               <th scope="col" className="table-header">Duration</th>
               <th scope="col" className="table-header">Details</th>
@@ -248,16 +279,43 @@ export default function TasksPage() {
                   <div className="text-sm font-medium text-gray-900 dark:text-dark-100">
                     {getTaskTypeLabel(task.type)}
                   </div>
+                  {task.meta?.debug && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400">DEBUG</div>
+                  )}
                 </td>
                 <td className="table-cell">
                   <div className="text-sm text-gray-900 dark:text-dark-100">
-                    {task.accounts?.tiktok_username || 'Unknown'}
+                    {task.accounts?.tiktok_username || task.meta?.email || 'Unknown'}
                   </div>
+                  {task.profile_id && (
+                    <div className="text-xs text-gray-500 dark:text-dark-400">
+                      Profile: {task.profile_id}
+                    </div>
+                  )}
                 </td>
                 <td className="table-cell">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(task.status)}
                     {getStatusBadge(task.status)}
+                  </div>
+                </td>
+                <td className="table-cell">
+                  {task.meta?.geelark_status ? (
+                    <div className="space-y-1">
+                      {getGeeLarkStatusBadge(task.meta.geelark_status)}
+                      {task.meta.fail_code && (
+                        <div className="text-xs text-red-600 dark:text-red-400">
+                          Code: {task.meta.fail_code}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 dark:text-dark-500">-</span>
+                  )}
+                </td>
+                <td className="table-cell">
+                  <div className="text-sm font-mono text-gray-600 dark:text-dark-400">
+                    {task.geelark_task_id}
                   </div>
                 </td>
                 <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
@@ -266,11 +324,18 @@ export default function TasksPage() {
                 <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
                   {task.completed_at && task.started_at
                     ? `${Math.round((new Date(task.completed_at).getTime() - new Date(task.started_at).getTime()) / 1000)}s`
-                    : '-'}
+                    : task.meta?.cost_seconds ? `${task.meta.cost_seconds}s` : '-'}
                 </td>
                 <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
+                  {task.meta?.fail_desc && (
+                    <div className="text-red-600 dark:text-red-400 max-w-xs truncate" title={task.meta.fail_desc}>
+                      {task.meta.fail_desc}
+                    </div>
+                  )}
                   {task.meta?.error && (
-                    <span className="text-red-600 dark:text-red-400">{task.meta.error}</span>
+                    <div className="text-red-600 dark:text-red-400 max-w-xs truncate" title={task.meta.error}>
+                      {task.meta.error}
+                    </div>
                   )}
                   {task.meta?.retry_count && (
                     <span className="text-gray-600 dark:text-dark-400">Retry #{task.meta.retry_count}</span>

@@ -16,98 +16,137 @@ export async function GET(request: NextRequest) {
       runningTasks.map(async (task) => {
         if (!task.geelark_task_id) return
 
-        const taskStatus = await geelarkApi.getTaskStatus(task.geelark_task_id)
+        try {
+          const taskStatus = await geelarkApi.getTaskStatus(task.geelark_task_id)
 
-        // Update task status
-        if (taskStatus.status !== 'running') {
-          await supabaseAdmin
-            .from('tasks')
-            .update({
-              status: taskStatus.status === 'completed' ? 'completed' : 'failed',
-              ended_at: new Date().toISOString(),
-              message: taskStatus.result?.message || null,
-              meta: { ...task.meta, result: taskStatus.result }
-            })
-            .eq('id', task.id)
-
-          // Handle warmup completion
-          if (task.type === 'warmup' && taskStatus.status === 'completed') {
+          // Update task status
+          if (taskStatus.status !== 'running') {
             await supabaseAdmin
-              .from('accounts')
+              .from('tasks')
               .update({
-                warmup_done: true,
-                warmup_progress: 100,
-                status: 'active'
+                status: taskStatus.status === 'completed' ? 'completed' : 'failed',
+                ended_at: new Date().toISOString(),
+                message: taskStatus.result?.message || null,
+                meta: { ...task.meta, result: taskStatus.result }
               })
-              .eq('id', task.account_id)
+              .eq('id', task.id)
 
-            await supabaseAdmin.from('logs').insert({
-              level: 'info',
-              component: 'task-poller',
-              account_id: task.account_id,
-              message: 'Warm-up completed',
-              meta: { task_id: task.geelark_task_id }
-            })
-          }
+            // Handle warmup completion
+            if (task.type === 'warmup' && taskStatus.status === 'completed') {
+              await supabaseAdmin
+                .from('accounts')
+                .update({
+                  warmup_done: true,
+                  warmup_progress: 100,
+                  status: 'active'
+                })
+                .eq('id', task.account_id)
 
-          // Handle post completion
-          if (task.type === 'post' && taskStatus.status === 'completed') {
-            const tiktokPostId = taskStatus.result?.post_id || null
-
-            await supabaseAdmin
-              .from('posts')
-              .update({
-                status: 'posted',
-                tiktok_post_id: tiktokPostId,
-                posted_at: new Date().toISOString()
+              await supabaseAdmin.from('logs').insert({
+                level: 'info',
+                component: 'task-poller',
+                account_id: task.account_id,
+                message: 'Warm-up completed',
+                meta: { task_id: task.geelark_task_id }
               })
-              .eq('geelark_task_id', task.geelark_task_id)
+            }
 
-            await supabaseAdmin.from('logs').insert({
-              level: 'info',
-              component: 'task-poller',
-              account_id: task.account_id,
-              message: 'Post published successfully',
-              meta: { 
-                task_id: task.geelark_task_id,
-                tiktok_post_id: tiktokPostId
-              }
-            })
-          }
+            // Handle post completion
+            if (task.type === 'post' && taskStatus.status === 'completed') {
+              const tiktokPostId = taskStatus.result?.post_id || null
 
-          // Handle failures
-          if (taskStatus.status === 'failed') {
-            if (task.type === 'post') {
               await supabaseAdmin
                 .from('posts')
                 .update({
-                  status: 'failed',
-                  error: taskStatus.result?.error || 'Unknown error'
+                  status: 'posted',
+                  tiktok_post_id: tiktokPostId,
+                  posted_at: new Date().toISOString()
                 })
                 .eq('geelark_task_id', task.geelark_task_id)
+
+              await supabaseAdmin.from('logs').insert({
+                level: 'info',
+                component: 'task-poller',
+                account_id: task.account_id,
+                message: 'Post published successfully',
+                meta: { 
+                  task_id: task.geelark_task_id,
+                  tiktok_post_id: tiktokPostId
+                }
+              })
             }
 
-            await supabaseAdmin.from('logs').insert({
-              level: 'error',
-              component: 'task-poller',
-              account_id: task.account_id,
-              message: `${task.type} task failed`,
-              meta: { 
-                task_id: task.geelark_task_id,
-                error: taskStatus.result?.error
+            // Handle failures
+            if (taskStatus.status === 'failed') {
+              if (task.type === 'post') {
+                await supabaseAdmin
+                  .from('posts')
+                  .update({
+                    status: 'failed',
+                    error: taskStatus.result?.error || 'Unknown error'
+                  })
+                  .eq('geelark_task_id', task.geelark_task_id)
               }
-            })
 
-            // Increment error count on account
-            await supabaseAdmin.rpc('increment', {
-              table_name: 'accounts',
-              row_id: task.account_id,
-              column_name: 'error_count'
-            })
+              await supabaseAdmin.from('logs').insert({
+                level: 'error',
+                component: 'task-poller',
+                account_id: task.account_id,
+                message: `${task.type} task failed`,
+                meta: { 
+                  task_id: task.geelark_task_id,
+                  error: taskStatus.result?.error
+                }
+              })
+
+              // Increment error count on account
+              await supabaseAdmin.rpc('increment', {
+                table_name: 'accounts',
+                row_id: task.account_id,
+                column_name: 'error_count'
+              })
+            }
+          } else if (task.type === 'warmup' && taskStatus.status === 'running') {
+            // Calculate time-based progress for running warmup tasks
+            const startTime = new Date(task.started_at || task.created_at).getTime()
+            const currentTime = Date.now()
+            const elapsedMinutes = (currentTime - startTime) / (1000 * 60)
+            const durationMinutes = task.meta?.duration_minutes || 30
+            
+            // Calculate progress as percentage (0-99, never 100 until actually complete)
+            const progress = Math.min(99, Math.floor((elapsedMinutes / durationMinutes) * 100))
+            
+            // Update warmup progress
+            await supabaseAdmin
+              .from('accounts')
+              .update({
+                warmup_progress: progress,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', task.account_id)
+              
+            // Log progress update
+            if (progress % 10 === 0) { // Log every 10% increment
+              await supabaseAdmin.from('logs').insert({
+                level: 'info',
+                component: 'task-poller',
+                account_id: task.account_id,
+                message: `Warmup progress: ${progress}%`,
+                meta: { 
+                  task_id: task.geelark_task_id,
+                  elapsed_minutes: Math.floor(elapsedMinutes),
+                  duration_minutes: durationMinutes
+                }
+              })
+            }
           }
-        }
 
-        return { task_id: task.id, status: taskStatus.status }
+          return { task_id: task.id, status: taskStatus.status }
+        } catch (error) {
+          // Log the error but don't fail the entire batch
+          console.error(`Failed to check status for task ${task.geelark_task_id}:`, error)
+          return { task_id: task.id, status: 'error', error: String(error) }
+        }
       })
     )
 

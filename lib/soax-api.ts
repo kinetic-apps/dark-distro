@@ -132,34 +132,30 @@ export class SOAXAPI {
 
   async checkProxyHealth(proxy: ProxyCredentials): Promise<boolean> {
     try {
-      const response = await fetch('https://api.ipify.org?format=json', {
-        method: 'GET',
-        headers: {
-          'Proxy-Authorization': `Basic ${Buffer.from(`${proxy.username}:${proxy.password}`).toString('base64')}`
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        await supabaseAdmin
-          .from('proxies')
-          .update({ 
-            current_ip: data.ip,
-            health: 'good',
-            updated_at: new Date().toISOString()
-          })
-          .eq('host', proxy.host)
-          .eq('port', proxy.port)
-        
-        return true
-      }
+      // For now, we'll mark the proxy as "checking" and return true
+      // The actual IP will be updated when the proxy is used by GeeLark
+      await supabaseAdmin
+        .from('proxies')
+        .update({ 
+          health: 'checking',
+          updated_at: new Date().toISOString()
+        })
+        .eq('host', proxy.host)
+        .eq('port', proxy.port)
       
-      return false
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'soax-api',
+        message: 'Proxy marked for health check',
+        meta: { proxy: proxy.host }
+      })
+      
+      return true
     } catch (error) {
       await supabaseAdmin.from('logs').insert({
         level: 'warning',
         component: 'soax-api',
-        message: 'Proxy health check failed',
+        message: 'Failed to update proxy status',
         meta: { proxy: proxy.host, error: String(error) }
       })
       

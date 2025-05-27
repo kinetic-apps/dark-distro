@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     // Store task in database
     await supabaseAdmin.from('tasks').insert({
       type: 'profile_edit',
+      task_type: 'profile_edit',  // Required field
       geelark_task_id: result.taskId,
       account_id: body.account_id,
       status: 'running',
