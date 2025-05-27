@@ -28,7 +28,9 @@ import {
   Timer,
   Calendar,
   Layers,
-  Activity
+  Activity,
+  Globe,
+  Edit3
 } from 'lucide-react'
 import { ImageGenerationService } from '@/lib/services/image-generation-service'
 import type { GeneratedCarouselImage, ImageGenerationSettings } from '@/lib/types/image-generation'
@@ -146,9 +148,13 @@ export default function JobDetailsPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [showLogs, setShowLogs] = useState(false)
   const [hasNewLogs, setHasNewLogs] = useState(false)
+  const [showNewLogsIndicator, setShowNewLogsIndicator] = useState(false)
   const logsEndRef = useRef<HTMLDivElement>(null)
+  const logsContainerRef = useRef<HTMLDivElement>(null)
   const [gridPage, setGridPage] = useState(0)
   const VARIANTS_PER_PAGE = 10
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+  const [templateSaveProgress, setTemplateSaveProgress] = useState('')
 
   const loadJobData = useCallback(async () => {
     try {
@@ -211,6 +217,13 @@ export default function JobDetailsPage() {
           setLogs(prev => [...prev, payload.new])
           if (!showLogs) {
             setHasNewLogs(true)
+          } else if (logsContainerRef.current) {
+            // Check if user is at bottom when new log arrives
+            const container = logsContainerRef.current
+            const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50
+            if (!isAtBottom) {
+              setShowNewLogsIndicator(true)
+            }
           }
         }
       )
@@ -222,10 +235,16 @@ export default function JobDetailsPage() {
     }
   }, [loadJobData, status, jobId, showLogs])
 
-  // Auto-scroll to latest log when new logs arrive
+  // Auto-scroll to latest log when new logs arrive (only if already at bottom)
   useEffect(() => {
-    if (showLogs && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    if (showLogs && logsEndRef.current && logsContainerRef.current) {
+      const container = logsContainerRef.current
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50 // 50px threshold
+      
+      if (isAtBottom) {
+        logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+        setShowNewLogsIndicator(false)
+      }
     }
   }, [logs, showLogs])
 
@@ -235,6 +254,17 @@ export default function JobDetailsPage() {
       setHasNewLogs(false)
     }
   }, [showLogs])
+
+  // Handle scroll to hide new logs indicator when user scrolls to bottom
+  const handleLogsScroll = () => {
+    if (logsContainerRef.current) {
+      const container = logsContainerRef.current
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50
+      if (isAtBottom) {
+        setShowNewLogsIndicator(false)
+      }
+    }
+  }
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this job?')) return
@@ -269,20 +299,28 @@ export default function JobDetailsPage() {
 
   const handleSaveAsTemplate = async () => {
     try {
+      setIsSavingTemplate(true)
+      setTemplateSaveProgress('Preparing template...')
+      
       const { source_images: sourceImages } = JSON.parse(job.template_description || '{}')
       if (!sourceImages || sourceImages.length === 0) {
         alert('Cannot save as template: No source images found')
+        setIsSavingTemplate(false)
+        setTemplateSaveProgress('')
         return
       }
 
+      setTemplateSaveProgress('Downloading source images...')
       const sourceFiles: File[] = []
       for (let i = 0; i < sourceImages.length; i++) {
+        setTemplateSaveProgress(`Downloading image ${i + 1} of ${sourceImages.length}...`)
         const response = await fetch(sourceImages[i])
         const blob = await response.blob()
         const file = new File([blob], `source_${i}.jpg`, { type: blob.type })
         sourceFiles.push(file)
       }
 
+      setTemplateSaveProgress('Creating template...')
       await ImageGenerationService.createTemplate({
         name: job.template_name || job.name,
         description: `Template created from job: ${job.name}`,
@@ -291,11 +329,47 @@ export default function JobDetailsPage() {
         job_id: jobId
       })
 
-      alert('Template saved successfully!')
+      setTemplateSaveProgress('')
+      
+      // Show success message with a nice toast-like notification
+      const successMessage = document.createElement('div')
+      successMessage.className = 'fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 rounded-lg shadow-lg animate-slide-in'
+      successMessage.innerHTML = `
+        <svg class="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span class="text-sm font-medium text-green-800 dark:text-green-200">Template saved successfully!</span>
+      `
+      document.body.appendChild(successMessage)
+      
+      setTimeout(() => {
+        successMessage.classList.add('animate-slide-out')
+        setTimeout(() => successMessage.remove(), 300)
+      }, 3000)
+
       await loadJobData()
     } catch (error) {
       console.error('Error saving template:', error)
-      alert('Failed to save template')
+      setTemplateSaveProgress('')
+      
+      // Show error message with a nice toast-like notification
+      const errorMessage = document.createElement('div')
+      errorMessage.className = 'fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg shadow-lg animate-slide-in'
+      errorMessage.innerHTML = `
+        <svg class="h-5 w-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+        <span class="text-sm font-medium text-red-800 dark:text-red-200">Failed to save template. Please try again.</span>
+      `
+      document.body.appendChild(errorMessage)
+      
+      setTimeout(() => {
+        errorMessage.classList.add('animate-slide-out')
+        setTimeout(() => errorMessage.remove(), 300)
+      }, 3000)
+    } finally {
+      setIsSavingTemplate(false)
+      setTemplateSaveProgress('')
     }
   }
 
@@ -468,10 +542,25 @@ export default function JobDetailsPage() {
                 ) : (
                   <button
                     onClick={handleSaveAsTemplate}
-                    className="btn-secondary"
+                    className="btn-secondary relative overflow-hidden"
+                    disabled={isSavingTemplate}
                   >
-                    <Save className="mr-2 h-4 w-4" />
-                    Save as Template
+                    {isSavingTemplate ? (
+                      <>
+                        <div className="absolute inset-0 bg-gray-100 dark:bg-gray-700 opacity-50" />
+                        <div className="relative flex items-center gap-2">
+                          <div className="h-4 w-4 border-2 border-gray-600 dark:border-gray-300 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs">
+                            {templateSaveProgress || 'Saving...'}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save as Template
+                      </>
+                    )}
                   </button>
                 )}
                 <button
@@ -633,7 +722,25 @@ export default function JobDetailsPage() {
             </button>
             
             {showLogs && (
-              <div className="border-t border-gray-200 dark:border-dark-700 max-h-96 overflow-y-auto">
+              <div 
+                ref={logsContainerRef}
+                className="border-t border-gray-200 dark:border-dark-700 max-h-96 overflow-y-auto relative"
+                onScroll={handleLogsScroll}
+              >
+                {showNewLogsIndicator && (
+                  <button
+                    onClick={() => {
+                      if (logsEndRef.current) {
+                        logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+                        setShowNewLogsIndicator(false)
+                      }
+                    }}
+                    className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-3 py-1.5 bg-blue-500 text-white text-xs rounded-full shadow-lg hover:bg-blue-600 transition-colors flex items-center gap-1.5 z-10"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                    New logs
+                  </button>
+                )}
                 {logs.length === 0 ? (
                   <p className="p-6 text-sm text-gray-500 dark:text-dark-400 text-center">No logs available</p>
                 ) : (
