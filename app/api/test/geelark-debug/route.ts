@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      success: true,
+              success: true,
       config,
       tests: {
         listProfiles: {

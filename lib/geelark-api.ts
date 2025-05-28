@@ -815,6 +815,223 @@ export class GeeLarkAPI {
     
     return response.items || []
   }
+
+  // ADB Management
+  async enableADB(deviceIds: string[]): Promise<void> {
+    await this.request('/open/v1/adb/setStatus', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: deviceIds,
+        open: true
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'ADB enabled for devices',
+      meta: { device_ids: deviceIds }
+    })
+  }
+
+  async disableADB(deviceIds: string[]): Promise<void> {
+    await this.request('/open/v1/adb/setStatus', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: deviceIds,
+        open: false
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'ADB disabled for devices',
+      meta: { device_ids: deviceIds }
+    })
+  }
+
+  async getADBInfo(deviceIds: string[]): Promise<{
+    items: Array<{
+      code: number
+      id: string
+      ip: string
+      port: string
+      pwd: string
+    }>
+  }> {
+    const data = await this.request<any>('/open/v1/adb/getData', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: deviceIds
+      })
+    })
+
+    // Log successful ADB info retrieval
+    const successfulDevices = data.items.filter((item: any) => item.code === 0)
+    if (successfulDevices.length > 0) {
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'geelark-api',
+        message: 'ADB info retrieved successfully',
+        meta: { 
+          device_count: successfulDevices.length,
+          devices: successfulDevices.map((d: any) => ({ id: d.id, ip: d.ip, port: d.port }))
+        }
+      })
+    }
+
+    // Log any errors
+    const failedDevices = data.items.filter((item: any) => item.code !== 0)
+    if (failedDevices.length > 0) {
+      await supabaseAdmin.from('logs').insert({
+        level: 'warning',
+        component: 'geelark-api',
+        message: 'Some devices failed to provide ADB info',
+        meta: { 
+          failed_devices: failedDevices.map((d: any) => ({ 
+            id: d.id, 
+            code: d.code,
+            error: d.code === 42001 ? 'Cloud phone does not exist' :
+                   d.code === 42002 ? 'Cloud phone is not running' :
+                   d.code === 49001 ? 'ADB is not enabled' :
+                   d.code === 49002 ? 'Device does not support ADB' : 'Unknown error'
+          }))
+        }
+      })
+    }
+
+    return data
+  }
+
+  // Custom RPA Task Management
+  async getTaskFlows(page: number = 1, pageSize: number = 100): Promise<{
+    total: number
+    items: Array<{
+      id: string
+      title: string
+      desc: string
+      params: string[]
+    }>
+  }> {
+    const data = await this.request<any>('/open/v1/task/flow/list', {
+      method: 'POST',
+      body: JSON.stringify({
+        page,
+        pageSize
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Task flows retrieved',
+      meta: { 
+        total: data.total,
+        flows: data.items
+      }
+    })
+
+    return data
+  }
+
+  async createCustomRPATask(
+    profileId: string,
+    flowId: string,
+    params: Record<string, any>,
+    options?: {
+      name?: string
+      remark?: string
+    }
+  ): Promise<{ taskId: string }> {
+    const data = await this.request<{ taskId: string }>('/open/v1/task/rpa/add', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: options?.name || `custom_rpa_${Date.now()}`,
+        remark: options?.remark || 'Custom RPA task',
+        scheduleAt: Math.floor(Date.now() / 1000),
+        id: profileId,
+        flowId: flowId,
+        paramMap: params
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Custom RPA task created',
+      meta: { 
+        profile_id: profileId,
+        flow_id: flowId,
+        task_id: data.taskId,
+        params
+      }
+    })
+
+    return data
+  }
+
+  // Phone-based TikTok login using custom RPA
+  async loginTikTokWithPhone(
+    profileId: string,
+    phoneNumber: string,
+    flowId: string
+  ): Promise<{ taskId: string }> {
+    // Format phone number (remove country code if present)
+    const formattedPhone = phoneNumber.startsWith('1') ? phoneNumber.substring(1) : phoneNumber
+    
+    const data = await this.createCustomRPATask(
+      profileId,
+      flowId,
+      {
+        phoneNumber: formattedPhone,
+        otpCode: '' // Will be updated later
+      },
+      {
+        name: `tiktok_phone_login_${Date.now()}`,
+        remark: `Phone login for ${formattedPhone}`
+      }
+    )
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'TikTok phone login RPA task initiated',
+      meta: { 
+        profile_id: profileId,
+        phone_number: formattedPhone,
+        task_id: data.taskId,
+        flow_id: flowId
+      }
+    })
+
+    return data
+  }
+
+  // Update RPA task with OTP
+  async updateRPATaskWithOTP(
+    profileId: string,
+    flowId: string,
+    phoneNumber: string,
+    otpCode: string
+  ): Promise<{ taskId: string }> {
+    const formattedPhone = phoneNumber.startsWith('1') ? phoneNumber.substring(1) : phoneNumber
+    
+    const data = await this.createCustomRPATask(
+      profileId,
+      flowId,
+      {
+        phoneNumber: formattedPhone,
+        otpCode: otpCode
+      },
+      {
+        name: `tiktok_otp_entry_${Date.now()}`,
+        remark: `OTP entry for ${formattedPhone}`
+      }
+    )
+
+    return data
+  }
 }
 
 export const geelarkApi = new GeeLarkAPI()

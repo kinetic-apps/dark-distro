@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         balance
       }, { status: 400 })
     }
-    
+
     // Test different service codes by making direct API call
     console.log(`Testing rental with service code: ${serviceCode}`)
     
@@ -37,10 +37,10 @@ export async function POST(request: NextRequest) {
       url.searchParams.append('ltr', '1')
       url.searchParams.append('auto_renew', '1')
     }
-    
+
     const response = await fetch(url.toString())
     const text = await response.text()
-    
+
     console.log('DaisySMS raw response:', text)
     
     if (!response.ok || !text.startsWith('ACCESS_NUMBER')) {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         ]
       }, { status: 400 })
     }
-    
+
     // Parse successful response
     const [status, rentalId, phoneNumber] = text.split(':')
     
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       })
       .select()
       .single()
-    
+
     return NextResponse.json({
       success: true,
       rental: {

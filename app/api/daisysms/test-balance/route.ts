@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       const servicesUrl = new URL(process.env.DAISYSMS_API_BASE_URL!)
       servicesUrl.searchParams.append('api_key', process.env.DAISYSMS_API_KEY!)
       servicesUrl.searchParams.append('action', 'getPricesVerification')
-      
+
       const servicesResponse = await fetch(servicesUrl.toString())
       if (servicesResponse.ok) {
         services = await servicesResponse.json()
@@ -120,8 +120,8 @@ export async function GET(request: NextRequest) {
       console.error('Failed to get services:', error)
     }
     
-    return NextResponse.json({
-      success: true,
+      return NextResponse.json({
+        success: true,
       balance,
       api_configured: true,
       api_url: process.env.DAISYSMS_API_BASE_URL,

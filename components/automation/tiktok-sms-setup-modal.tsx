@@ -315,6 +315,8 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
                           <option value="2">Android 11</option>
                           <option value="3">Android 12</option>
                           <option value="4">Android 13</option>
+                          <option value="7">Android 14</option>
+                          <option value="8">Android 15</option>
                         </select>
                       </div>
                     </div>
@@ -449,6 +451,24 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
               {/* SMS Rental Configuration */}
               <div className="space-y-3">
                 <h4 className="text-sm font-medium text-gray-900 dark:text-dark-100">SMS Rental Options</h4>
+                
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <strong>Automated Phone Login:</strong> This setup uses GeeLark RPA (Robotic Process Automation) to automatically:
+                      <ul className="list-disc list-inside mt-1 space-y-0.5">
+                        <li>Navigate to TikTok login screen</li>
+                        <li>Enter the phone number from DaisySMS</li>
+                        <li>Automatically input the OTP when received</li>
+                        <li>Complete account creation</li>
+                      </ul>
+                      <p className="mt-2">
+                        <strong>Note:</strong> You need to create a TikTok phone login task flow in your GeeLark dashboard first.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 
                 <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-dark-800 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-700">
                   <input

@@ -1,16 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Smartphone, Phone } from 'lucide-react'
+import { Plus, Smartphone, Phone, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { SyncProfilesButton } from '@/components/sync-profiles-button'
 import { SetupPhoneModal } from '@/components/automation/setup-phone-modal'
 import { TikTokSMSSetupModal } from '@/components/automation/tiktok-sms-setup-modal'
+import { TikTokCredentialsSetupModal } from '@/components/automation/tiktok-credentials-setup-modal'
 import { useRouter } from 'next/navigation'
 
 export function ProfilesHeader() {
   const [showSetupModal, setShowSetupModal] = useState(false)
   const [showTikTokSMSModal, setShowTikTokSMSModal] = useState(false)
+  const [showTikTokCredentialsModal, setShowTikTokCredentialsModal] = useState(false)
   const router = useRouter()
 
   const handleSetupSuccess = (accountId: string, profileId: string) => {
@@ -28,7 +30,15 @@ export function ProfilesHeader() {
           className="btn-secondary"
         >
           <Phone className="h-4 w-4 mr-2" />
-          TikTok SMS Setup
+          +SMS Setup
+        </button>
+        
+        <button
+          onClick={() => setShowTikTokCredentialsModal(true)}
+          className="btn-secondary"
+        >
+          <Mail className="h-4 w-4 mr-2" />
+          +Email Setup
         </button>
         
         <button
@@ -55,6 +65,13 @@ export function ProfilesHeader() {
       {showTikTokSMSModal && (
         <TikTokSMSSetupModal
           onClose={() => setShowTikTokSMSModal(false)}
+          onSuccess={handleSetupSuccess}
+        />
+      )}
+      
+      {showTikTokCredentialsModal && (
+        <TikTokCredentialsSetupModal
+          onClose={() => setShowTikTokCredentialsModal(false)}
           onSuccess={handleSetupSuccess}
         />
       )}

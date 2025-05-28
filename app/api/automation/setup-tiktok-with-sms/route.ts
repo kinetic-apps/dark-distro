@@ -24,6 +24,9 @@ interface SetupOptions {
   // SMS rental configuration
   long_term_rental?: boolean  // Whether to use long-term rental for DaisySMS
   
+  // RPA configuration
+  task_flow_id?: string  // Custom task flow ID for phone login
+  
   // Warmup configuration
   warmup_duration_minutes?: number
   warmup_action?: 'browse video' | 'search video' | 'search profile'
@@ -71,6 +74,7 @@ export async function POST(request: NextRequest) {
       remark: body.remark || 'Automated TikTok setup with SMS',
       region: body.region || 'us',
       long_term_rental: body.long_term_rental || false,
+      task_flow_id: body.task_flow_id,
       warmup_duration_minutes: body.warmup_duration_minutes || 30,
       warmup_action: body.warmup_action || 'browse video',
       warmup_keywords: body.warmup_keywords
@@ -446,49 +450,102 @@ export async function POST(request: NextRequest) {
     // Step 5: Start TikTok and initiate login
     let loginTaskId: string | undefined
     try {
-      // Start TikTok app
+      // First, check if we have a task flow ID configured
+      if (!options.task_flow_id) {
+        // Try to find a TikTok phone login flow
+        const flows = await geelarkApi.getTaskFlows()
+        const phoneLoginFlow = flows.items.find(flow => 
+          flow.params.includes('phoneNumber') && 
+          (flow.title.toLowerCase().includes('tiktok') || flow.title.toLowerCase().includes('phone'))
+        )
+        
+        if (!phoneLoginFlow) {
+          throw new Error('No TikTok phone login task flow found. Please create one in GeeLark dashboard.')
+        }
+        
+        options.task_flow_id = phoneLoginFlow.id
+        
+        await supabaseAdmin.from('logs').insert({
+          level: 'info',
+          component: 'automation-tiktok-sms',
+          message: 'Auto-detected TikTok phone login flow',
+          meta: { 
+            flow_id: phoneLoginFlow.id,
+            flow_title: phoneLoginFlow.title,
+            flow_params: phoneLoginFlow.params
+          }
+        })
+      }
+      
+      // Launch TikTok app
+      console.log('Starting TikTok app...')
       await geelarkApi.startApp(result.profile_id!, 'com.zhiliaoapp.musically')
       
-      // Wait a bit for app to start
-      // Note: GeeLark doesn't have an API to check if a specific app is running,
-      // so we use a short wait here. The app should start quickly since the phone is already running.
-      console.log('Waiting for TikTok to start...')
+      // Wait for app to load
       await new Promise(resolve => setTimeout(resolve, 5000))
-
-      // For now, we'll need to handle the login manually since GeeLark API
-      // doesn't support phone number login directly
-      // This is a placeholder for future implementation
+      
+      // Create RPA task for phone login
+      console.log('Creating RPA task for phone login...')
+      const loginTask = await geelarkApi.loginTikTokWithPhone(
+        result.profile_id!,
+        phoneNumber!,
+        options.task_flow_id
+      )
+      
+      loginTaskId = loginTask.taskId
       
       result.tasks.push({
         step: 'TikTok Login',
         status: 'success',
-        message: `Login ready with phone: ${phoneNumber}. Manual intervention may be required.`
+        message: `Phone login RPA task created. Phone: ${phoneNumber}`,
+        task_id: loginTaskId
       })
-
-      // Store the phone number in the account metadata for reference
+      
+      // Store the task ID and phone number in account metadata
       await supabaseAdmin
         .from('accounts')
         .update({
           status: 'pending_verification',
           meta: {
             phone_number: phoneNumber,
-            phone_number_formatted: phoneNumber.substring(1), // Remove leading 1 for TikTok
+            phone_number_formatted: phoneNumber!.startsWith('1') ? phoneNumber!.substring(1) : phoneNumber,
             rental_id: rentalId,
-            setup_type: 'daisysms'
+            setup_type: 'daisysms',
+            login_method: 'phone_rpa',
+            login_task_id: loginTaskId,
+            task_flow_id: options.task_flow_id
           },
           updated_at: new Date().toISOString()
         })
         .eq('id', result.account_id)
         
-      // Log the phone number format
+      // Store the login task in tasks table
+      await supabaseAdmin.from('tasks').insert({
+        type: 'login',
+        task_type: 'login',
+        geelark_task_id: loginTaskId,
+        account_id: result.account_id,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        meta: {
+          profile_id: result.profile_id,
+          phone_number: phoneNumber,
+          method: 'phone_rpa',
+          flow_id: options.task_flow_id
+        }
+      })
+        
       await supabaseAdmin.from('logs').insert({
         level: 'info',
         component: 'automation-tiktok-sms',
-        message: 'Phone number formatted for TikTok',
+        message: 'Phone login RPA task initiated',
         meta: {
-          original: phoneNumber,
-          formatted: phoneNumber.substring(1),
-          note: 'TikTok expects 10-digit US numbers without country code'
+          phone_number: phoneNumber,
+          formatted: phoneNumber!.startsWith('1') ? phoneNumber!.substring(1) : phoneNumber,
+          method: 'rpa',
+          rental_id: rentalId,
+          task_id: loginTaskId,
+          flow_id: options.task_flow_id
         }
       })
 
@@ -582,14 +639,119 @@ async function monitorOTP(
 ) {
   console.log(`Starting OTP monitoring for DaisySMS rental ID: ${rentalId}`)
   
+  // Get the account data including task flow info
+  const { data: accountData } = await supabaseAdmin
+    .from('accounts')
+    .select('meta')
+    .eq('id', accountId)
+    .single()
+  
+  const loginTaskId = accountData?.meta?.login_task_id
+  const taskFlowId = accountData?.meta?.task_flow_id || options.task_flow_id
+  const phoneNumber = accountData?.meta?.phone_number
+  
+  // Log initial monitoring setup
+  await supabaseAdmin.from('logs').insert({
+    level: 'info',
+    component: 'automation-tiktok-sms-monitor',
+    message: 'OTP monitoring started',
+    meta: { 
+      rental_id: rentalId,
+      account_id: accountId,
+      profile_id: profileId,
+      login_task_id: loginTaskId,
+      task_flow_id: taskFlowId,
+      check_interval: '5 seconds',
+      max_duration: '20 minutes'
+    }
+  })
+  
   const maxAttempts = 240 // Check for 20 minutes (240 * 5 seconds)
   let attempts = 0
   let loginSuccessful = false
   let warmupStarted = false
+  let lastOtpCheckResult: any = null
+  let lastTaskStatus: any = null
 
   const checkInterval = setInterval(async () => {
     try {
       attempts++
+      
+      // Log every 12 attempts (1 minute)
+      if (attempts % 12 === 1) {
+        console.log(`OTP monitoring: ${Math.floor(attempts / 12)} minutes elapsed, rental ${rentalId}`)
+      }
+      
+      // If we have a login task ID, check its status
+      if (loginTaskId && !loginSuccessful) {
+        try {
+          const taskStatus = await geelarkApi.getTaskStatus(loginTaskId)
+          
+          // Log if task status changed
+          if (JSON.stringify(taskStatus) !== JSON.stringify(lastTaskStatus)) {
+            console.log(`Login task status changed for ${loginTaskId}:`, taskStatus)
+            lastTaskStatus = taskStatus
+            
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'automation-tiktok-sms-monitor',
+              message: 'Login task status changed',
+              meta: { 
+                task_id: loginTaskId,
+                status: taskStatus.status,
+                result: taskStatus.result,
+                attempts: attempts
+              }
+            })
+            
+            // Update the task record
+            await supabaseAdmin
+              .from('tasks')
+              .update({
+                status: taskStatus.status,
+                meta: {
+                  geelark_status: taskStatus.result?.geelark_status,
+                  fail_code: taskStatus.result?.failCode,
+                  fail_desc: taskStatus.result?.failDesc
+                },
+                updated_at: new Date().toISOString()
+              })
+              .eq('geelark_task_id', loginTaskId)
+          }
+          
+          // Check if login completed successfully
+          if (taskStatus.status === 'completed') {
+            console.log('GeeLark login task completed successfully!')
+            loginSuccessful = true
+            
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'automation-tiktok-sms-monitor',
+              message: 'RPA login task completed - waiting for OTP',
+              meta: { 
+                task_id: loginTaskId,
+                account_id: accountId,
+                profile_id: profileId
+              }
+            })
+          } else if (taskStatus.status === 'failed') {
+            console.log('GeeLark login task failed:', taskStatus.result)
+            
+            await supabaseAdmin.from('logs').insert({
+              level: 'warning',
+              component: 'automation-tiktok-sms-monitor',
+              message: 'RPA login task failed',
+              meta: { 
+                task_id: loginTaskId,
+                fail_code: taskStatus.result?.failCode,
+                fail_desc: taskStatus.result?.failDesc
+              }
+            })
+          }
+        } catch (taskError) {
+          console.error('Error checking login task status:', taskError)
+        }
+      }
       
       // First check if the account status has changed (indicating successful login)
       const { data: account } = await supabaseAdmin
@@ -622,7 +784,7 @@ async function monitorOTP(
           
           await supabaseAdmin.from('logs').insert({
             level: 'info',
-            component: 'automation-tiktok-sms',
+            component: 'automation-tiktok-sms-monitor',
             message: 'TikTok login successful without SMS verification',
             meta: { 
               account_id: accountId, 
@@ -672,7 +834,7 @@ async function monitorOTP(
 
             await supabaseAdmin.from('logs').insert({
               level: 'info',
-              component: 'automation-tiktok-sms',
+              component: 'automation-tiktok-sms-monitor',
               message: `Warmup started after successful login: ${actionText} for ${options.warmup_duration_minutes} minutes`,
               meta: { 
                 account_id: accountId,
@@ -687,7 +849,7 @@ async function monitorOTP(
             console.error('Failed to start warmup after login:', warmupError)
             await supabaseAdmin.from('logs').insert({
               level: 'error',
-              component: 'automation-tiktok-sms',
+              component: 'automation-tiktok-sms-monitor',
               message: 'Failed to start warmup after successful login',
               meta: { 
                 account_id: accountId,
@@ -706,8 +868,28 @@ async function monitorOTP(
       // Check for OTP
       const otpStatus = await daisyApi.checkOTP(rentalId)
       
+      // Log if status changed
+      if (JSON.stringify(otpStatus) !== JSON.stringify(lastOtpCheckResult)) {
+        console.log(`OTP status changed for rental ${rentalId}:`, otpStatus)
+        lastOtpCheckResult = otpStatus
+        
+        await supabaseAdmin.from('logs').insert({
+          level: 'info',
+          component: 'automation-tiktok-sms-monitor',
+          message: 'OTP check status changed',
+          meta: { 
+            rental_id: rentalId,
+            status: otpStatus.status,
+            code: otpStatus.code,
+            attempts: attempts
+          }
+        })
+      }
+      
       if (otpStatus.status === 'received' && otpStatus.code) {
         clearInterval(checkInterval)
+        
+        console.log(`OTP RECEIVED! Rental ${rentalId}, Code: ${otpStatus.code}`)
         
         // Update the SMS rental record
         await supabaseAdmin
@@ -733,15 +915,139 @@ async function monitorOTP(
           })
           .eq('id', accountId)
         
+        // Create a new RPA task to enter the OTP
+        if (taskFlowId && phoneNumber) {
+          try {
+            console.log('Creating RPA task to enter OTP...')
+            
+            const otpTask = await geelarkApi.updateRPATaskWithOTP(
+              profileId,
+              taskFlowId,
+              phoneNumber,
+              otpStatus.code
+            )
+            
+            console.log('OTP entry RPA task created:', otpTask.taskId)
+            
+            // Store the OTP task
+            await supabaseAdmin.from('tasks').insert({
+              type: 'otp_entry',
+              task_type: 'otp_entry',
+              geelark_task_id: otpTask.taskId,
+              account_id: accountId,
+              status: 'running',
+              started_at: new Date().toISOString(),
+              meta: {
+                profile_id: profileId,
+                otp_code: otpStatus.code,
+                method: 'rpa',
+                flow_id: taskFlowId
+              }
+            })
+            
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'automation-tiktok-sms-monitor',
+              message: 'OTP entry RPA task created',
+              meta: { 
+                account_id: accountId,
+                profile_id: profileId,
+                otp_code: otpStatus.code,
+                task_id: otpTask.taskId,
+                flow_id: taskFlowId
+              }
+            })
+            
+            // Monitor the OTP task for completion
+            let otpTaskAttempts = 0
+            const maxOtpTaskAttempts = 60 // 5 minutes
+            
+            const otpTaskInterval = setInterval(async () => {
+              otpTaskAttempts++
+              
+              try {
+                const otpTaskStatus = await geelarkApi.getTaskStatus(otpTask.taskId)
+                
+                if (otpTaskStatus.status === 'completed') {
+                  clearInterval(otpTaskInterval)
+                  loginSuccessful = true
+                  
+                  console.log('OTP entry task completed successfully!')
+                  
+                  // Update account status
+                  await supabaseAdmin
+                    .from('accounts')
+                    .update({
+                      status: 'active',
+                      meta: {
+                        ...accountData?.meta,
+                        login_completed_at: new Date().toISOString(),
+                        login_method: 'phone_rpa_auto'
+                      },
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', accountId)
+                  
+                  await supabaseAdmin.from('logs').insert({
+                    level: 'info',
+                    component: 'automation-tiktok-sms-monitor',
+                    message: 'Account creation completed via RPA',
+                    meta: { 
+                      account_id: accountId,
+                      profile_id: profileId,
+                      otp_task_id: otpTask.taskId
+                    }
+                  })
+                  
+                  // Start warmup if configured
+                  if (options.warmup_duration_minutes && options.warmup_duration_minutes > 0) {
+                    // ... warmup code (same as above)
+                  }
+                } else if (otpTaskStatus.status === 'failed' || otpTaskAttempts >= maxOtpTaskAttempts) {
+                  clearInterval(otpTaskInterval)
+                  
+                  await supabaseAdmin.from('logs').insert({
+                    level: 'error',
+                    component: 'automation-tiktok-sms-monitor',
+                    message: 'OTP entry task failed or timed out',
+                    meta: { 
+                      account_id: accountId,
+                      task_id: otpTask.taskId,
+                      status: otpTaskStatus.status,
+                      attempts: otpTaskAttempts
+                    }
+                  })
+                }
+              } catch (error) {
+                console.error('Error checking OTP task status:', error)
+              }
+            }, 5000) // Check every 5 seconds
+            
+          } catch (otpError) {
+            console.error('Failed to create OTP entry task:', otpError)
+            await supabaseAdmin.from('logs').insert({
+              level: 'error',
+              component: 'automation-tiktok-sms-monitor',
+              message: 'Failed to create OTP entry RPA task',
+              meta: { 
+                account_id: accountId,
+                error: otpError instanceof Error ? otpError.message : String(otpError)
+              }
+            })
+          }
+        }
+        
         await supabaseAdmin.from('logs').insert({
           level: 'info',
-          component: 'automation-tiktok-sms',
+          component: 'automation-tiktok-sms-monitor',
           message: 'OTP received successfully',
           meta: { 
             account_id: accountId, 
             profile_id: profileId,
             otp_code: otpStatus.code,
-            rental_id: rentalId
+            rental_id: rentalId,
+            time_to_receive: `${Math.floor(attempts * 5 / 60)} minutes`,
+            rpa_auto_entry: !!taskFlowId
           }
         })
         
@@ -755,37 +1061,73 @@ async function monitorOTP(
       } else if (otpStatus.status === 'cancelled' || otpStatus.status === 'expired') {
         clearInterval(checkInterval)
         
+        console.log(`OTP monitoring stopped: ${otpStatus.status} for rental ${rentalId}`)
+        
         await supabaseAdmin.from('logs').insert({
           level: 'warning',
-          component: 'automation-tiktok-sms',
+          component: 'automation-tiktok-sms-monitor',
           message: `OTP monitoring stopped: ${otpStatus.status}`,
-          meta: { account_id: accountId, profile_id: profileId, rental_id: rentalId }
+          meta: { 
+            account_id: accountId, 
+            profile_id: profileId, 
+            rental_id: rentalId,
+            attempts: attempts,
+            duration: `${Math.floor(attempts * 5 / 60)} minutes`
+          }
         })
       } else if (attempts >= maxAttempts) {
         clearInterval(checkInterval)
+        
+        console.log(`OTP monitoring timeout for rental ${rentalId} after 20 minutes`)
         
         // If we haven't received OTP or successful login after 20 minutes, 
         // the rental will auto-cancel and refund
         await supabaseAdmin.from('logs').insert({
           level: 'warning',
-          component: 'automation-tiktok-sms',
+          component: 'automation-tiktok-sms-monitor',
           message: 'OTP monitoring timeout - rental will auto-cancel',
           meta: { 
             account_id: accountId, 
             profile_id: profileId, 
             rental_id: rentalId,
             attempts: attempts,
-            login_successful: loginSuccessful
+            login_successful: loginSuccessful,
+            last_status: otpStatus.status
           }
         })
       }
       
       // Log progress every 2 minutes
       if (attempts % 24 === 0) {
-        console.log(`OTP monitoring in progress: ${Math.round(attempts * 5 / 60)} minutes elapsed`)
+        console.log(`OTP monitoring in progress: ${Math.round(attempts * 5 / 60)} minutes elapsed for rental ${rentalId}`)
+        
+        await supabaseAdmin.from('logs').insert({
+          level: 'info',
+          component: 'automation-tiktok-sms-monitor',
+          message: 'OTP monitoring progress',
+          meta: { 
+            rental_id: rentalId,
+            minutes_elapsed: Math.round(attempts * 5 / 60),
+            status: otpStatus.status,
+            account_id: accountId
+          }
+        })
       }
     } catch (error) {
       console.error('OTP check error:', error)
+      
+      // Log the error
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'automation-tiktok-sms-monitor',
+        message: 'OTP check failed',
+        meta: { 
+          rental_id: rentalId,
+          account_id: accountId,
+          error: error instanceof Error ? error.message : String(error),
+          attempts: attempts
+        }
+      })
       
       if (attempts >= maxAttempts) {
         clearInterval(checkInterval)

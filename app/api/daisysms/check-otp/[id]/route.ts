@@ -44,7 +44,7 @@ export async function GET(
             })
             .eq('rental_id', rentalId)
 
-          return NextResponse.json({
+      return NextResponse.json({
             status: 'completed_no_sms',
             message: 'Login was successful without SMS verification',
             rental_completed: true

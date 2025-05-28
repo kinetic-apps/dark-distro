@@ -1,0 +1,96 @@
+def request_daisysms_code_and_verify_tiktok(d):
+    import requests, time
+
+    api_key = "<your-daisysms-api-key>"
+    base_url = "https://daisysms.com/stubs/handler_api.php"
+
+    # Step 1: Rent a number
+    while True:
+        try:
+            print("[DaisySMS] Requesting phone number...")
+            response = requests.get(f"{base_url}?api_key={api_key}&action=getNumber&service=lf&max_price=5.5")
+            if response.text.startswith("ACCESS_NUMBER"):
+                parts = response.text.strip().split(":")
+                daisysms_id = parts[1]
+                daisysms_phone_number = parts[2]
+                break
+            else:
+                print(f"[DaisySMS] Response: {response.text}")
+        except Exception as e:
+            print(f"[DaisySMS] Error: {e}")
+        time.sleep(5)
+
+    phone_number = daisysms_phone_number[1:] if daisysms_phone_number.startswith("1") else daisysms_phone_number
+    print(f"[DaisySMS] Number: {phone_number}, ID: {daisysms_id}")
+    time.sleep(3)
+
+    # Step 2: Enter number and click 'Continue'
+    phone_field = d(className="android.widget.EditText", focused=True)
+    if phone_field.exists:
+        print("[App] Entering phone number...")
+        phone_field.set_text(phone_number)
+        time.sleep(1)
+        d.press("enter")
+    else:
+        print("[App] Phone input field not found.")
+        return
+
+    for _ in range(10):
+        continue_btn = d(resourceId="com.zhiliaoapp.musically:id/do0", text="Continue")
+        if continue_btn.exists:
+            continue_btn.click()
+            print("[App] Clicked 'Continue'.")
+            break
+        time.sleep(1)
+    else:
+        print("[App] 'Continue' button not found.")
+        return
+
+    # Step 3: Poll for SMS code
+    otp_code = None
+    while True:
+        try:
+            print("[DaisySMS] Polling for SMS...")
+            status = requests.get(f"{base_url}?api_key={api_key}&action=getStatus&id={daisysms_id}")
+            if status.text.startswith("STATUS_OK"):
+                otp_code = status.text.strip().split(":")[1]
+                print(f"[DaisySMS] Received OTP: {otp_code}")
+                break
+            elif status.text == "STATUS_CANCEL":
+                print("[DaisySMS] Rental was cancelled.")
+                return
+            elif status.text == "NO_ACTIVATION":
+                print("[DaisySMS] Rental ID invalid.")
+                return
+            else:
+                print(f"[DaisySMS] Waiting... Status: {status.text}")
+        except Exception as e:
+            print(f"[DaisySMS] Polling error: {e}")
+        time.sleep(5)
+
+    # Step 4: Input OTP and click 'Next'
+    otp_field = d(className="android.widget.EditText", focused=True)
+    if otp_field.exists:
+        print("[App] Entering OTP...")
+        otp_field.set_text(otp_code)
+        time.sleep(1)
+        d.press("enter")
+        next_btn = d.xpath("//android.widget.Button[@text='Next']")
+        if next_btn.exists:
+            next_btn.click()
+            print("[App] OTP submitted.")
+        else:
+            print("[App] 'Next' button not found.")
+    else:
+        print("[App] OTP input field not found.")
+
+    # Step 5: Confirm account creation
+    for _ in range(10):
+        create_btn = d(resourceId="android:id/button1", text="Create account")
+        if create_btn.exists:
+            create_btn.click()
+            print("[App] Clicked 'Create account'.")
+            break
+        time.sleep(1)
+    else:
+        print("[App] 'Create account' button not found.")

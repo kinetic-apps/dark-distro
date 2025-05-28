@@ -201,27 +201,27 @@ export class DaisySMSAPI {
   async setStatus(rentalId: string, status: '6' | '8'): Promise<void> {
     try {
       const response = await this.request({
-        action: 'setStatus',
-        id: rentalId,
-        status: status
-      })
+      action: 'setStatus',
+      id: rentalId,
+      status: status
+    })
 
       console.log(`DaisySMS setStatus response for rental ${rentalId}:`, response)
 
-      const statusText = status === '6' ? 'completed' : 'cancelled'
-      
-      await supabaseAdmin
-        .from('sms_rentals')
-        .update({ 
-          status: statusText === 'completed' ? 'received' : 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('rental_id', rentalId)
+    const statusText = status === '6' ? 'completed' : 'cancelled'
+    
+    await supabaseAdmin
+      .from('sms_rentals')
+      .update({ 
+        status: statusText === 'completed' ? 'received' : 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('rental_id', rentalId)
 
-      await supabaseAdmin.from('logs').insert({
-        level: 'info',
-        component: 'daisy-api',
-        message: `Rental ${statusText}`,
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'daisy-api',
+      message: `Rental ${statusText}`,
         meta: { rental_id: rentalId, response }
       })
     } catch (error) {
@@ -232,7 +232,7 @@ export class DaisySMSAPI {
         component: 'daisy-api',
         message: `Failed to set rental status but continuing`,
         meta: { rental_id: rentalId, status, error: String(error) }
-      })
+    })
     }
   }
 

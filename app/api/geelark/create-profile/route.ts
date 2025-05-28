@@ -218,22 +218,22 @@ export async function POST(request: NextRequest) {
 
     // Create phone record with equipment info
     const phoneData = {
-      profile_id: profileData.id,
-      account_id: account.id,
+        profile_id: profileData.id,
+        account_id: account.id,
       device_model: profileData.equipmentInfo?.deviceModel || surface_model || 'Unknown',
       android_version: profileData.equipmentInfo?.osVersion || `Android ${android_version || '13'}`,
-      status: 'offline',
-      meta: {
+        status: 'offline',
+        meta: {
         profile_name: profileData.profileName || profileData.envSerialNo || 'Unknown',
         serial_no: profileData.envSerialNo,
         imei: profileData.equipmentInfo?.imei,
         phone_number: profileData.equipmentInfo?.phoneNumber,
         country: profileData.equipmentInfo?.countryName,
         timezone: profileData.equipmentInfo?.timeZone,
-        proxy_info: proxyData,
+          proxy_info: proxyData,
         remark: remark,
         equipment_info: profileData.equipmentInfo
-      }
+        }
     }
 
     console.log('Creating phone record:', phoneData)

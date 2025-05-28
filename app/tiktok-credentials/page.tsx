@@ -100,7 +100,7 @@ export default function TikTokCredentialsPage() {
       // Try to find email and password in various column names
       const email = row.email || row.Email || row.EMAIL || row.username || row.Username || ''
       const password = row.password || row.Password || row.PASSWORD || row.pass || row.Pass || ''
-      const creator_name = row.creator_name || row.creator || row.name || row.Name || ''
+      const creator_name = row.creator_name || row.creator || row.name || row.Name || row.username || row.Username || row.USERNAME || ''
       const creator_id = row.creator_id || row.id || row.ID || ''
 
       if (!email) errors.push('Email is required')

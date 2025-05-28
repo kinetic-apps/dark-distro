@@ -4,232 +4,242 @@ import { daisyApi } from '@/lib/daisy-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
-  const debugLog: any[] = []
+  const logs: any[] = []
   const log = (message: string, data?: any) => {
-    const entry = { timestamp: new Date().toISOString(), message, data }
-    console.log(message, data || '')
-    debugLog.push(entry)
+    console.log(`[TikTok Login Debug] ${message}`, data || '')
+    logs.push({ timestamp: new Date().toISOString(), message, data })
   }
 
   try {
-    const { profile_id, phone_number, manual_mode = false } = await request.json()
-    
+    const body = await request.json()
+    const { profile_id, phone_number, action = 'check' } = body
+
     if (!profile_id) {
-      return NextResponse.json({ error: 'profile_id required' }, { status: 400 })
+      return NextResponse.json({ error: 'Profile ID required' }, { status: 400 })
     }
 
-    log('Starting TikTok login debug', { profile_id, phone_number, manual_mode })
+    log('Starting TikTok login debug', { profile_id, phone_number, action })
 
-    // Step 1: Check phone status
-    log('Checking phone status...')
-    const phoneStatus = await geelarkApi.getPhoneStatus([profile_id])
-    log('Phone status response', phoneStatus)
-    
-    if (phoneStatus.successDetails?.[0]?.status !== 0) {
-      log('Phone not ready, starting it...')
-      await geelarkApi.startPhones([profile_id])
+    // Action 1: Check current rentals
+    if (action === 'check' || action === 'all') {
+      log('Checking current SMS rentals...')
       
-      // Wait for phone to be ready
-      let attempts = 0
-      while (attempts < 30) {
-        attempts++
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        const status = await geelarkApi.getPhoneStatus([profile_id])
-        if (status.successDetails?.[0]?.status === 0) {
-          log('Phone is now ready')
-          break
-        }
-      }
-    }
-
-    // Step 2: Check if TikTok is installed
-    log('Checking if TikTok is installed...')
-    const isInstalled = await geelarkApi.isTikTokInstalled(profile_id)
-    log('TikTok installed', { isInstalled })
-
-    if (!isInstalled) {
-      return NextResponse.json({ 
-        error: 'TikTok not installed',
-        debugLog 
-      }, { status: 400 })
-    }
-
-    // Step 3: Take screenshot before starting
-    log('Taking screenshot before TikTok start...')
-    try {
-      const screenshotTask = await geelarkApi.takeScreenshot(profile_id)
-      log('Screenshot task created', { taskId: screenshotTask.taskId })
-      
-      // Wait a bit and get the result
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const screenshotResult = await geelarkApi.getScreenshotResult(screenshotTask.taskId)
-      log('Screenshot result', screenshotResult)
-    } catch (e) {
-      log('Screenshot failed', { error: String(e) })
-    }
-
-    // Step 4: Start TikTok
-    log('Starting TikTok app...')
-    await geelarkApi.startApp(profile_id, 'com.zhiliaoapp.musically')
-    
-    // Wait for app to load
-    log('Waiting 10 seconds for TikTok to load...')
-    await new Promise(resolve => setTimeout(resolve, 10000))
-
-    // Step 5: Take screenshot after TikTok starts
-    log('Taking screenshot after TikTok start...')
-    try {
-      const screenshotTask = await geelarkApi.takeScreenshot(profile_id)
-      log('Screenshot task created', { taskId: screenshotTask.taskId })
-      
-      // Wait a bit and get the result
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      const screenshotResult = await geelarkApi.getScreenshotResult(screenshotTask.taskId)
-      log('Screenshot result', screenshotResult)
-    } catch (e) {
-      log('Screenshot failed', { error: String(e) })
-    }
-
-    // Step 6: If phone number provided, try to initiate login
-    let rentalId: string | undefined
-    if (phone_number) {
-      log('Phone number provided, checking if it needs SMS', { phone_number })
-      
-      // First, let's check recent rentals for this phone number
-      const { data: existingRental } = await supabaseAdmin
+      const { data: rentals } = await supabaseAdmin
         .from('sms_rentals')
         .select('*')
-        .eq('phone_number', phone_number)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+        .limit(5)
       
-      if (existingRental) {
-        rentalId = existingRental.rental_id
-        log('Found existing rental', { 
-          rental_id: rentalId,
-          status: existingRental.status,
-          otp: existingRental.otp
-        })
+      log('Recent rentals:', rentals)
+
+      // Check active rentals via DaisySMS API
+      try {
+        const balance = await daisyApi.getBalance()
+        log('DaisySMS balance:', balance)
+      } catch (e) {
+        log('Failed to get balance:', e)
       }
     }
 
-    // Step 7: Manual mode - just provide info for manual testing
-    if (manual_mode) {
-      log('Manual mode - providing debug info')
-      
-      // Rent a number if not provided
+    // Action 2: Test phone number login (manual process)
+    if (action === 'test_login' || action === 'all') {
       if (!phone_number) {
-        log('Renting new number with lf service code...')
-        try {
-          const rental = await daisyApi.rentNumber(undefined, false)
-          rentalId = rental.rental_id
-          
-          log('Number rented successfully', {
-            rental_id: rental.rental_id,
-            phone: rental.phone
+        return NextResponse.json({ 
+          error: 'Phone number required for test_login action',
+          logs 
+        }, { status: 400 })
+      }
+
+      log('Testing TikTok login with phone number...')
+      
+      // According to GeeLark docs, they only support email/password login via API
+      // Phone number login must be done manually
+      log('IMPORTANT: GeeLark API does NOT support phone number login')
+      log('The tiktokLogin endpoint only accepts email/password')
+      log('Phone number login must be done manually through the app')
+      
+      // What we CAN do:
+      // 1. Start the phone
+      // 2. Start TikTok app
+      // 3. Rent a number from DaisySMS
+      // 4. Monitor for OTP
+      // 5. User must manually enter phone number in TikTok
+      
+      log('Current implementation flow:')
+      log('1. Phone is started ✓')
+      log('2. TikTok app is started ✓')
+      log('3. DaisySMS number is rented ✓')
+      log('4. OTP monitoring is active ✓')
+      log('5. User must MANUALLY enter phone number in TikTok ❌')
+      log('6. When TikTok sends OTP, DaisySMS will receive it')
+      log('7. We update the database with the OTP')
+      
+      // Check if there's an active rental for this profile
+      const { data: account } = await supabaseAdmin
+        .from('accounts')
+        .select('*, phones(*)')
+        .eq('phones.profile_id', profile_id)
+        .single()
+      
+      if (account) {
+        log('Account found:', { 
+          id: account.id, 
+          status: account.status,
+          meta: account.meta 
+        })
+        
+        // Check for active rental
+        const { data: activeRental } = await supabaseAdmin
+          .from('sms_rentals')
+          .select('*')
+          .eq('account_id', account.id)
+          .eq('status', 'active')
+          .single()
+        
+        if (activeRental) {
+          log('Active rental found:', {
+            rental_id: activeRental.rental_id,
+            phone: activeRental.phone,
+            created_at: activeRental.created_at,
+            otp: activeRental.otp
           })
           
-          return NextResponse.json({
-            success: true,
-            mode: 'manual',
-            rental: {
-              rental_id: rental.rental_id,
-              phone: rental.phone
-            },
-            instructions: [
-              `1. Phone is ready and TikTok is started`,
-              `2. Use phone number: ${rental.phone}`,
-              `3. Manually navigate to login screen and enter the phone number`,
-              `4. Monitor OTP at: /api/daisysms/check-otp/${rental.rental_id}`,
-              `5. Check webhook logs for any incoming SMS`,
-              `6. Take screenshots to see what's happening`
-            ],
-            debugLog
-          })
-        } catch (error) {
-          log('Failed to rent number', { error: String(error) })
-          throw error
+          // Check OTP status
+          try {
+            const otpStatus = await daisyApi.checkOTP(activeRental.rental_id)
+            log('OTP check result:', otpStatus)
+          } catch (e) {
+            log('Failed to check OTP:', e)
+          }
+        } else {
+          log('No active rental found for this account')
         }
       }
     }
 
-    // Step 8: Check GeeLark task status if we have recent tasks
-    log('Checking for recent TikTok tasks...')
-    const { data: recentTasks } = await supabaseAdmin
-      .from('tasks')
-      .select('*')
-      .eq('profile_id', profile_id)
-      .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
-      .order('created_at', { ascending: false })
-      .limit(5)
-    
-    if (recentTasks && recentTasks.length > 0) {
-      log('Found recent tasks', { 
-        count: recentTasks.length,
-        latest: recentTasks[0]
-      })
+    // Action 3: Test webhook
+    if (action === 'test_webhook' || action === 'all') {
+      log('Checking webhook configuration...')
+      
+      // Get webhook info from DaisySMS
+      try {
+        const webhookResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/daisysms/webhook-info`)
+        const webhookData = await webhookResponse.json()
+        log('Webhook info:', webhookData)
+      } catch (e) {
+        log('Failed to get webhook info:', e)
+      }
+      
+      // Check recent webhook logs
+      const { data: webhookLogs } = await supabaseAdmin
+        .from('logs')
+        .select('*')
+        .eq('component', 'daisysms-webhook')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      
+      log('Recent webhook logs:', webhookLogs)
     }
 
-    // Step 9: Check DaisySMS logs
-    log('Checking DaisySMS logs...')
-    const { data: daisyLogs } = await supabaseAdmin
-      .from('logs')
-      .select('*')
-      .eq('component', 'daisy-api')
-      .gte('timestamp', new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Last 30 min
-      .order('timestamp', { ascending: false })
-      .limit(10)
-    
-    if (daisyLogs && daisyLogs.length > 0) {
-      log('Found DaisySMS logs', { count: daisyLogs.length })
+    // Action 4: Manual login initiation
+    if (action === 'manual_login') {
+      log('Manual login process:')
+      log('1. Ensure phone is running and TikTok is open')
+      log('2. Navigate to login screen in TikTok')
+      log('3. Select "Use phone or email"')
+      log('4. Enter the rented phone number WITHOUT country code')
+      log('5. TikTok will send OTP to the number')
+      log('6. Check SMS rentals page for the OTP')
+      
+      // Get the formatted phone number
+      if (phone_number) {
+        const formatted = phone_number.startsWith('1') ? phone_number.substring(1) : phone_number
+        log('Formatted phone number for TikTok:', formatted)
+        log('Enter this in TikTok:', formatted)
+      }
     }
 
-    // Step 10: Final status check
-    const finalStatus = {
-      phone_ready: phoneStatus.successDetails?.[0]?.status === 0,
-      tiktok_installed: isInstalled,
-      rental_id: rentalId,
-      phone_number: phone_number,
-      recent_tasks: recentTasks?.length || 0,
-      daisy_logs: daisyLogs?.length || 0
+    // Action 5: Check GeeLark task status
+    if (action === 'check_tasks' || action === 'all') {
+      log('Checking GeeLark tasks...')
+      
+      const { data: tasks } = await supabaseAdmin
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      
+      log('Recent tasks:', tasks)
+      
+      // Check task status in GeeLark
+      for (const task of tasks || []) {
+        if (task.geelark_task_id) {
+          try {
+            const status = await geelarkApi.getTaskStatus(task.geelark_task_id)
+            log(`Task ${task.geelark_task_id} status:`, status)
+          } catch (e) {
+            log(`Failed to get status for task ${task.geelark_task_id}:`, e)
+          }
+        }
+      }
     }
-    
-    log('Debug complete', finalStatus)
 
-    // Save debug log
+    // Log to database for tracking
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'tiktok-login-debug',
       message: 'Debug session completed',
-      meta: {
+      meta: { 
         profile_id,
-        phone_number,
-        manual_mode,
-        final_status: finalStatus,
-        debug_log: debugLog
+        action,
+        logs_count: logs.length
       }
     })
 
     return NextResponse.json({
       success: true,
-      finalStatus,
-      debugLog,
-      nextSteps: [
-        'Check screenshots to see TikTok state',
-        'Monitor SMS rentals for OTP',
-        'Check webhook logs',
-        'Try manual login if automated fails'
+      profile_id,
+      action,
+      logs,
+      recommendations: [
+        'GeeLark API does NOT support phone number login - only email/password',
+        'Phone login must be done manually in the TikTok app',
+        'Make sure to enter phone number WITHOUT country code (e.g., 3476711222 not 13476711222)',
+        'Monitor the SMS rentals page for incoming OTP',
+        'Check webhook logs to ensure DaisySMS is sending webhooks',
+        'Consider implementing email/password login instead for full automation'
       ]
     })
 
   } catch (error) {
-    log('Debug failed', { error: String(error) })
+    log('Error:', error)
     
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : String(error),
-      debugLog
+      error: error instanceof Error ? error.message : 'Unknown error',
+      logs
     }, { status: 500 })
   }
+}
+
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    message: 'TikTok Login Debug Endpoint',
+    usage: {
+      method: 'POST',
+      body: {
+        profile_id: 'required - GeeLark profile ID',
+        phone_number: 'optional - phone number for testing',
+        action: 'check | test_login | test_webhook | manual_login | check_tasks | all'
+      },
+      actions: {
+        check: 'Check current SMS rentals and balance',
+        test_login: 'Test the login flow and check for issues',
+        test_webhook: 'Check webhook configuration and recent logs',
+        manual_login: 'Get instructions for manual login process',
+        check_tasks: 'Check GeeLark task status',
+        all: 'Run all checks'
+      }
+    }
+  })
 } 
