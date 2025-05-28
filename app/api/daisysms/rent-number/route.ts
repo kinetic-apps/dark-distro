@@ -4,7 +4,17 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // Handle empty body or JSON parsing errors
+    let body: any = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch (e) {
+      // Empty body is fine, continue with empty object
+    }
+    
     const { account_id } = body
 
     // Check current rental count

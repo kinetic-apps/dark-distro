@@ -1,7 +1,7 @@
 import { supabaseAdmin } from './supabase/admin'
 import { createHash } from 'crypto'
 
-const API_BASE_URL = process.env.GEELARK_API_BASE_URL || 'https://openapi.geelark.com'
+const API_BASE_URL = (process.env.GEELARK_API_BASE_URL || 'https://openapi.geelark.com').replace(/\/$/, '')
 const API_KEY = process.env.GEELARK_API_KEY || ''
 const APP_ID = process.env.GEELARK_APP_ID || ''
 
@@ -191,12 +191,30 @@ export class GeeLarkAPI {
       body: JSON.stringify(requestBody)
     })
 
+    console.log('GeeLark createProfile response:', JSON.stringify(data, null, 2))
+
+    if (!data || !data.details) {
+      console.error('Invalid response structure:', data)
+      throw new Error('Invalid response from GeeLark API - missing details')
+    }
+
     if (data.failAmount > 0) {
       const failedDetail = data.details.find(d => d.code !== 0)
-      throw new Error(`Failed to create profile: ${failedDetail?.msg || 'Unknown error'}`)
+      console.error('Profile creation failed:', failedDetail)
+      throw new Error(`Failed to create profile: ${failedDetail?.msg || 'Unknown error'} (code: ${failedDetail?.code})`)
+    }
+
+    if (!data.details || data.details.length === 0) {
+      console.error('No profile details in response:', data)
+      throw new Error('No profile created - empty details array')
     }
 
     const successDetail = data.details[0]
+    
+    if (!successDetail || !successDetail.id) {
+      console.error('Invalid success detail:', successDetail)
+      throw new Error('Invalid profile detail - missing ID')
+    }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
@@ -422,6 +440,23 @@ export class GeeLarkAPI {
         page: 1,
         pageSize: 100
       })
+    })
+  }
+
+  async startApp(profileId: string, packageName: string): Promise<void> {
+    await this.request('/open/v1/app/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        envId: profileId,
+        packageName: packageName
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'App started',
+      meta: { profile_id: profileId, package_name: packageName }
     })
   }
 
@@ -770,7 +805,15 @@ export class GeeLarkAPI {
 
   // Profile Management
   async getProfileList(): Promise<any[]> {
-    return await this.request('/open/v1/phone/list')
+    const response = await this.request<any>('/open/v1/phone/list', {
+      method: 'POST',
+      body: JSON.stringify({
+        page: 1,
+        pageSize: 100
+      })
+    })
+    
+    return response.items || []
   }
 }
 

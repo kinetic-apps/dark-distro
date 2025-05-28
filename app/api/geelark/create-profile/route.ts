@@ -4,40 +4,50 @@ import { soaxApi } from '@/lib/soax-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
+  let account: any = null
+  let profileCreated = false
+  let profileData: any = null
+  
   try {
     const body = await request.json()
     const { 
-      device_info, 
-      assign_proxy, 
-      proxy_type,
-      proxy_id,        // GeeLark proxy ID
-      proxy_config,    // Manual/Dynamic proxy configuration
       android_version,
+      proxy_id,
+      database_proxy_id,  // Add support for database proxy ID
+      proxy_config,
+      proxy_type,
+      assign_proxy,
       group_name,
       tags,
-      region,
-      charge_mode,
-      language,
+      remark,
       surface_brand,
       surface_model,
-      remark
+      region,
+      charge_mode,
+      language
     } = body
 
-    // Prepare GeeLark profile creation parameters
+    console.log('Create profile request:', { 
+      android_version, 
+      proxy_id, 
+      has_proxy_config: !!proxy_config,
+      group_name 
+    })
+
+    // Prepare profile parameters FIRST
     const profileParams: any = {
       androidVersion: android_version,
       groupName: group_name,
       tagsName: tags,
-      region: region,
+      remark,
+      region,
       chargeMode: charge_mode,
-      language: language,
+      language,
       surfaceBrandName: surface_brand,
-      surfaceModelName: surface_model,
-      remark: remark
+      surfaceModelName: surface_model
     }
 
-    // Handle proxy configuration
-    let proxyData = null
+    let proxyData: any = null
 
     if (proxy_id) {
       // Using GeeLark proxy by ID
@@ -50,6 +60,24 @@ export async function POST(request: NextRequest) {
         type: 'geelark',
         label: `GeeLark Proxy ${proxy_id}`,
         geelark_proxy_id: proxy_id
+      }
+    } else if (database_proxy_id) {
+      // Using database proxy by ID
+      const { data: dbProxy } = await supabaseAdmin
+        .from('proxies')
+        .select('*')
+        .eq('id', database_proxy_id)
+        .single()
+
+      if (dbProxy) {
+        profileParams.proxyConfig = {
+          typeId: 1, // SOCKS5
+          server: dbProxy.host,
+          port: dbProxy.port,
+          username: dbProxy.username,
+          password: dbProxy.password
+        }
+        proxyData = dbProxy
       }
     } else if (proxy_config) {
       // Using manual or dynamic proxy configuration
@@ -100,17 +128,21 @@ export async function POST(request: NextRequest) {
           password: proxyCredentials.password
         }
       } else {
-        // Find available SIM proxy
-        const { data: availableProxy } = await supabaseAdmin
+        // Find available proxy based on type preference
+        let proxyQuery = supabaseAdmin
           .from('proxies')
           .select('*')
-          .eq('type', 'sim')
           .is('assigned_account_id', null)
           .limit(1)
-          .single()
+
+        if (useProxyType !== 'auto') {
+          proxyQuery = proxyQuery.eq('type', useProxyType)
+        }
+
+        const { data: availableProxy } = await proxyQuery.single()
         
         if (!availableProxy) {
-          throw new Error('No available SIM proxies. Please add more proxies or use sticky proxy type.')
+          throw new Error(`No available ${useProxyType} proxies. Please add more proxies or use a different type.`)
         }
 
         proxyData = availableProxy
@@ -126,51 +158,94 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create GeeLark profile
-    const profileResponse = await geelarkApi.createProfile(profileParams)
-
-    const profileData = profileResponse.details[0]
-
-    // Create account record
-    const accountData: any = {
-      geelark_profile_id: profileData.id,
-      status: 'new',
-      warmup_done: false,
-      warmup_progress: 0,
-      error_count: 0
+    // Create GeeLark profile FIRST
+    console.log('Creating GeeLark profile with params:', JSON.stringify(profileParams, null, 2))
+    
+    let profileResponse
+    try {
+      profileResponse = await geelarkApi.createProfile(profileParams)
+      profileCreated = true
+    } catch (geelarkError) {
+      console.error('GeeLark API error:', geelarkError)
+      throw new Error(`GeeLark API error: ${geelarkError instanceof Error ? geelarkError.message : String(geelarkError)}`)
     }
 
-    // Only add proxy_id if we have a database proxy record
-    if (proxyData && proxyData.id) {
-      accountData.proxy_id = proxyData.id
+    if (!profileResponse || !profileResponse.details || profileResponse.details.length === 0) {
+      console.error('Invalid profile response:', profileResponse)
+      throw new Error('Invalid response from GeeLark API - no profile details returned')
     }
 
-    const { data: account, error: accountError } = await supabaseAdmin
+    profileData = profileResponse.details[0]
+    
+    if (!profileData || !profileData.id) {
+      console.error('Invalid profile data:', profileData)
+      throw new Error('Invalid profile data - missing profile ID')
+    }
+
+    // NOW create account record with the GeeLark profile ID
+    const { data: accountData, error: accountError } = await supabaseAdmin
       .from('accounts')
-      .insert(accountData)
+      .insert({
+        geelark_profile_id: profileData.id,
+        meta: {
+          created_via: 'api',
+          device_model: surface_model,
+          android_version: android_version,
+          group_name: group_name,
+          remark: remark,
+          profile_name: profileData.profileName,
+          serial_no: profileData.envSerialNo
+        }
+      })
       .select()
       .single()
 
-    if (accountError) throw accountError
+    if (accountError) {
+      console.error('Account creation error:', accountError)
+      // Clean up the GeeLark profile since account creation failed
+      if (profileCreated && profileData.id) {
+        try {
+          await geelarkApi.deleteProfile(profileData.id)
+        } catch (deleteError) {
+          console.error('Failed to clean up GeeLark profile:', deleteError)
+        }
+      }
+      throw new Error(`Failed to create account: ${accountError.message}`)
+    }
+    
+    account = accountData
+    console.log('Account created:', account.id)
 
     // Create phone record with equipment info
-    await supabaseAdmin
+    const phoneData = {
+      profile_id: profileData.id,
+      account_id: account.id,
+      device_model: profileData.equipmentInfo?.deviceModel || surface_model || 'Unknown',
+      android_version: profileData.equipmentInfo?.osVersion || `Android ${android_version || '13'}`,
+      status: 'offline',
+      meta: {
+        profile_name: profileData.profileName || profileData.envSerialNo || 'Unknown',
+        serial_no: profileData.envSerialNo,
+        imei: profileData.equipmentInfo?.imei,
+        phone_number: profileData.equipmentInfo?.phoneNumber,
+        country: profileData.equipmentInfo?.countryName,
+        timezone: profileData.equipmentInfo?.timeZone,
+        proxy_info: proxyData,
+        remark: remark,
+        equipment_info: profileData.equipmentInfo
+      }
+    }
+
+    console.log('Creating phone record:', phoneData)
+
+    const { error: phoneError } = await supabaseAdmin
       .from('phones')
-      .insert({
-        profile_id: profileData.id,
-        account_id: account.id,
-        device_model: profileData.equipmentInfo.deviceModel || surface_model || 'Unknown',
-        android_version: profileData.equipmentInfo.osVersion || `Android ${android_version || '13'}`,
-        status: 'offline',
-        imei: profileData.equipmentInfo.imei,
-        phone_number: profileData.equipmentInfo.phoneNumber,
-        country: profileData.equipmentInfo.countryName,
-        timezone: profileData.equipmentInfo.timeZone,
-        meta: {
-          proxy_info: proxyData,
-          remark: remark
-        }
-      })
+      .insert(phoneData)
+
+    if (phoneError) {
+      console.error('Failed to create phone record:', phoneError)
+      throw phoneError
+    }
 
     // Update proxy assignment if we have a database proxy
     if (proxyData && proxyData.id) {
@@ -210,12 +285,36 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Create profile error:', error)
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack')
+    
+    // Clean up resources if they were created
+    if (profileCreated && profileData?.id) {
+      console.log('Cleaning up GeeLark profile:', profileData.id)
+      try {
+        await geelarkApi.deleteProfile(profileData.id)
+      } catch (deleteError) {
+        console.error('Failed to clean up GeeLark profile:', deleteError)
+      }
+    }
+    
+    if (account?.id) {
+      console.log('Cleaning up account:', account.id)
+      await supabaseAdmin
+        .from('accounts')
+        .delete()
+        .eq('id', account.id)
+    }
     
     await supabaseAdmin.from('logs').insert({
       level: 'error',
       component: 'api-create-profile',
       message: 'Failed to create profile',
-      meta: { error: String(error) }
+      meta: { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        account_id: account?.id,
+        profile_id: profileData?.id
+      }
     })
 
     return NextResponse.json(

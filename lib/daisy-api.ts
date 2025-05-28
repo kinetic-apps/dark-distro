@@ -5,6 +5,7 @@ const API_KEY = process.env.DAISYSMS_API_KEY!
 
 export interface RentalInfo {
   id: string
+  rental_id: string
   phone: string
   expires_at: Date
 }
@@ -62,8 +63,9 @@ export class DaisySMSAPI {
   async rentNumber(accountId?: string): Promise<RentalInfo> {
     const response = await this.request({
       action: 'getNumber',
-      service: 'tiktok',
-      country: '0'
+      service: 'wa',
+      country: '0',
+      max_price: '1.0'
     })
 
     const [status, rentalId, phoneNumber] = response.split(':')
@@ -91,11 +93,12 @@ export class DaisySMSAPI {
       level: 'info',
       component: 'daisy-api',
       message: 'Phone number rented',
-      meta: { rental_id: rentalId, phone_number: phoneNumber, account_id: accountId }
+      meta: { rental_id: rentalId, phone_number: phoneNumber, account_id: accountId, service: 'wa' }
     })
 
     return {
       id: data.id,
+      rental_id: rentalId,
       phone: phoneNumber,
       expires_at: expiresAt
     }
@@ -197,6 +200,20 @@ export class DaisySMSAPI {
   async canRentNewNumber(): Promise<boolean> {
     const count = await this.getActiveRentalsCount()
     return count < 20
+  }
+
+  async getBalance(): Promise<number> {
+    const response = await this.request({
+      action: 'getBalance'
+    })
+
+    // Response format: ACCESS_BALANCE:50.30
+    if (response.startsWith('ACCESS_BALANCE:')) {
+      const balance = parseFloat(response.split(':')[1])
+      return balance
+    }
+
+    throw new Error(`Unexpected balance response: ${response}`)
   }
 }
 

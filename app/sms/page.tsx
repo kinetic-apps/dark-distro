@@ -112,7 +112,11 @@ export default function SMSPage() {
 
     try {
       const response = await fetch('/api/daisysms/rent-number', {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})  // Send empty object for now, can add account_id later
       })
 
       if (!response.ok) {
