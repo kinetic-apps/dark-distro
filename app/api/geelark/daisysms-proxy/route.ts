@@ -18,28 +18,40 @@ export async function GET(request: NextRequest) {
         })
       }
       
-      // Get the phone number from the account metadata
-      const { data: account } = await supabaseAdmin
-        .from('accounts')
-        .select('meta')
-        .eq('id', accountId)
+      // Get the most recent phone number from SMS rentals for this account
+      const { data: rental } = await supabaseAdmin
+        .from('sms_rentals')
+        .select('phone_number, rental_id, status')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single()
       
-      if (!account?.meta?.phone_number) {
+      if (!rental || !rental.phone_number) {
         return NextResponse.json({ 
           success: false, 
           error: 'No phone number found for account' 
         })
       }
       
-      // Format phone number (remove country code if present)
-      const phoneNumber = account.meta.phone_number
-      const formattedPhone = phoneNumber.startsWith('1') ? phoneNumber.substring(1) : phoneNumber
+      // Log the request
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'geelark-daisysms-proxy',
+        message: 'Phone number retrieved',
+        meta: { 
+          account_id: accountId,
+          phone_number: rental.phone_number,
+          rental_id: rental.rental_id,
+          status: rental.status
+        }
+      })
       
-      return NextResponse.json({
-        success: true,
-        phone_number: formattedPhone,
-        rental_id: account.meta.rental_id
+      return NextResponse.json({ 
+        success: true, 
+        phone_number: rental.phone_number,
+        rental_id: rental.rental_id,
+        status: rental.status
       })
     }
     
