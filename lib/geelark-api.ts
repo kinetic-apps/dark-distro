@@ -1018,6 +1018,39 @@ export class GeeLarkAPI {
     return data
   }
 
+  // Create TikTok phone login task with account ID
+  async createTikTokPhoneLoginTask(
+    profileId: string,
+    accountId: string,
+    flowId: string
+  ): Promise<{ taskId: string }> {
+    const data = await this.createCustomRPATask(
+      profileId,
+      flowId,
+      {
+        accountId: accountId  // Pass the account ID for the task flow to fetch phone number
+      },
+      {
+        name: `tiktok_phone_login_${Date.now()}`,
+        remark: `Phone login for account ${accountId}`
+      }
+    )
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'TikTok phone login RPA task created',
+      meta: { 
+        profile_id: profileId,
+        account_id: accountId,
+        task_id: data.taskId,
+        flow_id: flowId
+      }
+    })
+
+    return data
+  }
+
   // Update RPA task with OTP
   async updateRPATaskWithOTP(
     profileId: string,

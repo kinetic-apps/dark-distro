@@ -402,7 +402,102 @@ export async function POST(request: NextRequest) {
       // Continue with setup even if installation fails
     }
 
-    // Step 4: Rent DaisySMS number
+    // Use the tiktok task flow ID
+    const TIKTOK_FLOW_ID = '568610393463722230'
+
+    // Step 4: Create RPA task first (without phone number)
+    let loginTaskId: string | undefined
+    try {
+      // Create a placeholder RPA task that will wait for phone number
+      console.log('Creating RPA task for phone login...')
+      
+      const loginTask = await geelarkApi.createTikTokPhoneLoginTask(
+        result.profile_id!,
+        result.account_id!,
+        TIKTOK_FLOW_ID
+      )
+      
+      loginTaskId = loginTask.taskId
+      
+      result.tasks.push({
+        step: 'Create RPA Task',
+        status: 'success',
+        message: `RPA task created, waiting to start. Task ID: ${loginTaskId}`,
+        task_id: loginTaskId
+      })
+      
+      // Store the task ID in account metadata
+      await supabaseAdmin
+        .from('accounts')
+        .update({
+          status: 'rpa_task_created',
+          meta: {
+            setup_type: 'daisysms',
+            login_method: 'phone_rpa',
+            login_task_id: loginTaskId,
+            task_flow_id: TIKTOK_FLOW_ID
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', result.account_id)
+        
+      // Store the login task in tasks table
+      await supabaseAdmin.from('tasks').insert({
+        type: 'login',
+        task_type: 'login',
+        geelark_task_id: loginTaskId,
+        account_id: result.account_id,
+        status: 'created',
+        started_at: new Date().toISOString(),
+        meta: {
+          profile_id: result.profile_id,
+          method: 'phone_rpa',
+          flow_id: TIKTOK_FLOW_ID,
+          waiting_for_phone: true
+        }
+      })
+
+      // Wait for RPA task to actually start (status changes from 1 to 2)
+      console.log('Waiting for RPA task to start...')
+      let taskStarted = false
+      let waitAttempts = 0
+      const maxWaitAttempts = 60 // 60 * 2 seconds = 2 minutes max wait
+      
+      while (!taskStarted && waitAttempts < maxWaitAttempts) {
+        waitAttempts++
+        try {
+          const taskStatus = await geelarkApi.getTaskStatus(loginTaskId)
+          console.log(`Task status check ${waitAttempts}: ${taskStatus.status}`)
+          
+          // Status 2 means "In progress"
+          if (taskStatus.status === 'running' || taskStatus.result?.status === 2) {
+            taskStarted = true
+            console.log('RPA task has started!')
+            break
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        } catch (error) {
+          console.error('Error checking task status:', error)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      }
+      
+      if (!taskStarted) {
+        console.warn('RPA task did not start within timeout, proceeding with rental anyway')
+      }
+
+    } catch (error) {
+      result.tasks.push({
+        step: 'Create RPA Task',
+        status: 'failed',
+        message: 'Failed to create RPA task',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      throw error
+    }
+
+    // Step 5: Rent DaisySMS number (after RPA task is running)
     let rentalId: string | undefined
     let phoneNumber: string | undefined
     
@@ -437,47 +532,8 @@ export async function POST(request: NextRequest) {
           long_term_rental: options.long_term_rental
         }
       })
-    } catch (error) {
-      result.tasks.push({
-        step: 'Rent Phone Number',
-        status: 'failed',
-        message: 'Failed to rent phone number',
-        error: error instanceof Error ? error.message : String(error)
-      })
-      throw error
-    }
-
-    // Step 5: Start TikTok and initiate login
-    let loginTaskId: string | undefined
-    try {
-      // Use the tiktok task flow ID
-      const TIKTOK_FLOW_ID = '568610393463722230'
       
-      // Launch TikTok app
-      console.log('Starting TikTok app...')
-      await geelarkApi.startApp(result.profile_id!, 'com.zhiliaoapp.musically')
-      
-      // Wait for app to load
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      
-      // Create RPA task for phone login
-      console.log('Creating RPA task for phone login...')
-      const loginTask = await geelarkApi.loginTikTokWithPhone(
-        result.profile_id!,
-        phoneNumber!,
-        TIKTOK_FLOW_ID
-      )
-      
-      loginTaskId = loginTask.taskId
-      
-      result.tasks.push({
-        step: 'TikTok Login',
-        status: 'success',
-        message: `Phone login RPA task created. Phone: ${phoneNumber}`,
-        task_id: loginTaskId
-      })
-      
-      // Store the task ID and phone number in account metadata
+      // Update account with phone number
       await supabaseAdmin
         .from('accounts')
         .update({
@@ -495,44 +551,30 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', result.account_id)
         
-      // Store the login task in tasks table
-      await supabaseAdmin.from('tasks').insert({
-        type: 'login',
-        task_type: 'login',
-        geelark_task_id: loginTaskId,
-        account_id: result.account_id,
-        status: 'running',
-        started_at: new Date().toISOString(),
-        meta: {
-          profile_id: result.profile_id,
-          phone_number: phoneNumber,
-          method: 'phone_rpa',
-          flow_id: TIKTOK_FLOW_ID
-        }
-      })
+      // Update the task with phone number
+      await supabaseAdmin
+        .from('tasks')
+        .update({
+          status: 'running',
+          meta: {
+            profile_id: result.profile_id,
+            phone_number: phoneNumber,
+            method: 'phone_rpa',
+            flow_id: TIKTOK_FLOW_ID,
+            waiting_for_phone: false
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('geelark_task_id', loginTaskId)
         
-      await supabaseAdmin.from('logs').insert({
-        level: 'info',
-        component: 'automation-tiktok-sms',
-        message: 'Phone login RPA task initiated',
-        meta: {
-          phone_number: phoneNumber,
-          formatted: phoneNumber!.startsWith('1') ? phoneNumber!.substring(1) : phoneNumber,
-          method: 'rpa',
-          rental_id: rentalId,
-          task_id: loginTaskId,
-          flow_id: TIKTOK_FLOW_ID
-        }
-      })
-
     } catch (error) {
       result.tasks.push({
-        step: 'TikTok Login',
+        step: 'Rent Phone Number',
         status: 'failed',
-        message: 'Failed to initiate TikTok login',
+        message: 'Failed to rent phone number',
         error: error instanceof Error ? error.message : String(error)
       })
-      // Continue with setup
+      throw error
     }
 
     // Step 6: Monitor for OTP
