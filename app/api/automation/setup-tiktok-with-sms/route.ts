@@ -21,6 +21,9 @@ interface SetupOptions {
   remark?: string
   region?: string
   
+  // SMS rental configuration
+  long_term_rental?: boolean  // Whether to use long-term rental for DaisySMS
+  
   // Warmup configuration
   warmup_duration_minutes?: number
   warmup_action?: 'browse video' | 'search video' | 'search profile'
@@ -67,6 +70,7 @@ export async function POST(request: NextRequest) {
       tags: body.tags || ['auto-setup', 'daisysms'],
       remark: body.remark || 'Automated TikTok setup with SMS',
       region: body.region || 'us',
+      long_term_rental: body.long_term_rental || false,
       warmup_duration_minutes: body.warmup_duration_minutes || 30,
       warmup_action: body.warmup_action || 'browse video',
       warmup_keywords: body.warmup_keywords
@@ -406,7 +410,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Rent a number
-      const rental = await daisyApi.rentNumber(result.account_id)
+      const rental = await daisyApi.rentNumber(result.account_id, options.long_term_rental)
       rentalId = rental.rental_id  // Use the DaisySMS rental ID, not the Supabase UUID
       phoneNumber = rental.phone
       result.rental_id = rentalId
@@ -415,7 +419,7 @@ export async function POST(request: NextRequest) {
       result.tasks.push({
         step: 'Rent Phone Number',
         status: 'success',
-        message: `Phone number rented: ${phoneNumber}`
+        message: `Phone number rented: ${phoneNumber}${options.long_term_rental ? ' (Long-term rental)' : ''}`
       })
 
       await supabaseAdmin.from('logs').insert({
@@ -425,7 +429,8 @@ export async function POST(request: NextRequest) {
         meta: { 
           account_id: result.account_id,
           rental_id: rentalId,
-          phone_number: phoneNumber
+          phone_number: phoneNumber,
+          long_term_rental: options.long_term_rental
         }
       })
     } catch (error) {
@@ -467,12 +472,25 @@ export async function POST(request: NextRequest) {
           status: 'pending_verification',
           meta: {
             phone_number: phoneNumber,
+            phone_number_formatted: phoneNumber.substring(1), // Remove leading 1 for TikTok
             rental_id: rentalId,
             setup_type: 'daisysms'
           },
           updated_at: new Date().toISOString()
         })
         .eq('id', result.account_id)
+        
+      // Log the phone number format
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'automation-tiktok-sms',
+        message: 'Phone number formatted for TikTok',
+        meta: {
+          original: phoneNumber,
+          formatted: phoneNumber.substring(1),
+          note: 'TikTok expects 10-digit US numbers without country code'
+        }
+      })
 
     } catch (error) {
       result.tasks.push({
@@ -492,8 +510,8 @@ export async function POST(request: NextRequest) {
         message: 'OTP monitoring started. Check SMS rentals page for verification code.'
       })
 
-      // Start background OTP monitoring
-      monitorOTP(rentalId!, result.account_id!, result.profile_id!)
+      // Start background OTP monitoring (which will also handle warmup after login)
+      monitorOTP(rentalId!, result.account_id!, result.profile_id!, options)
         .catch(error => {
           console.error('OTP monitoring error:', error)
         })
@@ -504,76 +522,6 @@ export async function POST(request: NextRequest) {
         status: 'failed',
         message: 'Failed to start OTP monitoring',
         error: error instanceof Error ? error.message : String(error)
-      })
-    }
-
-    // Step 7: Start Warmup (if configured)
-    if (options.warmup_duration_minutes && options.warmup_duration_minutes > 0) {
-      try {
-        const warmupOptions: any = {
-          duration_minutes: options.warmup_duration_minutes,
-          action: options.warmup_action || 'browse video'
-        }
-
-        // Only add keywords for search actions
-        if (options.warmup_action !== 'browse video' && options.warmup_keywords && options.warmup_keywords.length > 0) {
-          warmupOptions.keywords = options.warmup_keywords
-        }
-
-        const warmupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/start-warmup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            account_ids: [result.account_id],
-            options: warmupOptions
-          })
-        })
-
-        const warmupData = await warmupResponse.json()
-        
-        if (!warmupResponse.ok) {
-          throw new Error(warmupData.error || 'Failed to start warmup')
-        }
-
-        const actionText = options.warmup_action === 'browse video' ? 'browsing videos' :
-                          options.warmup_action === 'search video' ? 'searching videos' :
-                          'searching profiles'
-
-        result.tasks.push({
-          step: 'Start Warmup',
-          status: 'success',
-          message: `Warmup started: ${actionText} for ${options.warmup_duration_minutes} minutes`,
-          task_id: warmupData.task_ids?.[0]
-        })
-
-        await supabaseAdmin.from('logs').insert({
-          level: 'info',
-          component: 'automation-tiktok-sms',
-          message: 'Warmup task started',
-          meta: { 
-            account_id: result.account_id,
-            profile_id: result.profile_id,
-            warmup_duration: options.warmup_duration_minutes,
-            warmup_action: options.warmup_action || 'browse video',
-            keywords: options.warmup_keywords
-          }
-        })
-
-        result.warmup_task_id = warmupData.task_ids?.[0]
-      } catch (error) {
-        result.tasks.push({
-          step: 'Start Warmup',
-          status: 'failed',
-          message: 'Failed to start warmup',
-          error: error instanceof Error ? error.message : String(error)
-        })
-        // Don't throw - warmup is optional
-      }
-    } else {
-      result.tasks.push({
-        step: 'Start Warmup',
-        status: 'skipped',
-        message: 'Warmup not configured'
       })
     }
 
@@ -629,17 +577,133 @@ export async function POST(request: NextRequest) {
 async function monitorOTP(
   rentalId: string,
   accountId: string,
-  profileId: string
+  profileId: string,
+  options: SetupOptions
 ) {
   console.log(`Starting OTP monitoring for DaisySMS rental ID: ${rentalId}`)
   
-  const maxAttempts = 120 // Check for 10 minutes (120 * 5 seconds)
+  const maxAttempts = 240 // Check for 20 minutes (240 * 5 seconds)
   let attempts = 0
+  let loginSuccessful = false
+  let warmupStarted = false
 
   const checkInterval = setInterval(async () => {
     try {
       attempts++
       
+      // First check if the account status has changed (indicating successful login)
+      const { data: account } = await supabaseAdmin
+        .from('accounts')
+        .select('status, meta')
+        .eq('id', accountId)
+        .single()
+      
+      if (account && (account.status === 'active' || account.status === 'warming_up')) {
+        // Login was successful!
+        loginSuccessful = true
+        
+        console.log('Login successful, completing rental')
+        
+        // Mark the rental as completed in DaisySMS to prevent refund
+        try {
+          await daisyApi.setStatus(rentalId, '6') // 6 = completed
+          
+          await supabaseAdmin
+            .from('sms_rentals')
+            .update({
+              status: 'completed_no_sms',
+              meta: {
+                completed_reason: 'login_successful_without_sms',
+                completed_at: new Date().toISOString()
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('rental_id', rentalId)
+          
+          await supabaseAdmin.from('logs').insert({
+            level: 'info',
+            component: 'automation-tiktok-sms',
+            message: 'TikTok login successful without SMS verification',
+            meta: { 
+              account_id: accountId, 
+              profile_id: profileId,
+              rental_id: rentalId,
+              rental_completed: true
+            }
+          })
+        } catch (completeError) {
+          console.error('Failed to complete rental:', completeError)
+        }
+        
+        // Start warmup if configured and not already started
+        if (!warmupStarted && options.warmup_duration_minutes && options.warmup_duration_minutes > 0) {
+          warmupStarted = true
+          clearInterval(checkInterval) // Stop monitoring since login is done
+          
+          try {
+            const warmupOptions: any = {
+              duration_minutes: options.warmup_duration_minutes,
+              action: options.warmup_action || 'browse video'
+            }
+
+            // Only add keywords for search actions
+            if (options.warmup_action !== 'browse video' && options.warmup_keywords && options.warmup_keywords.length > 0) {
+              warmupOptions.keywords = options.warmup_keywords
+            }
+
+            const warmupResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/start-warmup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                account_ids: [accountId],
+                options: warmupOptions
+              })
+            })
+
+            const warmupData = await warmupResponse.json()
+            
+            if (!warmupResponse.ok) {
+              throw new Error(warmupData.error || 'Failed to start warmup')
+            }
+
+            const actionText = options.warmup_action === 'browse video' ? 'browsing videos' :
+                              options.warmup_action === 'search video' ? 'searching videos' :
+                              'searching profiles'
+
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'automation-tiktok-sms',
+              message: `Warmup started after successful login: ${actionText} for ${options.warmup_duration_minutes} minutes`,
+              meta: { 
+                account_id: accountId,
+                profile_id: profileId,
+                warmup_duration: options.warmup_duration_minutes,
+                warmup_action: options.warmup_action || 'browse video',
+                keywords: options.warmup_keywords,
+                task_id: warmupData.task_ids?.[0]
+              }
+            })
+          } catch (warmupError) {
+            console.error('Failed to start warmup after login:', warmupError)
+            await supabaseAdmin.from('logs').insert({
+              level: 'error',
+              component: 'automation-tiktok-sms',
+              message: 'Failed to start warmup after successful login',
+              meta: { 
+                account_id: accountId,
+                profile_id: profileId,
+                error: warmupError instanceof Error ? warmupError.message : String(warmupError)
+              }
+            })
+          }
+        } else {
+          clearInterval(checkInterval) // Stop monitoring since login is done and no warmup needed
+        }
+        
+        return
+      }
+      
+      // Check for OTP
       const otpStatus = await daisyApi.checkOTP(rentalId)
       
       if (otpStatus.status === 'received' && otpStatus.code) {
@@ -661,6 +725,7 @@ async function monitorOTP(
           .update({
             status: 'otp_received',
             meta: {
+              ...account?.meta,
               otp_code: otpStatus.code,
               otp_received_at: new Date().toISOString()
             },
@@ -675,12 +740,17 @@ async function monitorOTP(
           meta: { 
             account_id: accountId, 
             profile_id: profileId,
-            otp_code: otpStatus.code
+            otp_code: otpStatus.code,
+            rental_id: rentalId
           }
         })
         
-        // TODO: Implement automated OTP entry when GeeLark supports it
-        // For now, the user needs to manually enter the OTP
+        // Mark rental as completed since we got the OTP
+        try {
+          await daisyApi.setStatus(rentalId, '6') // 6 = completed
+        } catch (completeError) {
+          console.error('Failed to complete rental after OTP:', completeError)
+        }
         
       } else if (otpStatus.status === 'cancelled' || otpStatus.status === 'expired') {
         clearInterval(checkInterval)
@@ -689,17 +759,30 @@ async function monitorOTP(
           level: 'warning',
           component: 'automation-tiktok-sms',
           message: `OTP monitoring stopped: ${otpStatus.status}`,
-          meta: { account_id: accountId, profile_id: profileId }
+          meta: { account_id: accountId, profile_id: profileId, rental_id: rentalId }
         })
       } else if (attempts >= maxAttempts) {
         clearInterval(checkInterval)
         
+        // If we haven't received OTP or successful login after 20 minutes, 
+        // the rental will auto-cancel and refund
         await supabaseAdmin.from('logs').insert({
           level: 'warning',
           component: 'automation-tiktok-sms',
-          message: 'OTP monitoring timeout',
-          meta: { account_id: accountId, profile_id: profileId }
+          message: 'OTP monitoring timeout - rental will auto-cancel',
+          meta: { 
+            account_id: accountId, 
+            profile_id: profileId, 
+            rental_id: rentalId,
+            attempts: attempts,
+            login_successful: loginSuccessful
+          }
         })
+      }
+      
+      // Log progress every 2 minutes
+      if (attempts % 24 === 0) {
+        console.log(`OTP monitoring in progress: ${Math.round(attempts * 5 / 60)} minutes elapsed`)
       }
     } catch (error) {
       console.error('OTP check error:', error)

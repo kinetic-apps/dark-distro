@@ -4,48 +4,73 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params
-  const rentalId = id
+  const rentalId = params.id
   
   try {
 
-    // Get rental from database
-    const { data: rental, error } = await supabaseAdmin
+    // Get the rental from database
+    const { data: rental, error: rentalError } = await supabaseAdmin
       .from('sms_rentals')
-      .select('*')
-      .eq('id', rentalId)
+      .select('*, accounts(*)')
+      .eq('rental_id', rentalId)
       .single()
 
-    if (error || !rental) {
+    if (rentalError || !rental) {
       return NextResponse.json(
         { error: 'Rental not found' },
         { status: 404 }
       )
     }
 
-    if (!rental.rental_id) {
-      return NextResponse.json(
-        { error: 'Invalid rental' },
-        { status: 400 }
-      )
+    // Check if the associated account is already active (login successful)
+    if (rental.accounts && (rental.accounts.status === 'active' || rental.accounts.status === 'warming_up')) {
+      // Login was successful, complete the rental if not already done
+      if (rental.status === 'waiting') {
+        try {
+          await daisyApi.setStatus(rentalId, '6') // Complete the rental
+          
+          await supabaseAdmin
+            .from('sms_rentals')
+            .update({
+              status: 'completed_no_sms',
+              meta: {
+                ...rental.meta,
+                completed_reason: 'login_successful_without_sms',
+                completed_at: new Date().toISOString()
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('rental_id', rentalId)
+
+          return NextResponse.json({
+            status: 'completed_no_sms',
+            message: 'Login was successful without SMS verification',
+            rental_completed: true
+          })
+        } catch (completeError) {
+          console.error('Failed to complete rental:', completeError)
+        }
+      }
     }
 
-    // Check if already received or expired
-    if (rental.status === 'received' || rental.status === 'expired') {
-      return NextResponse.json({
-        status: rental.status,
-        code: rental.otp_code
-      })
-    }
+    // Check OTP status from DaisySMS
+    const otpStatus = await daisyApi.checkOTP(rentalId)
 
-    // Check OTP status
-    const otpStatus = await daisyApi.checkOTP(rental.rental_id)
+    // If OTP received and rental is still waiting, complete it
+    if (otpStatus.status === 'received' && otpStatus.code && rental.status === 'waiting') {
+      try {
+        await daisyApi.setStatus(rentalId, '6') // Complete the rental
+      } catch (completeError) {
+        console.error('Failed to complete rental after OTP:', completeError)
+      }
+    }
 
     return NextResponse.json({
-      status: otpStatus.status,
-      code: otpStatus.code
+      ...otpStatus,
+      rental_status: rental.status,
+      account_status: rental.accounts?.status
     })
   } catch (error) {
     console.error('Check OTP error:', error)
@@ -58,7 +83,7 @@ export async function GET(
     })
 
     return NextResponse.json(
-      { error: 'Failed to check OTP' },
+      { error: error instanceof Error ? error.message : 'Failed to check OTP' },
       { status: 500 }
     )
   }

@@ -3,49 +3,45 @@ import { daisyApi } from '@/lib/daisy-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
-  let rental_id: string | undefined
-  
   try {
-    const body = await request.json()
-    rental_id = body.rental_id
-    const { status } = body
+    const { rental_id, status, reason } = await request.json()
 
-    if (!rental_id || !['6', '8'].includes(status)) {
+    if (!rental_id || !status) {
       return NextResponse.json(
-        { error: 'Invalid rental ID or status' },
+        { error: 'Missing rental_id or status' },
         { status: 400 }
       )
     }
 
-    // Set status in DaisySMS
-    await daisyApi.setStatus(rental_id, status as '6' | '8')
+    if (status !== '6' && status !== '8') {
+      return NextResponse.json(
+        { error: 'Invalid status. Must be 6 (complete) or 8 (cancel)' },
+        { status: 400 }
+      )
+    }
 
-    const statusText = status === '6' ? 'completed' : 'cancelled'
+    // Set the status in DaisySMS
+    await daisyApi.setStatus(rental_id, status)
 
+    // Log the action
     await supabaseAdmin.from('logs').insert({
       level: 'info',
-      component: 'api-set-status',
-      message: `Rental ${statusText}`,
-      meta: { rental_id, status }
+      component: 'daisysms-status',
+      message: `Rental status set to ${status === '6' ? 'completed' : 'cancelled'}`,
+      meta: { rental_id, status, reason }
     })
 
     return NextResponse.json({
       success: true,
-      status: statusText
+      status: status === '6' ? 'completed' : 'cancelled',
+      rental_id
     })
   } catch (error) {
-    console.error('Set status error:', error)
+    console.error('DaisySMS set status error:', error)
     
-    await supabaseAdmin.from('logs').insert({
-      level: 'error',
-      component: 'api-set-status',
-      message: 'Failed to set rental status',
-      meta: { error: String(error), rental_id }
-    })
-
-    return NextResponse.json(
-      { error: 'Failed to set status' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }

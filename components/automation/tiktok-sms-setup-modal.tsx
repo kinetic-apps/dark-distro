@@ -35,8 +35,7 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
     { step: 'Install TikTok', status: 'pending', message: 'Waiting to start...' },
     { step: 'Rent Phone Number', status: 'pending', message: 'Waiting to start...' },
     { step: 'TikTok Login', status: 'pending', message: 'Waiting to start...' },
-    { step: 'Monitor OTP', status: 'pending', message: 'Waiting to start...' },
-    { step: 'Start Warmup', status: 'pending', message: 'Waiting to start...' }
+    { step: 'Monitor OTP', status: 'pending', message: 'Waiting to start...' }
   ])
   
   // Form state
@@ -58,6 +57,7 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
   const [warmupKeywords, setWarmupKeywords] = useState('')
   const [selectedNiche, setSelectedNiche] = useState('')
   const [showWarmupAdvanced, setShowWarmupAdvanced] = useState(false)
+  const [longTermRental, setLongTermRental] = useState(false)
   const [groupName, setGroupName] = useState('tiktok-sms-setup')
   const [deviceModel, setDeviceModel] = useState('Pixel 6')
   const [androidVersion, setAndroidVersion] = useState(3) // Android 12
@@ -123,7 +123,8 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
         warmup_duration_minutes: warmupDuration,
         warmup_action: warmupAction,
         device_model: deviceModel,
-        android_version: androidVersion
+        android_version: androidVersion,
+        long_term_rental: longTermRental
       }
 
       // Add warmup keywords if applicable
@@ -441,6 +442,38 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
                         />
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SMS Rental Configuration */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-dark-100">SMS Rental Options</h4>
+                
+                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-dark-800 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-dark-700">
+                  <input
+                    type="checkbox"
+                    checked={longTermRental}
+                    onChange={(e) => setLongTermRental(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-900 dark:text-dark-100">
+                      Long-term Rental
+                    </span>
+                    <p className="text-xs text-gray-600 dark:text-dark-400 mt-1">
+                      Keep the number for 24 hours (auto-renews daily). Perfect for handling re-logins if TikTok signs out during warmup.
+                    </p>
+                  </div>
+                </label>
+                
+                {longTermRental && (
+                  <div className="ml-6 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      <strong>Cost:</strong> Initial SMS cost + $0.25/day for WhatsApp/TikTok<br/>
+                      <strong>Benefits:</strong> Can receive multiple OTPs, handle re-logins, keep number active<br/>
+                      <strong>Note:</strong> Auto-renew can be disabled later from the SMS Rentals page
+                    </p>
                   </div>
                 )}
               </div>

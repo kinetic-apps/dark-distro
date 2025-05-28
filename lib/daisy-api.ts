@@ -60,13 +60,25 @@ export class DaisySMSAPI {
     }
   }
 
-  async rentNumber(accountId?: string): Promise<RentalInfo> {
-    const response = await this.request({
+  async rentNumber(accountId?: string, longTermRental: boolean = false): Promise<RentalInfo> {
+    console.log('DaisySMS rentNumber called with accountId:', accountId, 'longTermRental:', longTermRental)
+    
+    const params: Record<string, string> = {
       action: 'getNumber',
-      service: 'wa',
-      country: '0',
-      max_price: '1.0'
-    })
+      service: 'lf',  // TikTok service code
+      country: '0',   // USA
+      max_price: '0.50'  // Set max price to 50 cents to handle price fluctuations
+    }
+
+    // Add long-term rental parameter if requested
+    if (longTermRental) {
+      params.ltr = '1'
+      params.auto_renew = '1' // Enable auto-renew by default for long-term rentals
+    }
+    
+    const response = await this.request(params)
+
+    console.log('DaisySMS raw response:', response)
 
     const [status, rentalId, phoneNumber] = response.split(':')
     
@@ -74,26 +86,49 @@ export class DaisySMSAPI {
       throw new Error(`Failed to rent number: ${response}`)
     }
 
-    const expiresAt = new Date()
-    expiresAt.setHours(expiresAt.getHours() + 72)
+    console.log('DaisySMS rental successful:', { status, rentalId, phoneNumber, longTermRental })
 
-    const { data } = await supabaseAdmin
+    const expiresAt = new Date()
+    // Long-term rentals are active for 24 hours initially, then auto-renew daily
+    expiresAt.setHours(expiresAt.getHours() + (longTermRental ? 24 : 72))
+
+    const { data, error } = await supabaseAdmin
       .from('sms_rentals')
       .insert({
         rental_id: rentalId,
         phone_number: phoneNumber,
         status: 'waiting',
         expires_at: expiresAt.toISOString(),
-        account_id: accountId
+        account_id: accountId,
+        meta: {
+          long_term_rental: longTermRental,
+          auto_renew: longTermRental
+        }
       })
       .select()
       .single()
+
+    if (error) {
+      console.error('Failed to insert SMS rental:', error)
+      throw new Error(`Failed to save rental to database: ${error.message}`)
+    }
+
+    if (!data) {
+      throw new Error('Failed to save rental to database: no data returned')
+    }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'daisy-api',
       message: 'Phone number rented',
-      meta: { rental_id: rentalId, phone_number: phoneNumber, account_id: accountId, service: 'wa' }
+      meta: { 
+        rental_id: rentalId, 
+        phone_number: phoneNumber, 
+        account_id: accountId, 
+        service: 'lf',
+        raw_response: response,
+        long_term_rental: longTermRental
+      }
     })
 
     return {
@@ -129,7 +164,7 @@ export class DaisySMSAPI {
       await supabaseAdmin
         .from('sms_rentals')
         .update({ 
-          otp_code: code,
+          otp: code,
           status: 'received',
           updated_at: new Date().toISOString()
         })
@@ -164,28 +199,41 @@ export class DaisySMSAPI {
   }
 
   async setStatus(rentalId: string, status: '6' | '8'): Promise<void> {
-    await this.request({
-      action: 'setStatus',
-      id: rentalId,
-      status: status
-    })
-
-    const statusText = status === '6' ? 'completed' : 'cancelled'
-    
-    await supabaseAdmin
-      .from('sms_rentals')
-      .update({ 
-        status: statusText === 'completed' ? 'received' : 'cancelled',
-        updated_at: new Date().toISOString()
+    try {
+      const response = await this.request({
+        action: 'setStatus',
+        id: rentalId,
+        status: status
       })
-      .eq('rental_id', rentalId)
 
-    await supabaseAdmin.from('logs').insert({
-      level: 'info',
-      component: 'daisy-api',
-      message: `Rental ${statusText}`,
-      meta: { rental_id: rentalId }
-    })
+      console.log(`DaisySMS setStatus response for rental ${rentalId}:`, response)
+
+      const statusText = status === '6' ? 'completed' : 'cancelled'
+      
+      await supabaseAdmin
+        .from('sms_rentals')
+        .update({ 
+          status: statusText === 'completed' ? 'received' : 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('rental_id', rentalId)
+
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'daisy-api',
+        message: `Rental ${statusText}`,
+        meta: { rental_id: rentalId, response }
+      })
+    } catch (error) {
+      // Log but don't throw - rental might already be completed/cancelled
+      console.error(`Failed to set status for rental ${rentalId}:`, error)
+      await supabaseAdmin.from('logs').insert({
+        level: 'warning',
+        component: 'daisy-api',
+        message: `Failed to set rental status but continuing`,
+        meta: { rental_id: rentalId, status, error: String(error) }
+      })
+    }
   }
 
   async getActiveRentalsCount(): Promise<number> {
