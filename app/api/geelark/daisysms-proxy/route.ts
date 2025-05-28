@@ -47,9 +47,14 @@ export async function GET(request: NextRequest) {
         }
       })
       
+      // Format phone number - remove country code '1' if present
+      const formattedPhone = rental.phone_number.startsWith('1') && rental.phone_number.length === 11 
+        ? rental.phone_number.substring(1) 
+        : rental.phone_number
+      
       return NextResponse.json({ 
         success: true, 
-        phone_number: rental.phone_number,
+        phone_number: formattedPhone,
         rental_id: rental.rental_id,
         status: rental.status
       })

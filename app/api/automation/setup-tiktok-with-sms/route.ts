@@ -450,32 +450,8 @@ export async function POST(request: NextRequest) {
     // Step 5: Start TikTok and initiate login
     let loginTaskId: string | undefined
     try {
-      // First, check if we have a task flow ID configured
-      if (!options.task_flow_id) {
-        // Try to find a TikTok phone login flow
-        const flows = await geelarkApi.getTaskFlows()
-        const phoneLoginFlow = flows.items.find(flow => 
-          flow.params.includes('phoneNumber') && 
-          (flow.title.toLowerCase().includes('tiktok') || flow.title.toLowerCase().includes('phone'))
-        )
-        
-        if (!phoneLoginFlow) {
-          throw new Error('No TikTok phone login task flow found. Please create one in GeeLark dashboard.')
-        }
-        
-        options.task_flow_id = phoneLoginFlow.id
-        
-        await supabaseAdmin.from('logs').insert({
-          level: 'info',
-          component: 'automation-tiktok-sms',
-          message: 'Auto-detected TikTok phone login flow',
-          meta: { 
-            flow_id: phoneLoginFlow.id,
-            flow_title: phoneLoginFlow.title,
-            flow_params: phoneLoginFlow.params
-          }
-        })
-      }
+      // Use the tiktok task flow ID
+      const TIKTOK_FLOW_ID = '568610393463722230'
       
       // Launch TikTok app
       console.log('Starting TikTok app...')
@@ -489,7 +465,7 @@ export async function POST(request: NextRequest) {
       const loginTask = await geelarkApi.loginTikTokWithPhone(
         result.profile_id!,
         phoneNumber!,
-        options.task_flow_id
+        TIKTOK_FLOW_ID
       )
       
       loginTaskId = loginTask.taskId
@@ -513,7 +489,7 @@ export async function POST(request: NextRequest) {
             setup_type: 'daisysms',
             login_method: 'phone_rpa',
             login_task_id: loginTaskId,
-            task_flow_id: options.task_flow_id
+            task_flow_id: TIKTOK_FLOW_ID
           },
           updated_at: new Date().toISOString()
         })
@@ -531,7 +507,7 @@ export async function POST(request: NextRequest) {
           profile_id: result.profile_id,
           phone_number: phoneNumber,
           method: 'phone_rpa',
-          flow_id: options.task_flow_id
+          flow_id: TIKTOK_FLOW_ID
         }
       })
         
@@ -545,7 +521,7 @@ export async function POST(request: NextRequest) {
           method: 'rpa',
           rental_id: rentalId,
           task_id: loginTaskId,
-          flow_id: options.task_flow_id
+          flow_id: TIKTOK_FLOW_ID
         }
       })
 

@@ -977,19 +977,29 @@ export class GeeLarkAPI {
     phoneNumber: string,
     flowId: string
   ): Promise<{ taskId: string }> {
-    // Format phone number (remove country code if present)
-    const formattedPhone = phoneNumber.startsWith('1') ? phoneNumber.substring(1) : phoneNumber
+    // The task flow will fetch the phone number using the accountId
+    // We don't need to pass phoneNumber as a parameter
+    
+    // Get the account ID from the profile
+    const { data: account } = await supabaseAdmin
+      .from('accounts')
+      .select('id')
+      .eq('geelark_profile_id', profileId)
+      .single()
+    
+    if (!account) {
+      throw new Error('Account not found for profile')
+    }
     
     const data = await this.createCustomRPATask(
       profileId,
       flowId,
       {
-        phoneNumber: formattedPhone,
-        otpCode: '' // Will be updated later
+        accountId: account.id  // Pass the account ID for the task flow to fetch phone number
       },
       {
         name: `tiktok_phone_login_${Date.now()}`,
-        remark: `Phone login for ${formattedPhone}`
+        remark: `Phone login for account ${account.id}`
       }
     )
 
@@ -999,7 +1009,7 @@ export class GeeLarkAPI {
       message: 'TikTok phone login RPA task initiated',
       meta: { 
         profile_id: profileId,
-        phone_number: formattedPhone,
+        account_id: account.id,
         task_id: data.taskId,
         flow_id: flowId
       }
