@@ -4,9 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const rentalId = params.id
+  const { id: rentalId } = await params
   
   try {
 
