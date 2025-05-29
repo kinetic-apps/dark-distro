@@ -457,34 +457,71 @@ export async function POST(request: NextRequest) {
         }
       })
 
+      // Simulate what Geelark will see when it makes the API call
+      const geelarkApiUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/daisysms-proxy?action=get_phone_and_check_otp&account_id=${result.account_id}`
+      
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'automation-tiktok-sms',
+        message: 'Simulating Geelark API call (what Geelark will request)',
+        meta: { 
+          account_id: result.account_id,
+          geelark_url: geelarkApiUrl,
+          geelark_variable: '${accountId}',
+          actual_account_id: result.account_id,
+          note: 'Geelark will replace ${accountId} with the actual account ID'
+        }
+      })
+
       // Wait for RPA task to actually start (status changes from 1 to 2)
       console.log('Waiting for RPA task to start...')
       let taskStarted = false
       let waitAttempts = 0
-      const maxWaitAttempts = 60 // 60 * 2 seconds = 2 minutes max wait
       
-      while (!taskStarted && waitAttempts < maxWaitAttempts) {
+      while (!taskStarted) {
         waitAttempts++
         try {
           const taskStatus = await geelarkApi.getTaskStatus(loginTaskId)
-          console.log(`Task status check ${waitAttempts}: ${taskStatus.status}`)
+          
+          // Log every 10 attempts (20 seconds)
+          if (waitAttempts % 10 === 1) {
+            console.log(`Task status check ${waitAttempts}: ${taskStatus.status} (${Math.floor(waitAttempts * 2 / 60)} minutes elapsed)`)
+          }
           
           // Status 2 means "In progress"
           if (taskStatus.status === 'running' || taskStatus.result?.status === 2) {
             taskStarted = true
-            console.log('RPA task has started!')
+            console.log(`RPA task has started! (took ${waitAttempts * 2} seconds)`)
+            
+            // Log the startup time
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'automation-tiktok-sms',
+              message: 'RPA task started successfully',
+              meta: { 
+                task_id: loginTaskId,
+                wait_time_seconds: waitAttempts * 2,
+                attempts: waitAttempts
+              }
+            })
             break
+          }
+          
+          // Check if task failed
+          if (taskStatus.status === 'failed' || taskStatus.result?.status === 4) {
+            throw new Error(`RPA task failed to start: ${taskStatus.result?.failDesc || 'Unknown error'}`)
           }
           
           await new Promise(resolve => setTimeout(resolve, 2000))
         } catch (error) {
+          // If it's a task failure, throw immediately
+          if (error instanceof Error && error.message.includes('RPA task failed')) {
+            throw error
+          }
+          
           console.error('Error checking task status:', error)
           await new Promise(resolve => setTimeout(resolve, 2000))
         }
-      }
-      
-      if (!taskStarted) {
-        console.warn('RPA task did not start within timeout, proceeding with rental anyway')
       }
 
     } catch (error) {
@@ -532,6 +569,37 @@ export async function POST(request: NextRequest) {
           long_term_rental: options.long_term_rental
         }
       })
+      
+      // Simulate what Geelark will receive when it calls our API
+      try {
+        const simulatedGeelarkResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/daisysms-proxy?action=get_phone_and_check_otp&account_id=${result.account_id}`
+        )
+        const simulatedData = await simulatedGeelarkResponse.json()
+        
+        await supabaseAdmin.from('logs').insert({
+          level: 'info',
+          component: 'automation-tiktok-sms',
+          message: 'Simulated Geelark API response (what Geelark will receive)',
+          meta: { 
+            account_id: result.account_id,
+            api_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/daisysms-proxy?action=get_phone_and_check_otp&account_id=${result.account_id}`,
+            response_data: simulatedData,
+            response_status: simulatedGeelarkResponse.status,
+            note: 'This is what Geelark should see when it makes the API call'
+          }
+        })
+      } catch (simError) {
+        await supabaseAdmin.from('logs').insert({
+          level: 'error',
+          component: 'automation-tiktok-sms',
+          message: 'Failed to simulate Geelark API call',
+          meta: { 
+            account_id: result.account_id,
+            error: simError instanceof Error ? simError.message : String(simError)
+          }
+        })
+      }
       
       // Update account with phone number
       await supabaseAdmin

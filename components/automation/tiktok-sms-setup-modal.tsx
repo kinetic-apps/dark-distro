@@ -456,15 +456,17 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
                   <div className="flex items-start gap-2">
                     <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
                     <div className="text-xs text-blue-700 dark:text-blue-300">
-                      <strong>Automated Phone Login:</strong> This setup uses GeeLark RPA (Robotic Process Automation) to automatically:
+                      <strong>Improved Automated Phone Login:</strong> This setup uses GeeLark RPA to automatically:
                       <ul className="list-disc list-inside mt-1 space-y-0.5">
-                        <li>Navigate to TikTok login screen</li>
-                        <li>Enter the phone number from DaisySMS</li>
+                        <li>Create and start the RPA task first</li>
+                        <li>Wait for the RPA to be ready (avoiding wasted rentals)</li>
+                        <li>Rent a phone number only when needed</li>
+                        <li>Navigate TikTok and enter the phone number</li>
                         <li>Automatically input the OTP when received</li>
                         <li>Complete account creation</li>
                       </ul>
                       <p className="mt-2">
-                        <strong>Note:</strong> You need to create a TikTok phone login task flow in your GeeLark dashboard first.
+                        <strong>Note:</strong> The RPA task will handle opening TikTok for the first time to ensure consistent UI behavior.
                       </p>
                     </div>
                   </div>
