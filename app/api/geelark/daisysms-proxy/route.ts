@@ -5,9 +5,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const action = searchParams.get('action')
-    const rentalId = searchParams.get('rental_id')
-    const accountId = searchParams.get('account_id')
+    let action = searchParams.get('action') || request.headers.get('action') || request.headers.get('x-action')
+    let rentalId = searchParams.get('rental_id') || request.headers.get('rental_id') || request.headers.get('x-rental-id')
+    let accountId = searchParams.get('account_id') || request.headers.get('account_id') || request.headers.get('x-account-id')
     
     // Log all incoming requests to help debug Geelark integration
     await supabaseAdmin.from('logs').insert({

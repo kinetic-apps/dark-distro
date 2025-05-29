@@ -330,76 +330,71 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    // Step 3: Install TikTok
+    // Step 3: Check if TikTok is installed (GeeLark handles installation automatically)
     try {
-      // Check if TikTok is already installed
-      const isInstalled = await geelarkApi.isTikTokInstalled(result.profile_id!)
+      console.log('Checking if TikTok is installed...')
       
-      if (isInstalled) {
-        result.tasks.push({
-          step: 'Install TikTok',
-          status: 'success',
-          message: 'TikTok is already installed'
-        })
-      } else {
-        const installResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/install-app`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profile_ids: [result.profile_id],
-            app_package: 'com.zhiliaoapp.musically',
-            version: '39.1.0',
-            app_version_id: '1901590921383706626' // Specific version ID for v39.1.0
-          })
-        })
-
-        const installData = await installResponse.json()
-        
-        if (!installResponse.ok) {
-          throw new Error(installData.error || 'Failed to install TikTok')
-        }
-
-        result.tasks.push({
-          step: 'Install TikTok',
-          status: 'success',
-          message: 'TikTok v39.1.0 installed successfully'
-        })
-
-        // Poll to check if TikTok is actually installed
-        console.log('Waiting for TikTok installation to complete...')
-        let installComplete = false
-        let installAttempts = 0
-        const maxInstallAttempts = 30 // 30 attempts * 2 seconds = 60 seconds max
-        
-        while (!installComplete && installAttempts < maxInstallAttempts) {
-          installAttempts++
-          try {
-            const isInstalled = await geelarkApi.isTikTokInstalled(result.profile_id!)
-            if (isInstalled) {
-              installComplete = true
-              console.log('TikTok installation confirmed')
-            } else {
-              console.log('TikTok not yet installed, waiting...')
-              await new Promise(resolve => setTimeout(resolve, 2000))
+      // Poll to check if TikTok is installed
+      let isInstalled = false
+      let checkAttempts = 0
+      const maxCheckAttempts = 60 // 60 attempts * 2 seconds = 2 minutes max
+      
+      while (!isInstalled && checkAttempts < maxCheckAttempts) {
+        checkAttempts++
+        try {
+          isInstalled = await geelarkApi.isTikTokInstalled(result.profile_id!)
+          
+          if (isInstalled) {
+            console.log('TikTok is installed!')
+            result.tasks.push({
+              step: 'Check TikTok Installation',
+              status: 'success',
+              message: 'TikTok is installed and ready'
+            })
+          } else {
+            // Log every 10 attempts (20 seconds)
+            if (checkAttempts % 10 === 1) {
+              console.log(`TikTok not yet installed, waiting... (${Math.floor(checkAttempts * 2 / 60)} minutes elapsed)`)
             }
-          } catch (checkError) {
-            console.error('Error checking TikTok installation:', checkError)
             await new Promise(resolve => setTimeout(resolve, 2000))
           }
+        } catch (checkError) {
+          console.error('Error checking TikTok installation:', checkError)
+          await new Promise(resolve => setTimeout(resolve, 2000))
         }
+      }
+      
+      if (!isInstalled) {
+        // TikTok is not installed after waiting
+        result.tasks.push({
+          step: 'Check TikTok Installation',
+          status: 'failed',
+          message: 'TikTok is not installed after waiting 2 minutes',
+          error: 'GeeLark should handle TikTok installation automatically'
+        })
         
-        if (!installComplete) {
-          console.warn('Could not confirm TikTok installation, proceeding anyway...')
-        }
+        // Log this for debugging
+        await supabaseAdmin.from('logs').insert({
+          level: 'warning',
+          component: 'automation-tiktok-sms',
+          message: 'TikTok not installed after waiting',
+          meta: {
+            profile_id: result.profile_id,
+            check_attempts: checkAttempts,
+            wait_time_seconds: checkAttempts * 2
+          }
+        })
+        
+        // Don't throw error - continue anyway as GeeLark might install it later
       }
     } catch (error) {
       result.tasks.push({
-        step: 'Install TikTok',
+        step: 'Check TikTok Installation',
         status: 'failed',
-        message: 'Failed to install TikTok',
+        message: 'Failed to check TikTok installation',
         error: error instanceof Error ? error.message : String(error)
       })
-      // Continue with setup even if installation fails
+      // Continue with setup even if check fails
     }
 
     // Use the tiktok task flow ID

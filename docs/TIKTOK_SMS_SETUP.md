@@ -7,7 +7,7 @@ This document describes the automated TikTok setup feature that uses DaisySMS fo
 The TikTok SMS Setup feature provides a one-click solution to:
 1. Create a new GeeLark profile or use an existing one
 2. Start the phone
-3. Install TikTok v39.1.0
+3. Check if TikTok is installed (GeeLark handles installation automatically)
 4. Rent a DaisySMS phone number
 5. Initiate TikTok login with the rented number
 6. Monitor for OTP verification codes
@@ -75,9 +75,9 @@ Response:
       "message": "Phone started successfully"
     },
     {
-      "step": "Install TikTok",
+      "step": "Check TikTok Installation",
       "status": "success",
-      "message": "TikTok v39.1.0 installed successfully"
+      "message": "TikTok is installed and ready"
     },
     {
       "step": "Rent Phone Number",
@@ -110,10 +110,11 @@ Response:
 - Starts the GeeLark phone
 - Waits 8 seconds for phone to fully initialize
 
-### 3. Install TikTok
-- Checks if TikTok is already installed
-- Installs TikTok v39.1.0 (com.zhiliaoapp.musically) if needed
-- Waits 15 seconds for installation to complete
+### 3. Check TikTok Installation
+- Polls to check if TikTok is installed
+- GeeLark handles TikTok installation automatically
+- Waits up to 2 minutes for TikTok to be installed
+- Continues with setup even if TikTok is not yet installed
 
 ### 4. Rent DaisySMS Number
 - Checks if rental limit (20) has been reached
@@ -176,11 +177,6 @@ Response:
 - Ensure you have available phone slots
 - Verify proxy ID is valid
 
-### "Failed to install TikTok"
-- Ensure phone is fully started
-- Check if TikTok app is available in GeeLark
-- Try manual installation from profile detail page
-
 ### "Failed to rent phone number"
 - Check DaisySMS balance
 - Verify API credentials are correct
@@ -213,4 +209,15 @@ Response:
 2. **OTP Codes**: Stored securely, auto-expire
 3. **Rate Limiting**: Respect DaisySMS limits
 4. **Proxy Rotation**: Each account gets unique proxy
-5. **Audit Trail**: All actions logged for compliance 
+5. **Audit Trail**: All actions logged for compliance
+
+### "Failed to install TikTok"
+- Ensure phone is fully started
+- Check if TikTok app is available in GeeLark
+- Try manual installation from profile detail page
+
+### "TikTok not installed"
+- GeeLark should handle TikTok installation automatically
+- Wait a few minutes for GeeLark to install TikTok
+- Check if the phone has internet connectivity
+- Verify the profile is properly configured 

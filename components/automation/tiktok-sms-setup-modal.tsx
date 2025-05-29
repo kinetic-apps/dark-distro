@@ -32,7 +32,7 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
   const [tasks, setTasks] = useState<SetupTask[]>([
     { step: 'Create/Select Profile', status: 'pending', message: 'Waiting to start...' },
     { step: 'Start Phone', status: 'pending', message: 'Waiting to start...' },
-    { step: 'Install TikTok', status: 'pending', message: 'Waiting to start...' },
+    { step: 'Check TikTok Installation', status: 'pending', message: 'Waiting to start...' },
     { step: 'Rent Phone Number', status: 'pending', message: 'Waiting to start...' },
     { step: 'TikTok Login', status: 'pending', message: 'Waiting to start...' },
     { step: 'Monitor OTP', status: 'pending', message: 'Waiting to start...' }
