@@ -347,7 +347,8 @@ export async function POST(request: NextRequest) {
         if (existingAccount) {
           // Update existing profile
           const updateData: any = {
-            tiktok_username: serialName,
+            // Only update tiktok_username if it's currently null or empty
+            ...((!existingAccount.tiktok_username || existingAccount.tiktok_username.trim() === '') && { tiktok_username: serialName }),
             status: profile.status === 2 ? 'active' : 'new',
             updated_at: new Date().toISOString(),
             meta: {
@@ -397,7 +398,7 @@ export async function POST(request: NextRequest) {
         // Create new account record
         const accountData: any = {
           geelark_profile_id: profileId,
-          tiktok_username: serialName,
+          tiktok_username: serialName,  // For new accounts, we can use serialName as a placeholder
           status: profile.status === 2 ? 'active' : 'new',
           warmup_done: false,
           warmup_progress: 0,

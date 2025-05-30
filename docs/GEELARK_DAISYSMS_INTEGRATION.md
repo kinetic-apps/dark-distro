@@ -3,6 +3,19 @@
 ## Overview
 This guide explains how to properly configure Geelark task flows to integrate with the DaisySMS proxy API for TikTok phone number login automation.
 
+## Task Flow Parameters
+
+When creating the RPA task for TikTok phone login, the following parameters are passed to Geelark:
+
+- `${accountId}` - The UUID of the account being created
+- `${username}` - The generated TikTok username (format: `spectre_XXXXXX`)
+- `${password}` - The shared password for all automated accounts
+
+These parameters should be used in your Geelark task flow as follows:
+1. Use `${accountId}` in network requests to fetch phone/OTP data
+2. Use `${username}` when filling the username field during account creation
+3. Use `${password}` when filling the password field during account creation
+
 ## API Endpoints
 
 ### Base URL

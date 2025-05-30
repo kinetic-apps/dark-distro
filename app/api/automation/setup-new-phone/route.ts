@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { geelarkApi } from '@/lib/geelark-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { customAlphabet } from 'nanoid'
+import { TIKTOK_USERNAME_PREFIX, TIKTOK_USERNAME_LENGTH } from '@/lib/constants/auth'
 
 interface SetupOptions {
   // Profile configuration
@@ -242,13 +244,22 @@ export async function POST(request: NextRequest) {
         task_id: loginTaskId
       })
 
-      // Update account with TikTok username
+      // Generate a unique username for TikTok
+      const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', TIKTOK_USERNAME_LENGTH)
+      const username = `${TIKTOK_USERNAME_PREFIX}${nanoid()}` // e.g. spectre_a8k2df
+
+      // Update account with generated TikTok username
       await supabaseAdmin
         .from('accounts')
         .update({
-          tiktok_username: loginEmail.split('@')[0], // Use email prefix as initial username
+          tiktok_username: username,
           status: 'active',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          meta: {
+            email: loginEmail,
+            username: username,
+            login_method: 'email'  // This flow uses email/password, not SMS
+          }
         })
         .eq('id', result.account_id)
 

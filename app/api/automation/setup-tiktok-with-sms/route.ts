@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { geelarkApi } from '@/lib/geelark-api'
 import { daisyApi } from '@/lib/daisy-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { customAlphabet } from 'nanoid'
+import { TIKTOK_AUTOMATION_PASSWORD, TIKTOK_USERNAME_PREFIX, TIKTOK_USERNAME_LENGTH } from '@/lib/constants/auth'
 
 interface SetupOptions {
   // Profile configuration
@@ -403,13 +405,35 @@ export async function POST(request: NextRequest) {
     // Step 4: Create RPA task first (without phone number)
     let loginTaskId: string | undefined
     try {
+      // Generate a unique username for TikTok
+      const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', TIKTOK_USERNAME_LENGTH)
+      const username = `${TIKTOK_USERNAME_PREFIX}${nanoid()}` // e.g. spectre_a8k2df
+      
+      // Store username in account record for future reference
+      await supabaseAdmin
+        .from('accounts')
+        .update({
+          tiktok_username: username,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', result.account_id)
+      
       // Create a placeholder RPA task that will wait for phone number
       console.log('Creating RPA task for phone login...')
       
-      const loginTask = await geelarkApi.createTikTokPhoneLoginTask(
+      // Pass accountId, username, and password to Geelark
+      const loginTask = await geelarkApi.createCustomRPATask(
         result.profile_id!,
-        result.account_id!,
-        TIKTOK_FLOW_ID
+        TIKTOK_FLOW_ID,
+        {
+          accountId: result.account_id!,
+          username: username,  // Pass the generated username
+          password: TIKTOK_AUTOMATION_PASSWORD  // Pass the shared password
+        },
+        {
+          name: `tiktok_phone_login_${Date.now()}`,
+          remark: `Phone login for account ${result.account_id} with username ${username}`
+        }
       )
       
       loginTaskId = loginTask.taskId
@@ -430,7 +454,9 @@ export async function POST(request: NextRequest) {
             setup_type: 'daisysms',
             login_method: 'phone_rpa',
             login_task_id: loginTaskId,
-            task_flow_id: TIKTOK_FLOW_ID
+            task_flow_id: TIKTOK_FLOW_ID,
+            username: username,  // Also store in meta for reference
+            password_type: 'shared_automation'  // Indicate this uses the shared password
           },
           updated_at: new Date().toISOString()
         })
@@ -448,7 +474,9 @@ export async function POST(request: NextRequest) {
           profile_id: result.profile_id,
           method: 'phone_rpa',
           flow_id: TIKTOK_FLOW_ID,
-          waiting_for_phone: true
+          waiting_for_phone: true,
+          username: username,  // Store username in task meta too
+          has_password: true  // Indicate password was provided
         }
       })
 
@@ -464,7 +492,9 @@ export async function POST(request: NextRequest) {
           geelark_url: geelarkApiUrl,
           geelark_variable: '${accountId}',
           actual_account_id: result.account_id,
-          note: 'Geelark will replace ${accountId} with the actual account ID'
+          username: username,
+          has_password: true,
+          note: 'Geelark will replace ${accountId} with the actual account ID, ${username} with the generated username, and ${password} with the shared password'
         }
       })
 
