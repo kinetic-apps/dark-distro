@@ -318,7 +318,11 @@ export default async function ProfileDetailPage({
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600 dark:text-dark-400">Status</span>
                       {profile.geelark_profile_id && (
-                        <ProfileStatus profileId={profile.geelark_profile_id} />
+                        <ProfileStatus 
+                          profileId={profile.geelark_profile_id} 
+                          accountId={profile.id}
+                          showProgress={true}
+                        />
                       )}
                     </div>
                     <div className="flex items-center justify-between">

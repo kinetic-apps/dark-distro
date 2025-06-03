@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ProfilesTable } from '@/components/tables/profiles-table'
+import { ProfilesTableV2 } from '@/components/tables/profiles-table-v2'
 import { ProfileBulkActions } from '@/components/profile-bulk-actions'
 import { AssignProxyModal } from '@/components/assign-proxy-modal'
 import { BulkDeleteModal } from '@/components/bulk-delete-modal'
@@ -123,7 +123,7 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
 
   return (
     <>
-      <ProfilesTable
+      <ProfilesTableV2
         profiles={profiles}
         onBulkAction={handleBulkAction}
       />

@@ -28,6 +28,8 @@ import {
 } from 'lucide-react'
 import { VariantAssignmentModal } from '@/components/variant-assignment-modal'
 import { ProfileStatus } from '@/components/profile-status'
+import { SimplePhoneStatus } from '@/components/simple-phone-status'
+import { TaskActivityStatus } from '@/components/task-activity-status'
 import { ScreenshotViewer } from '@/components/screenshot-viewer'
 import { TikTokLoginModal } from '@/components/tiktok-login-modal'
 
@@ -341,7 +343,9 @@ export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
                   <td className="px-6 py-4 whitespace-nowrap">
                   {profile.geelark_profile_id ? (
                       <div className="space-y-1">
-                    <ProfileStatus profileId={profile.geelark_profile_id} />
+                    <SimplePhoneStatus 
+                      profileId={profile.geelark_profile_id} 
+                    />
                         {profile.phone?.battery && getBatteryIcon(profile.phone.battery)}
                       </div>
                   ) : (
@@ -352,44 +356,10 @@ export function ProfilesTable({ profiles, onBulkAction }: ProfilesTableProps) {
                   )}
                 </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-dark-400">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <Activity className="h-3 w-3" />
-                        <span>{(() => {
-                          // Get the most recent task
-                          const latestTask = profile.tasks?.sort((a, b) => 
-                            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                          )[0]
-                          
-                          if (!latestTask) return 'Never'
-                          
-                          // Use completed_at if available, otherwise started_at, otherwise created_at
-                          const taskTime = latestTask.completed_at || latestTask.started_at || latestTask.created_at
-                          return formatRelativeTime(taskTime)
-                        })()}</span>
-                      </div>
-                      <div className="text-xs text-gray-400 dark:text-dark-500">
-                        {(() => {
-                          const latestTask = profile.tasks?.sort((a, b) => 
-                            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                          )[0]
-                          
-                          if (!latestTask) return 'No tasks yet'
-                          
-                          const taskTypeLabel = latestTask.type === 'warmup' ? 'Warmup' : 
-                                               latestTask.type === 'post' ? 'Post' : 
-                                               latestTask.type === 'tiktok_login' ? 'Login' :
-                                               latestTask.type === 'tiktok_edit' ? 'Edit Profile' :
-                                               latestTask.type
-                          
-                          const statusLabel = latestTask.status === 'completed' ? '✓' :
-                                            latestTask.status === 'failed' ? '✗' :
-                                            latestTask.status === 'running' ? '⟳' : ''
-                          
-                          return `${taskTypeLabel} ${statusLabel}`
-                        })()}
-                      </div>
-                    </div>
+                    <TaskActivityStatus 
+                      accountId={profile.id}
+                      className="text-xs"
+                    />
                   </td>
                 <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">

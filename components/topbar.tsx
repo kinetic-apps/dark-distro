@@ -12,9 +12,9 @@ export function TopBar() {
   const [stats, setStats] = useState({
     activeProfiles: 0,
     activeTasks: 0,
-    recentErrors: 0,
-    lastSync: new Date().toISOString()
+    recentErrors: 0
   })
+  const [lastSync, setLastSync] = useState(new Date())
   const { isCollapsed } = useSidebar()
 
   useEffect(() => {
@@ -40,9 +40,9 @@ export function TopBar() {
       setStats({
         activeProfiles: profiles.count || 0,
         activeTasks: tasks.count || 0,
-        recentErrors: errors.count || 0,
-        lastSync: new Date().toISOString()
+        recentErrors: errors.count || 0
       })
+      setLastSync(new Date())
     }
 
     fetchStats()
@@ -89,7 +89,7 @@ export function TopBar() {
           
           <div className="flex items-center gap-4">
             <div className="text-xs text-gray-400 dark:text-dark-500">
-              Last sync: {formatRelativeTime(stats.lastSync)}
+              Last sync: {formatRelativeTime(lastSync.toISOString())}
             </div>
             <ThemeToggle />
           </div>

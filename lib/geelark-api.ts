@@ -126,6 +126,7 @@ export class GeeLarkAPI {
   }
 
   async createProfile(deviceInfo?: {
+    amount?: number  // Add amount parameter for batch creation
     androidVersion?: number
     proxyId?: string  // Add support for GeeLark proxy ID
     proxyConfig?: {
@@ -157,7 +158,7 @@ export class GeeLarkAPI {
     const androidVersion = deviceInfo?.androidVersion || androidVersionMap['13'] || 4
 
     const requestBody: any = {
-      amount: 1, // Basic plan only supports 1 at a time
+      amount: deviceInfo?.amount || 1, // Support batch creation, default to 1
       androidVersion: androidVersion,
       groupName: deviceInfo?.groupName || 'ungrouped',
       tagsName: deviceInfo?.tagsName || [],
@@ -209,6 +210,11 @@ export class GeeLarkAPI {
       throw new Error('No profile created - empty details array')
     }
 
+    // For batch creation, log all successful profiles
+    if (deviceInfo?.amount && deviceInfo.amount > 1) {
+      console.log(`Batch creation successful: ${data.successAmount}/${deviceInfo.amount} profiles created`)
+    }
+
     const successDetail = data.details[0]
     
     if (!successDetail || !successDetail.id) {
@@ -219,12 +225,12 @@ export class GeeLarkAPI {
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'geelark-api',
-      message: 'Profile created',
+      message: deviceInfo?.amount && deviceInfo.amount > 1 ? 'Batch profiles created' : 'Profile created',
       meta: { 
-        profile_id: successDetail.id,
-        profile_name: successDetail.profileName,
-        serial_no: successDetail.envSerialNo,
-        equipment_info: successDetail.equipmentInfo,
+        amount: deviceInfo?.amount || 1,
+        success_amount: data.successAmount,
+        fail_amount: data.failAmount,
+        profile_ids: data.details.filter(d => d.code === 0).map(d => d.id),
         proxy_id: deviceInfo?.proxyId,
         has_proxy_config: !!deviceInfo?.proxyConfig
       }
@@ -335,12 +341,57 @@ export class GeeLarkAPI {
 
   // Phone Management
   async startPhones(phoneIds: string[]): Promise<any> {
-    return await this.request('/open/v1/phone/start', {
-      method: 'POST',
-      body: JSON.stringify({
-        ids: phoneIds
+    console.log(`[GeeLark] Starting phones: ${phoneIds.join(', ')}`)
+    
+    try {
+      const response = await this.request<{
+        successDetails?: Array<{ id: string; status: number }>
+        failDetails?: Array<{ id: string; code: number; msg: string }>
+      }>('/open/v1/phone/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          ids: phoneIds
+        })
       })
-    })
+      
+      console.log(`[GeeLark] Start phones response:`, JSON.stringify(response, null, 2))
+      
+      // Log success/failure details
+      if (response.successDetails) {
+        console.log(`[GeeLark] Successfully started ${response.successDetails.length} phones`)
+      }
+      if (response.failDetails) {
+        console.log(`[GeeLark] Failed to start ${response.failDetails.length} phones:`, response.failDetails)
+      }
+      
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'geelark-api',
+        message: 'Start phones API call',
+        meta: {
+          phone_ids: phoneIds,
+          response: response,
+          success_count: response.successDetails?.length || 0,
+          fail_count: response.failDetails?.length || 0
+        }
+      })
+      
+      return response
+    } catch (error) {
+      console.error(`[GeeLark] Failed to start phones ${phoneIds.join(', ')}:`, error)
+      
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'geelark-api',
+        message: 'Start phones API call failed',
+        meta: {
+          phone_ids: phoneIds,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      })
+      
+      throw error
+    }
   }
 
   async stopPhones(phoneIds: string[]): Promise<any> {
@@ -353,12 +404,24 @@ export class GeeLarkAPI {
   }
 
   async getPhoneStatus(phoneIds: string[]): Promise<any> {
-    return await this.request('/open/v1/phone/status', {
-      method: 'POST',
-      body: JSON.stringify({
-        ids: phoneIds
+    try {
+      const response = await this.request('/open/v1/phone/status', {
+        method: 'POST',
+        body: JSON.stringify({
+          ids: phoneIds
+        })
       })
-    })
+      
+      // Log the response structure for debugging
+      if (phoneIds.length === 1) {
+        console.log(`Phone status response for ${phoneIds[0]}:`, JSON.stringify(response, null, 2))
+      }
+      
+      return response
+    } catch (error) {
+      console.error(`Failed to get phone status for ${phoneIds.join(', ')}:`, error)
+      throw error
+    }
   }
 
   async takeScreenshot(phoneId: string): Promise<{ taskId: string }> {

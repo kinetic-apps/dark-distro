@@ -1,4 +1,15 @@
 {
+  "functions": {
+    "app/api/automation/setup-tiktok-with-sms/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/automation/setup-new-phone/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/automation/setup-tiktok-with-credentials/route.ts": {
+      "maxDuration": 300
+    }
+  },
   "crons": [
     {
       "path": "/api/geelark/task-status",

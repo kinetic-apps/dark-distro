@@ -32,6 +32,12 @@ export async function POST(request: NextRequest) {
       3: 'expired'
     }
 
+    // Check if statusResult has the expected structure
+    if (!statusResult || typeof statusResult !== 'object') {
+      console.error('Invalid status result structure:', statusResult)
+      throw new Error('Invalid response from GeeLark API')
+    }
+
     // Process successful results
     const phoneStatuses = statusResult.successDetails?.map((detail: any) => ({
       profile_id: detail.id,
@@ -79,6 +85,11 @@ export async function POST(request: NextRequest) {
       successful: statusResult.successAmount,
       failed: statusResult.failAmount,
       statuses: allStatuses
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
     })
   } catch (error) {
     console.error('Phone status error:', error)

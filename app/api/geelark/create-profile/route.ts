@@ -4,13 +4,16 @@ import { soaxApi } from '@/lib/soax-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
-  let account: any = null
-  let profileCreated = false
+  let accounts: any[] = []
+  let profilesCreated = false
   let profileData: any = null
+  let requestBody: any = null
   
   try {
-    const body = await request.json()
+    requestBody = await request.json()
+    const body = requestBody
     const { 
+      amount = 1,  // Support batch creation, default to 1
       android_version,
       proxy_id,
       database_proxy_id,  // Add support for database proxy ID
@@ -28,6 +31,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     console.log('Create profile request:', { 
+      amount,
       android_version, 
       proxy_id, 
       has_proxy_config: !!proxy_config,
@@ -36,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare profile parameters FIRST
     const profileParams: any = {
+      amount: amount,  // Pass amount to GeeLark API
       androidVersion: android_version,
       groupName: group_name,
       tagsName: tags,
@@ -158,13 +163,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create GeeLark profile FIRST
-    console.log('Creating GeeLark profile with params:', JSON.stringify(profileParams, null, 2))
+    // Create GeeLark profile(s) FIRST
+    console.log('Creating GeeLark profile(s) with params:', JSON.stringify(profileParams, null, 2))
     
     let profileResponse
     try {
       profileResponse = await geelarkApi.createProfile(profileParams)
-      profileCreated = true
+      profilesCreated = true
     } catch (geelarkError) {
       console.error('GeeLark API error:', geelarkError)
       throw new Error(`GeeLark API error: ${geelarkError instanceof Error ? geelarkError.message : String(geelarkError)}`)
@@ -175,150 +180,179 @@ export async function POST(request: NextRequest) {
       throw new Error('Invalid response from GeeLark API - no profile details returned')
     }
 
-    profileData = profileResponse.details[0]
+    profileData = profileResponse
+
+    // Handle batch creation response
+    const createdProfiles = []
+    const createdAccounts = []
     
-    if (!profileData || !profileData.id) {
-      console.error('Invalid profile data:', profileData)
-      throw new Error('Invalid profile data - missing profile ID')
-    }
+    // Process each created profile
+    for (const profile of profileData.details) {
+      if (profile.code === 0) { // Success
+        // Create account record with the GeeLark profile ID
+        const { data: accountData, error: accountError } = await supabaseAdmin
+          .from('accounts')
+          .insert({
+            geelark_profile_id: profile.id,
+            meta: {
+              created_via: 'api',
+              device_model: surface_model,
+              android_version: android_version,
+              group_name: group_name,
+              remark: remark,
+              profile_name: profile.profileName,
+              serial_no: profile.envSerialNo
+            }
+          })
+          .select()
+          .single()
 
-    // NOW create account record with the GeeLark profile ID
-    const { data: accountData, error: accountError } = await supabaseAdmin
-      .from('accounts')
-      .insert({
-        geelark_profile_id: profileData.id,
-        meta: {
-          created_via: 'api',
-          device_model: surface_model,
-          android_version: android_version,
-          group_name: group_name,
-          remark: remark,
-          profile_name: profileData.profileName,
-          serial_no: profileData.envSerialNo
+        if (accountError) {
+          console.error('Account creation error for profile:', profile.id, accountError)
+          continue
         }
-      })
-      .select()
-      .single()
+        
+        accounts.push(accountData)
+        createdAccounts.push(accountData)
+        console.log('Account created:', accountData.id)
 
-    if (accountError) {
-      console.error('Account creation error:', accountError)
-      // Clean up the GeeLark profile since account creation failed
-      if (profileCreated && profileData.id) {
-        try {
-          await geelarkApi.deleteProfile(profileData.id)
-        } catch (deleteError) {
-          console.error('Failed to clean up GeeLark profile:', deleteError)
+        // Create phone record with equipment info
+        const phoneData = {
+          profile_id: profile.id,
+          account_id: accountData.id,
+          device_model: profile.equipmentInfo?.deviceModel || surface_model || 'Unknown',
+          android_version: profile.equipmentInfo?.osVersion || `Android ${android_version || '13'}`,
+          status: 'offline',
+          meta: {
+            profile_name: profile.profileName || profile.envSerialNo || 'Unknown',
+            serial_no: profile.envSerialNo,
+            imei: profile.equipmentInfo?.imei,
+            phone_number: profile.equipmentInfo?.phoneNumber,
+            country: profile.equipmentInfo?.countryName,
+            timezone: profile.equipmentInfo?.timeZone,
+            proxy_info: proxyData,
+            remark: remark,
+            equipment_info: profile.equipmentInfo
+          }
         }
+
+        console.log('Creating phone record:', phoneData)
+
+        const { error: phoneError } = await supabaseAdmin
+          .from('phones')
+          .insert(phoneData)
+
+        if (phoneError) {
+          console.error('Failed to create phone record:', phoneError)
+        }
+
+        // Update proxy assignment if we have a database proxy
+        if (proxyData && proxyData.id && amount === 1) {
+          // Only assign proxy to single profile creation
+          await supabaseAdmin
+            .from('proxies')
+            .update({ assigned_account_id: accountData.id })
+            .eq('id', proxyData.id)
+        }
+
+        createdProfiles.push({
+          id: profile.id,
+          profileName: profile.profileName,
+          envSerialNo: profile.envSerialNo,
+          equipmentInfo: profile.equipmentInfo,
+          accountId: accountData.id
+        })
       }
-      throw new Error(`Failed to create account: ${accountError.message}`)
-    }
-    
-    account = accountData
-    console.log('Account created:', account.id)
-
-    // Create phone record with equipment info
-    const phoneData = {
-        profile_id: profileData.id,
-        account_id: account.id,
-      device_model: profileData.equipmentInfo?.deviceModel || surface_model || 'Unknown',
-      android_version: profileData.equipmentInfo?.osVersion || `Android ${android_version || '13'}`,
-        status: 'offline',
-        meta: {
-        profile_name: profileData.profileName || profileData.envSerialNo || 'Unknown',
-        serial_no: profileData.envSerialNo,
-        imei: profileData.equipmentInfo?.imei,
-        phone_number: profileData.equipmentInfo?.phoneNumber,
-        country: profileData.equipmentInfo?.countryName,
-        timezone: profileData.equipmentInfo?.timeZone,
-          proxy_info: proxyData,
-        remark: remark,
-        equipment_info: profileData.equipmentInfo
-        }
-    }
-
-    console.log('Creating phone record:', phoneData)
-
-    const { error: phoneError } = await supabaseAdmin
-      .from('phones')
-      .insert(phoneData)
-
-    if (phoneError) {
-      console.error('Failed to create phone record:', phoneError)
-      throw phoneError
-    }
-
-    // Update proxy assignment if we have a database proxy
-    if (proxyData && proxyData.id) {
-      await supabaseAdmin
-        .from('proxies')
-        .update({ assigned_account_id: account.id })
-        .eq('id', proxyData.id)
     }
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
       component: 'api-create-profile',
-      message: 'Profile created successfully',
+      message: amount > 1 ? 'Batch profiles created successfully' : 'Profile created successfully',
       meta: { 
-        account_id: account.id, 
-        profile_id: profileData.id,
-        profile_name: profileData.profileName,
-        serial_no: profileData.envSerialNo,
+        amount_requested: amount,
+        amount_created: createdProfiles.length,
+        account_ids: createdAccounts.map(a => a.id),
+        profile_ids: createdProfiles.map(p => p.id),
         proxy_type: proxyData?.type || 'none',
         proxy_source: proxy_id ? 'geelark' : proxy_config ? 'manual/dynamic' : 'auto',
         remark: remark
       }
     })
 
-    return NextResponse.json({ 
-      success: true, 
-      account_id: account.id,
-      profile_id: profileData.id,
-      profile_name: profileData.profileName,
-      serial_no: profileData.envSerialNo,
-      equipment_info: profileData.equipmentInfo,
-      proxy: proxyData ? {
-        id: proxyData.id,
-        type: proxyData.type,
-        label: proxyData.label
-      } : null
-    })
+    // Return appropriate response based on single or batch creation
+    if (amount === 1 && createdProfiles.length > 0) {
+      // Single profile creation response (backward compatible)
+      const profile = createdProfiles[0]
+      const account = createdAccounts[0]
+      
+      return NextResponse.json({ 
+        success: true, 
+        account_id: account.id,
+        profile_id: profile.id,
+        profile_name: profile.profileName,
+        serial_no: profile.envSerialNo,
+        equipment_info: profile.equipmentInfo,
+        proxy: proxyData ? {
+          id: proxyData.id,
+          type: proxyData.type,
+          label: proxyData.label
+        } : null
+      })
+    } else {
+      // Batch creation response
+      return NextResponse.json({
+        success: profileData.successAmount > 0,
+        total_amount: profileData.totalAmount,
+        success_amount: profileData.successAmount,
+        fail_amount: profileData.failAmount,
+        details: profileData.details,
+        created_accounts: createdAccounts.map(a => ({
+          account_id: a.id,
+          profile_id: a.geelark_profile_id
+        }))
+      })
+    }
   } catch (error) {
     console.error('Create profile error:', error)
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack')
     
     // Clean up resources if they were created
-    if (profileCreated && profileData?.id) {
-      console.log('Cleaning up GeeLark profile:', profileData.id)
-      try {
-        await geelarkApi.deleteProfile(profileData.id)
-      } catch (deleteError) {
-        console.error('Failed to clean up GeeLark profile:', deleteError)
+    if (profilesCreated && profileData?.details) {
+      console.log('Cleaning up GeeLark profiles due to error')
+      for (const profile of profileData.details) {
+        if (profile.code === 0 && profile.id) {
+          try {
+            await geelarkApi.deleteProfile(profile.id)
+          } catch (deleteError) {
+            console.error('Failed to clean up GeeLark profile:', profile.id, deleteError)
+          }
+        }
       }
     }
     
-    if (account?.id) {
-      console.log('Cleaning up account:', account.id)
+    if (accounts.length > 0) {
+      console.log('Cleaning up accounts:', accounts.map(a => a.id))
       await supabaseAdmin
         .from('accounts')
         .delete()
-        .eq('id', account.id)
+        .in('id', accounts.map(a => a.id))
     }
     
     await supabaseAdmin.from('logs').insert({
       level: 'error',
       component: 'api-create-profile',
-      message: 'Failed to create profile',
+      message: 'Failed to create profile(s)',
       meta: { 
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        account_id: account?.id,
-        profile_id: profileData?.id
+        account_ids: accounts.map(a => a.id),
+        amount_requested: requestBody?.amount || 1
       }
     })
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create profile' },
+      { error: error instanceof Error ? error.message : 'Failed to create profile(s)' },
       { status: 500 }
     )
   }

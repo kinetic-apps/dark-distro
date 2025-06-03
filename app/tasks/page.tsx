@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, RefreshCw, X, RotateCcw, CheckCircle, AlertCircle, Clock, ExternalLink } from 'lucide-react'
+import { Loader2, X, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 
 interface Task {
@@ -31,10 +31,11 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoRefresh] = useState(true) // Always enabled
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (skipGeeLarkSync = false) => {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('tasks')
@@ -44,6 +45,12 @@ export default function TasksPage() {
 
     if (data && !error) {
       setTasks(data)
+      
+      // Automatically sync running/pending tasks with GeeLark
+      if (!skipGeeLarkSync && autoRefresh) {
+        const runningTasks = data.filter(t => t.status === 'running' || t.status === 'pending')
+        await syncTaskStatuses(runningTasks.map(t => t.geelark_task_id))
+      }
     }
     setIsLoading(false)
   }
@@ -51,38 +58,41 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks()
     
-    if (autoRefresh) {
-      const interval = setInterval(fetchTasks, 10000)
-      return () => clearInterval(interval)
-    }
-  }, [autoRefresh])
+    // Always auto-refresh every 10 seconds
+    const interval = setInterval(fetchTasks, 10000)
+    return () => clearInterval(interval)
+  }, [])
 
-  const refreshTaskStatuses = async () => {
-    setIsRefreshing(true)
+  const syncTaskStatuses = async (taskIds: string[]) => {
+    setIsSyncing(true)
     try {
-      const taskIds = tasks
-        .filter(t => t.status === 'running' || t.status === 'pending')
-        .map(t => t.geelark_task_id)
+      // Always update the sync time when called
+      setLastSyncTime(new Date())
+      
+      if (taskIds.length === 0) {
+        // No tasks to sync
+        return
+      }
 
-      if (taskIds.length > 0) {
-        const response = await fetch('/api/geelark/task-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ task_ids: taskIds })
-        })
+      const response = await fetch('/api/geelark/task-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_ids: taskIds })
+      })
 
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Task status response:', data)
-          await fetchTasks()
-        }
+      if (response.ok) {
+        const data = await response.json()
+        console.log('Auto-synced task statuses:', data)
+        // Fetch again to get updated data from database
+        await fetchTasks(true) // Skip GeeLark sync to avoid infinite loop
       }
     } catch (error) {
-      console.error('Failed to refresh task statuses:', error)
+      console.error('Failed to sync task statuses:', error)
     } finally {
-      setIsRefreshing(false)
+      setIsSyncing(false)
     }
   }
+
 
   const cancelTasks = async () => {
     if (selectedTasks.length === 0) return
@@ -195,31 +205,37 @@ export default function TasksPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="page-title">TikTok Tasks</h1>
+          <h1 className="page-title">Tasks</h1>
           <p className="page-description">
-            Monitor and manage TikTok automation tasks
+            Monitor and manage automation tasks
+            {tasks.filter(t => t.status === 'running' || t.status === 'pending').length > 0 && (
+              <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
+                ({tasks.filter(t => t.status === 'running' || t.status === 'pending').length} active)
+              </span>
+            )}
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <label className="flex items-center text-sm text-gray-600 dark:text-dark-300">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-100 dark:focus:ring-dark-400"
-            />
-            Auto-refresh
-          </label>
-          
-          <button
-            onClick={refreshTaskStatuses}
-            disabled={isRefreshing}
-            className="btn-secondary"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh Status
-          </button>
+        <div className="flex items-center gap-4">
+          {/* Sync Status Indicator */}
+          <div className="flex items-center gap-2">
+            {isSyncing ? (
+              <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Syncing with GeeLark...</span>
+              </div>
+            ) : lastSyncTime ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>Auto-syncing • Last update: {formatRelativeTime(lastSyncTime.toISOString())}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+                <Clock className="h-4 w-4" />
+                <span>Waiting for first sync...</span>
+              </div>
+            )}
+          </div>
 
           {selectedTasks.length > 0 && (
             <>
@@ -243,9 +259,9 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-          <thead className="bg-gray-50 dark:bg-dark-900">
+          <thead className="bg-gray-50 dark:bg-dark-800">
             <tr>
               <th scope="col" className="relative w-12 px-6 sm:w-16 sm:px-8">
                 <input

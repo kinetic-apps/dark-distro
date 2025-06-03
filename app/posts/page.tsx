@@ -1,16 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { formatDate, formatRelativeTime } from '@/lib/utils'
-import { 
-  Send, 
-  CheckCircle, 
-  XCircle, 
-  Clock,
-  RefreshCw,
-  Play,
-  Filter
-} from 'lucide-react'
+import { Filter } from 'lucide-react'
 import Link from 'next/link'
 import PostsPageClient from './posts-page-client'
+import PostsTable from '@/components/posts-table'
 
 async function getPosts(searchParams: { status?: string }) {
   const supabase = await createClient()
@@ -66,41 +58,6 @@ export default async function PostsPage({
 }) {
   const params = await searchParams
   const { posts, statusCounts } = await getPosts(params)
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'queued':
-      case 'pending':
-        return <Clock className="h-4 w-4 text-gray-400 dark:text-dark-500" />
-      case 'processing':
-        return <RefreshCw className="h-4 w-4 text-blue-500 dark:text-blue-400 animate-spin" />
-      case 'posted':
-        return <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
-      case 'cancelled':
-        return <XCircle className="h-4 w-4 text-gray-400 dark:text-dark-500" />
-      default:
-        return null
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const classes = {
-      queued: 'status-neutral',
-      pending: 'status-neutral',
-      processing: 'status-warning',
-      posted: 'status-active',
-      failed: 'status-error',
-      cancelled: 'status-neutral'
-    }
-    
-    return (
-      <span className={classes[status as keyof typeof classes] || 'status-neutral'}>
-        {status}
-      </span>
-    )
-  }
 
   return (
     <PostsPageClient>
@@ -172,109 +129,7 @@ export default async function PostsPage({
         </nav>
       </div>
 
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-lg dark:bg-dark-850 dark:border-dark-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-          <thead className="bg-gray-50 dark:bg-dark-800">
-            <tr>
-              <th scope="col" className="table-header">
-                Post
-              </th>
-              <th scope="col" className="table-header">
-                Account
-              </th>
-              <th scope="col" className="table-header">
-                Status
-              </th>
-              <th scope="col" className="table-header">
-                Created
-              </th>
-              <th scope="col" className="table-header">
-                Posted
-              </th>
-              <th scope="col" className="table-header">
-                TikTok ID
-              </th>
-              <th scope="col" className="relative px-6 py-3">
-                <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-850">
-            {posts.map((post) => (
-              <tr key={post.id} className="hover:bg-gray-50 dark:hover:bg-dark-800">
-                <td className="table-cell">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-dark-100">
-                      {post.type === 'carousel' ? `Carousel (${post.content?.images_count || 0} images)` : 
-                       post.type === 'video' ? 'Video' : post.type}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-dark-400 truncate max-w-xs">
-                      {post.caption || 'No caption'}
-                    </p>
-                  </div>
-                </td>
-                <td className="table-cell">
-                  {post.account ? (
-                    <Link 
-                      href={`/profiles/${post.account.id}`}
-                      className="text-sm text-gray-900 hover:text-gray-700 dark:text-dark-100 dark:hover:text-dark-200"
-                    >
-                      {post.account.tiktok_username || 'Unnamed'}
-                    </Link>
-                  ) : (
-                    <span className="text-sm text-gray-400 dark:text-dark-500">Unknown</span>
-                  )}
-                </td>
-                <td className="table-cell">
-                  <div className="flex items-center">
-                    {getStatusIcon(post.status)}
-                    <span className="ml-2">{getStatusBadge(post.status)}</span>
-                  </div>
-                </td>
-                <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
-                  {formatRelativeTime(post.created_at)}
-                </td>
-                <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
-                  {post.posted_at ? formatRelativeTime(post.posted_at) : '—'}
-                </td>
-                <td className="table-cell">
-                  {post.tiktok_post_id ? (
-                    <a
-                      href={`https://www.tiktok.com/@${post.account?.tiktok_username}/video/${post.tiktok_post_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-mono"
-                    >
-                      {post.tiktok_post_id.slice(-8)}
-                    </a>
-                  ) : (
-                    <span className="text-sm text-gray-400 dark:text-dark-500">—</span>
-                  )}
-                </td>
-                <td className="relative whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
-                  {post.status === 'failed' && post.retry_count < 3 && (
-                    <button className="text-gray-600 hover:text-gray-900 dark:text-dark-400 dark:hover:text-dark-100">
-                      Retry
-                    </button>
-                  )}
-                  {post.status === 'queued' && (
-                    <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                      Cancel
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {posts.length === 0 && (
-              <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-500 dark:text-dark-400">
-                  No posts found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <PostsTable posts={posts} />
       </>
     </PostsPageClient>
   )

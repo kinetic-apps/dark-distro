@@ -39,35 +39,23 @@ export default function VideoUploadModal({ isOpen, onClose }: VideoUploadModalPr
     setError('')
 
     try {
-      // Generate unique filename
-      const timestamp = Date.now()
-      const filename = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-      const path = `videos/${filename}`
+      // Upload to API endpoint to ensure proper database tracking
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', 'video')
 
-      // Upload to Supabase storage
-      const { data, error: uploadError } = await supabase.storage
-        .from('assets')
-        .upload(path, file, {
-          contentType: file.type,
-          upsert: false
-        })
-
-      if (uploadError) throw uploadError
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('assets')
-        .getPublicUrl(path)
-
-      setUploadedVideo({ url: publicUrl, path })
-      
-      // Log the upload
-      await supabase.from('logs').insert({
-        level: 'info',
-        component: 'video-upload',
-        message: 'Video uploaded successfully',
-        meta: { filename, size: file.size, type: file.type }
+      const response = await fetch('/api/assets/upload', {
+        method: 'POST',
+        body: formData,
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Upload failed')
+      }
+
+      const result = await response.json()
+      setUploadedVideo({ url: result.url, path: result.storagePath })
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload video')
@@ -112,101 +100,109 @@ export default function VideoUploadModal({ isOpen, onClose }: VideoUploadModalPr
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-dark-850 rounded-lg max-w-lg w-full">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-dark-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-100">
-            Upload Video
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-300"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <>
+      {/* Backdrop with blur */}
+      <div className="fixed inset-0 z-40" onClick={handleClose}>
+        <div className="absolute inset-0 backdrop-blur-xl" />
+      </div>
+      
+      {/* Modal */}
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+        <div className="bg-white dark:bg-dark-850 rounded-lg max-w-lg w-full">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-dark-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-100">
+              Upload Video
+            </h2>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-dark-300"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
 
-        <div className="p-6">
-          {!uploadedVideo ? (
-            <>
-              <div className="border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg p-8">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="video-upload"
-                />
-                <label
-                  htmlFor="video-upload"
-                  className="flex flex-col items-center cursor-pointer"
-                >
-                  <Video className="h-12 w-12 text-gray-400 dark:text-dark-500 mb-4" />
-                  <p className="text-sm font-medium text-gray-900 dark:text-dark-100 mb-1">
-                    Click to upload video
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-dark-400">
-                    MP4, MOV, or other video formats (max 100MB)
-                  </p>
-                </label>
-              </div>
-
-              {uploading && (
-                <div className="mt-4 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-dark-100 mx-auto"></div>
-                  <p className="text-sm text-gray-500 dark:text-dark-400 mt-2">Uploading video...</p>
+          <div className="p-6">
+            {!uploadedVideo ? (
+              <>
+                <div className="border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg p-8">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="video-upload"
+                  />
+                  <label
+                    htmlFor="video-upload"
+                    className="flex flex-col items-center cursor-pointer"
+                  >
+                    <Video className="h-12 w-12 text-gray-400 dark:text-dark-500 mb-4" />
+                    <p className="text-sm font-medium text-gray-900 dark:text-dark-100 mb-1">
+                      Click to upload video
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-dark-400">
+                      MP4, MOV, or other video formats (max 100MB)
+                    </p>
+                  </label>
                 </div>
-              )}
 
-              {error && (
-                <div className="mt-4 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                {uploading && (
+                  <div className="mt-4 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-dark-100 mx-auto"></div>
+                    <p className="text-sm text-gray-500 dark:text-dark-400 mt-2">Uploading video...</p>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="mt-4 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900 dark:text-green-300">
+                      Video uploaded successfully!
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                      {uploadedVideo.path}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900 dark:text-green-300">
-                    Video uploaded successfully!
-                  </p>
-                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">
-                    {uploadedVideo.path}
-                  </p>
+
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  <video
+                    src={uploadedVideo.url}
+                    controls
+                    className="w-full h-full"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleReset}
+                    className="btn-secondary flex-1"
+                  >
+                    Upload Another
+                  </button>
+                  <button
+                    onClick={handlePostToTikTok}
+                    className="btn-primary flex-1"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Post to TikTok
+                  </button>
                 </div>
               </div>
-
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  src={uploadedVideo.url}
-                  controls
-                  className="w-full h-full"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleReset}
-                  className="btn-secondary flex-1"
-                >
-                  Upload Another
-                </button>
-                <button
-                  onClick={handlePostToTikTok}
-                  className="btn-primary flex-1"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Post to TikTok
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
-} 
+}

@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Play } from 'lucide-react'
-import Link from 'next/link'
+import { Play, CheckCircle, Clock, RefreshCw } from 'lucide-react'
 import BulkPostLauncher from '@/components/bulk-post-launcher'
-import TaskStatusUpdater from '@/components/task-status-updater'
 import { useRouter } from 'next/navigation'
+import { formatRelativeTime } from '@/lib/utils'
 
 interface PostsPageClientProps {
   children: React.ReactNode
@@ -13,18 +12,31 @@ interface PostsPageClientProps {
 
 export default function PostsPageClient({ children }: PostsPageClientProps) {
   const [showBulkLauncher, setShowBulkLauncher] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(() => {
-        router.refresh()
-      }, 10000) // Refresh every 10 seconds
-      
-      return () => clearInterval(interval)
+    // Initial sync
+    handleSync()
+    
+    // Set up interval for auto-refresh
+    const interval = setInterval(() => {
+      handleSync()
+    }, 10000) // Refresh every 10 seconds
+    
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleSync = async () => {
+    setIsSyncing(true)
+    try {
+      router.refresh()
+      setLastSyncTime(new Date())
+    } finally {
+      setIsSyncing(false)
     }
-  }, [autoRefresh, router])
+  }
 
   return (
     <>
@@ -38,19 +50,26 @@ export default function PostsPageClient({ children }: PostsPageClientProps) {
           </div>
           
           <div className="flex gap-3">
-            <label className="flex items-center text-sm text-gray-600 dark:text-dark-300">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="mr-2 rounded border-gray-300 text-gray-900 focus:ring-gray-900 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-100 dark:focus:ring-dark-400"
-              />
-              Auto-refresh
-            </label>
-            <TaskStatusUpdater />
-            <Link href="/assets" className="btn-secondary">
-              Browse Assets
-            </Link>
+            <div className="flex items-center text-sm">
+              {isSyncing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 text-blue-500 animate-spin" />
+                  <span className="text-gray-600 dark:text-dark-300">Syncing...</span>
+                </>
+              ) : lastSyncTime ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                  <span className="text-gray-600 dark:text-dark-300">
+                    Auto-syncing • Last update: {formatRelativeTime(lastSyncTime.toISOString())}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                  <span className="text-gray-600 dark:text-dark-300">Waiting for first sync...</span>
+                </>
+              )}
+            </div>
             <button 
               onClick={() => setShowBulkLauncher(true)}
               className="btn-primary"

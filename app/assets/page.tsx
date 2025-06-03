@@ -26,6 +26,7 @@ import GoogleDriveExportModal from '@/components/GoogleDriveExportModal'
 import AgencyWorkflowModal from '@/components/AgencyWorkflowModal'
 import PostContentModal from '@/components/post-content-modal'
 import VideoUploadModal from '@/components/video-upload-modal'
+import ManualAssetUploadModal from '@/components/manual-asset-upload-modal'
 import { GoogleAuthService } from '@/lib/services/google-auth'
 import { useSearchParams } from 'next/navigation'
 
@@ -66,6 +67,9 @@ interface ImageGenerationJob {
   created_at: string
   completed_at?: string
   carousel_variants?: CarouselVariant[]
+  contentType?: 'carousel' | 'single-image' | 'video'
+  source?: 'spectre' | 'manual_upload' | 'secondary'
+  settings?: any
 }
 
 export default function AssetsPage() {
@@ -76,7 +80,9 @@ export default function AssetsPage() {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState({
     status: 'all',
-    dateRange: 'all'
+    dateRange: 'all',
+    contentType: 'all',
+    source: 'all'
   })
   
   // Google Drive export states
@@ -97,6 +103,9 @@ export default function AssetsPage() {
   
   // Video upload modal state
   const [showVideoUpload, setShowVideoUpload] = useState(false)
+  
+  // Manual upload modal state
+  const [showManualUpload, setShowManualUpload] = useState(false)
 
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -181,13 +190,51 @@ export default function AssetsPage() {
     }
 
     // Process jobs and organize variants with slides
-    const processedJobs = data?.map(job => ({
-      ...job,
-      carousel_variants: job.carousel_variants?.map((variant: any) => ({
-        ...variant,
-        slides: variant.variant_slides?.sort((a: any, b: any) => a.slide_order - b.slide_order) || []
-      })) || []
-    })) || []
+    let processedJobs = data?.map(job => {
+      // Determine content type based on settings
+      let contentType = 'carousel'
+      if (job.settings?.asset_type === 'video') {
+        contentType = 'video'
+      } else if (job.carousel_variants?.length === 1 && job.carousel_variants[0]?.slide_count === 1) {
+        contentType = 'single-image'
+      }
+
+      // Determine source
+      let source = 'spectre'
+      if (job.settings?.source === 'manual_upload') {
+        source = 'manual_upload'
+      } else if (job.settings?.source === 'secondary') {
+        source = 'secondary'
+      }
+
+      return {
+        ...job,
+        contentType,
+        source,
+        carousel_variants: job.carousel_variants?.map((variant: any) => ({
+          ...variant,
+          slides: variant.variant_slides?.sort((a: any, b: any) => a.slide_order - b.slide_order) || []
+        })) || []
+      }
+    }) || []
+
+    // Apply content type filter
+    if (filter.contentType !== 'all') {
+      processedJobs = processedJobs.filter(job => job.contentType === filter.contentType)
+    }
+
+    // Apply source filter
+    if (filter.source !== 'all') {
+      processedJobs = processedJobs.filter(job => job.source === filter.source)
+    }
+
+    // Apply status filter (for carousel variants)
+    if (filter.status !== 'all' && filter.contentType !== 'video') {
+      processedJobs = processedJobs.map(job => ({
+        ...job,
+        carousel_variants: job.carousel_variants?.filter((variant: any) => variant.status === filter.status) || []
+      })).filter(job => job.carousel_variants && job.carousel_variants.length > 0)
+    }
 
     setJobs(processedJobs)
     setLoading(false)
@@ -291,16 +338,23 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">Carousel Assets</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-dark-100">Content Assets</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-dark-400">
-            Generated carousel variants ready for TikTok posting
+            Manage all your content assets for TikTok posting - carousels, images, and videos
           </p>
         </div>
         
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowVideoUpload(true)}
+            onClick={() => setShowManualUpload(true)}
             className="btn-primary"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Assets
+          </button>
+          <button
+            onClick={() => setShowVideoUpload(true)}
+            className="btn-secondary"
           >
             <Play className="h-4 w-4 mr-2" />
             Upload Video
@@ -337,8 +391,28 @@ export default function AssetsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Filter className="h-4 w-4 text-gray-400 dark:text-dark-500" />
+        <select
+          value={filter.contentType}
+          onChange={(e) => setFilter({ ...filter, contentType: e.target.value })}
+          className="select"
+        >
+          <option value="all">All types</option>
+          <option value="carousel">Carousels</option>
+          <option value="single-image">Single Images</option>
+          <option value="video">Videos</option>
+        </select>
+        <select
+          value={filter.source}
+          onChange={(e) => setFilter({ ...filter, source: e.target.value })}
+          className="select"
+        >
+          <option value="all">All sources</option>
+          <option value="spectre">Spectre Generated</option>
+          <option value="manual_upload">Manual Upload</option>
+          <option value="secondary">Secondary Source</option>
+        </select>
         <select
           value={filter.status}
           onChange={(e) => setFilter({ ...filter, status: e.target.value })}
@@ -380,34 +454,71 @@ export default function AssetsPage() {
             <div key={job.id} className="card hover:shadow-lg transition-shadow">
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-medium text-gray-900 dark:text-dark-100">{job.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        job.contentType === 'video' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                        job.contentType === 'single-image' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      }`}>
+                        {job.contentType === 'video' ? 'Video' : 
+                         job.contentType === 'single-image' ? 'Image' : 'Carousel'}
+                      </span>
+                      {job.source !== 'spectre' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                          {job.source === 'manual_upload' ? 'Manual' : 'Secondary'}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 dark:text-dark-400 mt-1">
-                      {job.carousel_variants?.length || 0} variants
+                      {job.contentType === 'video' ? '1 video' : 
+                       job.carousel_variants?.length || 0} {job.contentType === 'single-image' ? 'image' : 'variants'}
                     </p>
                   </div>
-                  <Folder className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  {job.contentType === 'video' ? (
+                    <Play className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  ) : job.contentType === 'single-image' ? (
+                    <ImageIcon className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  ) : (
+                    <Folder className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  )}
                 </div>
                 
                 {/* Preview thumbnails */}
-                <div className="grid grid-cols-3 gap-1 mb-3">
-                  {job.carousel_variants?.slice(0, 6).map((variant, idx) => (
-                    <div key={variant.id} className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded overflow-hidden">
-                      {variant.slides?.[0] && (
-                        <img
-                          src={variant.slides[0].image_url}
-                          alt={`Preview ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      )}
+                {job.contentType === 'video' ? (
+                  <div className="aspect-video bg-black rounded-lg overflow-hidden mb-3 relative">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Play className="h-12 w-12 text-white opacity-75" />
                     </div>
-                  ))}
-                  {job.carousel_variants && job.carousel_variants.length > 6 && (
-                    <div className="col-span-3 text-center text-xs text-gray-500 dark:text-dark-400 mt-1">
-                      +{job.carousel_variants.length - 6} more variants
-                    </div>
-                  )}
-                </div>
+                    {job.settings?.video_url && (
+                      <video 
+                        src={job.settings.video_url}
+                        className="w-full h-full object-cover"
+                        muted
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-1 mb-3">
+                    {job.carousel_variants?.slice(0, 6).map((variant, idx) => (
+                      <div key={variant.id} className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded overflow-hidden">
+                        {variant.slides?.[0] && (
+                          <img
+                            src={variant.slides[0].image_url}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {job.carousel_variants && job.carousel_variants.length > 6 && (
+                      <div className="col-span-3 text-center text-xs text-gray-500 dark:text-dark-400 mt-1">
+                        +{job.carousel_variants.length - 6} more variants
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between text-xs text-gray-500 dark:text-dark-400">
                   <span>{formatRelativeTime(job.created_at)}</span>
@@ -448,11 +559,33 @@ export default function AssetsPage() {
                   ) : (
                     <ChevronRight className="h-5 w-5 text-gray-400 dark:text-dark-500" />
                   )}
-                  <Folder className="h-5 w-5 text-gray-400 dark:text-dark-500" />
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-dark-100">{job.name}</h3>
+                  {job.contentType === 'video' ? (
+                    <Play className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  ) : job.contentType === 'single-image' ? (
+                    <ImageIcon className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  ) : (
+                    <Folder className="h-5 w-5 text-gray-400 dark:text-dark-500" />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-gray-900 dark:text-dark-100">{job.name}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        job.contentType === 'video' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                        job.contentType === 'single-image' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      }`}>
+                        {job.contentType === 'video' ? 'Video' : 
+                         job.contentType === 'single-image' ? 'Image' : 'Carousel'}
+                      </span>
+                      {job.source !== 'spectre' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                          {job.source === 'manual_upload' ? 'Manual' : 'Secondary'}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 dark:text-dark-400">
-                      {job.carousel_variants?.length || 0} variants • {formatRelativeTime(job.created_at)}
+                      {job.contentType === 'video' ? '1 video' : 
+                       `${job.carousel_variants?.length || 0} ${job.contentType === 'single-image' ? 'image' : 'variants'}`} • {formatRelativeTime(job.created_at)}
                     </p>
                   </div>
                 </div>
@@ -461,8 +594,51 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              {expandedJobs.has(job.id) && job.carousel_variants && (
+              {expandedJobs.has(job.id) && (
                 <div className="mt-4 space-y-3">
+                  {job.contentType === 'video' && job.settings?.video_url ? (
+                    <div className="border border-gray-200 dark:border-dark-700 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900 dark:text-dark-100">
+                            Video Asset
+                          </h4>
+                          <p className="text-sm text-gray-500 dark:text-dark-400 mt-1">
+                            {job.settings.original_filename || 'Uploaded video'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setPostModal({ isOpen: true, variant: null })
+                            }}
+                            className="btn-primary text-sm"
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Post to TikTok
+                          </button>
+                          <a
+                            href={job.settings.video_url}
+                            download
+                            className="btn-secondary text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                      <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                        <video
+                          src={job.settings.video_url}
+                          controls
+                          className="w-full h-full"
+                        />
+                      </div>
+                    </div>
+                  ) : job.carousel_variants && (
+                    <>
                   {job.carousel_variants.map((variant) => (
                     <div 
                       key={variant.id} 
@@ -575,9 +751,12 @@ export default function AssetsPage() {
                       </div>
                                       </div>
                 ))}
-                
-                {/* Export entire job button */}
-                <div className="flex justify-end gap-2 pt-2">
+                    </>
+                  )}
+                  
+                  {/* Export entire job button */}
+                  {job.carousel_variants && job.carousel_variants.length > 0 && (
+                    <div className="flex justify-end gap-2 pt-2">
                   <button
                     onClick={() => downloadJob(job)}
                     className="btn-secondary text-sm"
@@ -597,7 +776,8 @@ export default function AssetsPage() {
                     Export All to Google Drive
                   </button>
                 </div>
-              </div>
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -703,6 +883,12 @@ export default function AssetsPage() {
       <VideoUploadModal
         isOpen={showVideoUpload}
         onClose={() => setShowVideoUpload(false)}
+      />
+      
+      {/* Manual Asset Upload Modal */}
+      <ManualAssetUploadModal
+        isOpen={showManualUpload}
+        onClose={() => setShowManualUpload(false)}
       />
     </div>
   )
