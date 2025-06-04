@@ -21,8 +21,8 @@ export function ProfilesHeader() {
   }
 
   const handleSMSSetup = async () => {
-    if (smsQuantity < 1 || smsQuantity > 10) {
-      notify('error', 'Quantity must be between 1 and 10')
+    if (smsQuantity < 1 || smsQuantity > 20) {
+      notify('error', 'Quantity must be between 1 and 20')
       return
     }
 
@@ -65,10 +65,8 @@ export function ProfilesHeader() {
   }
 
   const handleSync = async (isAutoSync = false) => {
-    // Don't show notifications for auto-sync unless there are changes
-    if (!isAutoSync) {
-      setIsSyncing(true)
-    }
+    // Always show syncing state for visual feedback
+    setIsSyncing(true)
     
     try {
       // First sync profiles from GeeLark
@@ -121,9 +119,7 @@ export function ProfilesHeader() {
         notify('error', error instanceof Error ? error.message : 'Sync failed')
       }
     } finally {
-      if (!isAutoSync) {
-        setIsSyncing(false)
-      }
+      setIsSyncing(false)
     }
   }
 

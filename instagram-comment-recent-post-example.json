@@ -1,0 +1,292 @@
+{
+    "startParamMap": [
+      {
+        "key": "Username",
+        "type": "textarea",
+        "value": [],
+        "isNotRequired": false
+      },
+      {
+        "key": "Content",
+        "type": "string",
+        "value": "",
+        "isNotRequired": false
+      }
+    ],
+    "content": [
+      {
+        "name": "打开应用",
+        "type": "openApp",
+        "config": {
+          "packgename": "com.instagram.android"
+        }
+      },
+      {
+        "name": "等待元素出现",
+        "type": "waitEle",
+        "config": {
+          "serial": 1,
+          "filters": [
+            {
+              "type": "desc",
+              "content": "Log in"
+            }
+          ],
+          "variable": "isNotLogin",
+          "filterType": "equal",
+          "searchTime": 10000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false
+        }
+      },
+      {
+        "name": "IF条件",
+        "type": "ifElse",
+        "config": {
+          "remark": "未登录结束任务",
+          "children": [
+            {
+              "name": "结束任务",
+              "type": "endTask",
+              "config": {}
+            }
+          ],
+          "apposition": "and",
+          "conditionList": [
+            {
+              "relation": "exist",
+              "probability": 50,
+              "useVariable": "isNotLogin"
+            }
+          ]
+        }
+      },
+      {
+        "name": "For循环数据",
+        "type": "forData",
+        "config": {
+          "content": [
+            "${Username}"
+          ],
+          "children": [
+            {
+              "name": "打开应用",
+              "type": "openApp",
+              "config": {
+                "packgename": "com.instagram.android"
+              }
+            },
+            {
+              "name": "点击元素",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "filters": [
+                  {
+                    "type": "desc",
+                    "content": "Search and explore"
+                  }
+                ],
+                "useOffset": false,
+                "filterType": "contain",
+                "searchTime": 2000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "randomDistance": 0
+              }
+            },
+            {
+              "name": "日志",
+              "type": "log",
+              "config": {
+                "content": "${name}"
+              }
+            },
+            {
+              "name": "点击元素",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "filters": [
+                  {
+                    "type": "id",
+                    "content": "com.instagram.android:id/action_bar_search_edit_text"
+                  }
+                ],
+                "useOffset": false,
+                "filterType": "equal",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "randomDistance": 0
+              }
+            },
+            {
+              "name": "输入Content",
+              "type": "inputContent",
+              "config": {
+                "serial": 1,
+                "content": [
+                  "${name}"
+                ],
+                "filters": [
+                  {
+                    "type": "id",
+                    "content": "com.instagram.android:id/action_bar_search_edit_text"
+                  }
+                ],
+                "inputType": "taskOrder",
+                "filterType": "equal",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false
+              }
+            },
+            {
+              "name": "键盘操作",
+              "type": "keyOption",
+              "config": {
+                "keyType": "enter"
+              }
+            },
+            {
+              "name": "等待时间",
+              "type": "waitTime",
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 3000,
+                "timeoutMin": 2000,
+                "timeoutType": "randomInterval"
+              }
+            },
+            {
+              "name": "点击元素",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "filters": [
+                  {
+                    "type": "text",
+                    "content": "Accounts"
+                  }
+                ],
+                "useOffset": false,
+                "filterType": "equal",
+                "searchTime": 10000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "randomDistance": 0
+              }
+            },
+            {
+              "name": "等待时间",
+              "type": "waitTime",
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 3000,
+                "timeoutMin": 2000,
+                "timeoutType": "randomInterval"
+              }
+            },
+            {
+              "name": "点击元素",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "filters": [
+                  {
+                    "type": "id",
+                    "content": "com.instagram.android:id/row_search_user_container"
+                  }
+                ],
+                "useOffset": false,
+                "filterType": "equal",
+                "searchTime": 10000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false,
+                "randomDistance": 0
+              }
+            },
+            {
+              "name": "等待时间",
+              "type": "waitTime",
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 3000,
+                "timeoutMin": 2000,
+                "timeoutType": "randomInterval"
+              }
+            },
+            {
+              "name": "点击最新帖子",
+              "type": "click",
+              "config": {
+                "serial": 1,
+                "filters": [
+                  {
+                    "type": "id",
+                    "content": "com.instagram.android:id/image_button"
+                  }
+                ],
+                "filterType": "idOrClass",
+                "searchTime": 10000,
+                "serialType": "fixedValue"
+              }
+            },
+            {
+              "name": "页面截图",
+              "type": "screenshotPage",
+              "config": {}
+            },
+            {
+              "name": "输入评论",
+              "type": "inputContent",
+              "config": {
+                "serial": 1,
+                "content": [
+                  "${Content}"
+                ],
+                "filters": [
+                  {
+                    "type": "id",
+                    "content": "fullId(\"com.instagram.android:id/row_feed_button_comment\")"
+                  }
+                ],
+                "inputType": "taskOrder",
+                "filterType": "desc",
+                "searchTime": 5000,
+                "serialType": "fixedValue"
+              }
+            },
+            {
+              "name": "页面截图",
+              "type": "screenshotPage",
+              "config": {}
+            },
+            {
+              "name": "点击发送评论",
+              "type": "click",
+              "config": {
+                "filters": [
+                  {
+                    "type": "id",
+                    "content": "com.instagram.android:id/send_button"
+                  }
+                ],
+                "filterType": "idOrClass",
+                "searchTime": 3000
+              }
+            },
+            {
+              "name": "页面截图",
+              "type": "screenshotPage",
+              "config": {}
+            }
+          ],
+          "reversal": false,
+          "variable": "name",
+          "variableIndex": "nameIndex"
+        }
+      }
+    ]
+  }

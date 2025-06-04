@@ -1,0 +1,1086 @@
+{
+  "startParamMap": [
+    {
+      "isNotRequired": true,
+      "key": "secondarylogin",
+      "type": "string",
+      "value": "Use phone / email / username"
+    },
+    {
+      "isNotRequired": true,
+      "key": "profilepage",
+      "type": "string",
+      "value": "Profile"
+    },
+    {
+      "isNotRequired": true,
+      "key": "primarylogin",
+      "type": "string",
+      "value": "Use phone / email / username"
+    },
+    {
+      "isNotRequired": true,
+      "key": "alreadyhaveacc",
+      "type": "string",
+      "value": "Already have an account? Log in"
+    },
+    {
+      "isNotRequired": false,
+      "key": "accountId",
+      "type": "string",
+      "value": "ACCOUNTID"
+    },
+    {
+      "isNotRequired": false,
+      "key": "password",
+      "type": "string",
+      "value": "PASSWORD"
+    },
+    {
+      "isNotRequired": false,
+      "key": "username",
+      "type": "string",
+      "value": "USERNAME"
+    }
+  ],
+  "content": [
+    {
+      "config": {
+        "timeout": 8000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "packgename": "com.zhiliaoapp.musically"
+      },
+      "name": "Open app",
+      "type": "openApp"
+    },
+    {
+      "config": {
+        "timeout": 8000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Already have an account? Log in",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "randomDistance": 0,
+        "searchTime": 10000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "useOffset": false
+      },
+      "name": "Click element",
+      "type": "click"
+    },
+    {
+      "config": {
+        "timeout": 8000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "contain",
+        "filters": [
+          {
+            "content": "full screen",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "fullscreen"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "GOT IT",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "fullscreen"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Use phone / email / username",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "randomDistance": 0,
+        "searchTime": 10000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "useOffset": false
+      },
+      "name": "Click element",
+      "type": "click"
+    },
+    {
+      "config": {
+        "content": "${accountId}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "headers": [
+          {
+            "name": "action",
+            "value": "get_phone_and_check_otp"
+          },
+          {
+            "name": "account_id",
+            "value": "${accountId}"
+          }
+        ],
+        "remark": "req daisy data",
+        "type": "get",
+        "url": "https://spectre-studio.app/api/geelark/daisysms-proxy",
+        "variableMap": [
+          {
+            "value": "$",
+            "variable": "phoneData"
+          }
+        ]
+      },
+      "name": "Make a network request",
+      "type": "getNetworkRequest"
+    },
+    {
+      "config": {
+        "timeout": 5000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "headers": [
+                {
+                  "name": "action",
+                  "value": "get_phone_and_check_otp"
+                },
+                {
+                  "name": "account_id",
+                  "value": "${accountId}"
+                }
+              ],
+              "remark": "req daisy data",
+              "type": "get",
+              "url": "https://spectre-studio.app/api/geelark/daisysms-proxy",
+              "variableMap": [
+                {
+                  "value": "$",
+                  "variable": "phoneData"
+                }
+              ]
+            },
+            "name": "Make a network request",
+            "type": "getNetworkRequest"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "notExist",
+            "useVariable": "phoneData"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "content": "${phoneData}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "content": "${phoneData}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "rule": "(?<=\"phone_number\":\")\\d+",
+        "useVariable": "phoneData",
+        "variable": "phoneNumber"
+      },
+      "name": "Text extraction",
+      "type": "getExtractionData"
+    },
+    {
+      "config": {
+        "content": "${phoneNumber}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "rule": "(?<=\"rental_id\":\")\\d+",
+        "useVariable": "phoneData",
+        "variable": "rentalId"
+      },
+      "name": "Text extraction",
+      "type": "getExtractionData"
+    },
+    {
+      "config": {
+        "content": "${rentalId}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "content": [
+          "${phoneNumber}"
+        ],
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "android.widget.EditText",
+            "type": "class"
+          }
+        ],
+        "hiddenChildren": false,
+        "inputType": "taskOrder",
+        "remark": "enter phone #",
+        "searchTime": 15000,
+        "serial": 1,
+        "serialType": "fixedValue"
+      },
+      "name": "Enter content",
+      "type": "inputContent"
+    },
+    {
+      "config": {
+        "timeout": 10000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Continue",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "randomDistance": 0,
+        "searchTime": 10000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "useOffset": false
+      },
+      "name": "Click element",
+      "type": "click"
+    },
+    {
+      "config": {
+        "headers": [
+          {
+            "name": "action",
+            "value": "get_phone_and_check_otp"
+          },
+          {
+            "name": "account_id",
+            "value": "${accountId}"
+          }
+        ],
+        "remark": "otp data",
+        "type": "get",
+        "url": "https://spectre-studio.app/api/geelark/daisysms-proxy",
+        "variableMap": [
+          {
+            "value": "$",
+            "variable": "otpData"
+          }
+        ]
+      },
+      "name": "Make a network request",
+      "type": "getNetworkRequest"
+    },
+    {
+      "config": {
+        "timeout": 8000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "content": "${otpData}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "rule": "\"otp_code\":\"(\\d{4,8})\"",
+        "useVariable": "otpData",
+        "variable": "otpCode1"
+      },
+      "name": "Text extraction",
+      "type": "getExtractionData"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "rule": "\\d{4,8}",
+        "useVariable": "otpCode1",
+        "variable": "otpCode"
+      },
+      "name": "Text extraction",
+      "type": "getExtractionData"
+    },
+    {
+      "config": {
+        "content": "${otpCode}"
+      },
+      "name": "History",
+      "type": "log"
+    },
+    {
+      "config": {
+        "content": [
+          "${otpCode}"
+        ],
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "android.widget.EditText",
+            "type": "class"
+          }
+        ],
+        "hiddenChildren": false,
+        "inputType": "taskOrder",
+        "remark": "enter OTP",
+        "searchTime": 15000,
+        "serial": "1",
+        "serialType": "fixedValue"
+      },
+      "name": "Enter content",
+      "type": "inputContent"
+    },
+    {
+      "config": {
+        "remark": "wait another sec",
+        "timeout": 1000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Create account",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "createaccount"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Create account",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "saveItemName": "createaccount",
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Year picker",
+                  "type": "desc"
+                }
+              ],
+              "hiddenChildren": false,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "variable": "yearpicker"
+            },
+            "name": "Wait for element to appear",
+            "type": "waitEle"
+          },
+          {
+            "config": {
+              "_a": 100,
+              "_b": 300,
+              "direction": "bottom",
+              "distanceMax": "900",
+              "distanceMin": "600",
+              "isSection": false,
+              "position": [
+                260,
+                400
+              ],
+              "randomDistance": 0,
+              "randomWheelSleepTime": [
+                100,
+                300
+              ],
+              "saveItemName": "yearpicker"
+            },
+            "name": "Sliding page",
+            "type": "scrollPage"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Next",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "createaccount"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Let's go",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "letsgo"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Let’s go",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "saveItemName": "letsgo",
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "letsgo"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Choose username",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "usernameexist"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "content": "${username}"
+            },
+            "name": "History",
+            "type": "log"
+          },
+          {
+            "config": {
+              "content": [
+                "${username}"
+              ],
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "inputType": "taskOrder",
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue"
+            },
+            "name": "Enter content",
+            "type": "inputContent"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Next",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "usernameexist"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Choose password",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "passwordexist1"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "content": "${password}"
+            },
+            "name": "History",
+            "type": "log"
+          },
+          {
+            "config": {
+              "content": [
+                "${password}"
+              ],
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "inputType": "taskOrder",
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue"
+            },
+            "name": "Enter content",
+            "type": "inputContent"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Next",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "passwordexist1"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Create password",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "passwordexist2"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "content": "${password}"
+            },
+            "name": "History",
+            "type": "log"
+          },
+          {
+            "config": {
+              "content": [
+                "${password}"
+              ],
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "inputType": "taskOrder",
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue"
+            },
+            "name": "Enter content",
+            "type": "inputContent"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Next",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "passwordexist2"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Start watching",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "randomDistance": 0,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "useOffset": false
+      },
+      "name": "Click element",
+      "type": "click"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Got it",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "randomDistance": 0,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "useOffset": false
+      },
+      "name": "Click element",
+      "type": "click"
+    },
+    {
+      "config": {},
+      "name": "End task",
+      "type": "endTask"
+    }
+  ]
+}

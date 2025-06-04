@@ -1,0 +1,380 @@
+{
+    "startParamMap": [],
+    "content": [
+      {
+        "config": {
+          "packgename": "com.zhiliaoapp.musically",
+          "remark": "",
+          "timeout": 30000
+        },
+        "type": "openApp"
+      },
+      {
+        "config": {
+          "remark": "",
+          "timeout": 10000,
+          "timeoutMax": 300000,
+          "timeoutMin": 1000,
+          "timeoutType": "fixedValue"
+        },
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "Allow",
+              "type": "text"
+            }
+          ],
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filterType": "equal",
+          "filters": [
+            {
+              "content": "Got it",
+              "type": "text"
+            }
+          ],
+          "searchTime": 200,
+          "serial": 1,
+          "serialType": "fixedValue",
+          "useOffset": false
+        },
+        "name": "点击元素",
+        "type": "click"
+      },
+      {
+        "config": {
+          "filters": [
+            {
+              "content": "Home",
+              "type": "text"
+            }
+          ],
+          "remark": "",
+          "searchTime": 3000,
+          "serial": 1,
+          "serialMax": 50,
+          "serialMin": 1,
+          "serialType": "fixedValue",
+          "variable": ""
+        },
+        "type": "click"
+      },
+      {
+        "config": {
+          "remark": "",
+          "timeout": 2000,
+          "timeoutMax": 300000,
+          "timeoutMin": 1000,
+          "timeoutType": "fixedValue"
+        },
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "filters": [
+            {
+              "content": "For You",
+              "type": "text"
+            },
+            {
+              "content": "android:id/text1",
+              "type": "id"
+            }
+          ],
+          "remark": "",
+          "searchTime": 30,
+          "serial": 1,
+          "serialMax": 50,
+          "serialMin": 1,
+          "serialType": "fixedValue",
+          "variable": ""
+        },
+        "type": "click"
+      },
+      {
+        "config": {
+          "remark": "",
+          "timeout": 2000,
+          "timeoutMax": 300000,
+          "timeoutMin": 1000,
+          "timeoutType": "fixedValue"
+        },
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "direction": "top",
+          "distanceMax": 700,
+          "distanceMin": 500,
+          "position": [
+            300,
+            700
+          ],
+          "randomWheelSleepTime": [
+            300,
+            500
+          ],
+          "remark": ""
+        },
+        "type": "scrollPage"
+      },
+      {
+        "config": {
+          "remark": "",
+          "timeout": 2000,
+          "timeoutMax": 300000,
+          "timeoutMin": 1000,
+          "timeoutType": "fixedValue"
+        },
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "direction": "top",
+          "distanceMax": 700,
+          "distanceMin": 500,
+          "position": [
+            300,
+            700
+          ],
+          "randomWheelSleepTime": [
+            300,
+            500
+          ],
+          "remark": ""
+        },
+        "type": "scrollPage"
+      },
+      {
+        "config": {
+          "remark": "",
+          "timeout": 2000,
+          "timeoutMax": 300000,
+          "timeoutMin": 1000,
+          "timeoutType": "fixedValue"
+        },
+        "type": "waitTime"
+      },
+      {
+        "config": {
+          "children": [
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Allow",
+                    "type": "text"
+                  }
+                ],
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Continue",
+                    "type": "text"
+                  }
+                ],
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "Got it",
+                    "type": "text"
+                  }
+                ],
+                "searchTime": 200,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "useOffset": false
+              },
+              "name": "点击元素",
+              "type": "click"
+            },
+            {
+              "config": {
+                "direction": "top",
+                "distanceMax": 600,
+                "distanceMin": 500,
+                "position": [
+                  300,
+                  700
+                ],
+                "randomWheelSleepTime": [
+                  300,
+                  500
+                ],
+                "remark": ""
+              },
+              "type": "scrollPage"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "com.zhiliaoapp.musically:id/rzo",
+                    "type": "id"
+                  }
+                ],
+                "remark": "",
+                "searchTime": 30,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "avatar"
+              },
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "filterType": "equal",
+                "filters": [
+                  {
+                    "content": "com.zhiliaoapp.musically:id/tjl",
+                    "type": "id"
+                  }
+                ],
+                "remark": "",
+                "searchTime": 30,
+                "serial": 1,
+                "serialType": "fixedValue",
+                "variable": "avatar2"
+              },
+              "type": "waitEle"
+            },
+            {
+              "config": {
+                "apposition": "or",
+                "children": [
+                  {
+                    "config": {
+                      "remark": "",
+                      "timeout": 2000,
+                      "timeoutMax": 30000,
+                      "timeoutMin": 10000,
+                      "timeoutType": "randomInterval"
+                    },
+                    "type": "waitTime"
+                  },
+                  {
+                    "config": {
+                      "children": [
+                        {
+                          "config": {
+                            "filterType": "equal",
+                            "filters": [
+                              {
+                                "content": "com.zhiliaoapp.musically:id/dit",
+                                "type": "id"
+                              }
+                            ],
+                            "remark": "",
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue"
+                          },
+                          "type": "click"
+                        },
+                        {
+                          "config": {
+                            "filterType": "equal",
+                            "filters": [
+                              {
+                                "content": "com.zhiliaoapp.musically:id/dvx",
+                                "type": "id"
+                              }
+                            ],
+                            "remark": "",
+                            "searchTime": 3000,
+                            "serial": 1,
+                            "serialType": "fixedValue"
+                          },
+                          "type": "click"
+                        }
+                      ],
+                      "hiddenChildren": false,
+                      "other": [],
+                      "probability": 30,
+                      "relation": "random",
+                      "remark": ""
+                    },
+                    "type": "ifElse"
+                  },
+                  {
+                    "config": {
+                      "remark": "",
+                      "timeout": 2000,
+                      "timeoutMax": 30000,
+                      "timeoutMin": 10000,
+                      "timeoutType": "fixedValue"
+                    },
+                    "type": "waitTime"
+                  }
+                ],
+                "conditionList": [
+                  {
+                    "relation": "exist",
+                    "useVariable": "avatar"
+                  },
+                  {
+                    "probability": 50,
+                    "relation": "exist",
+                    "useVariable": "avatar2"
+                  }
+                ],
+                "hiddenChildren": false,
+                "other": [],
+                "remark": ""
+              },
+              "type": "ifElse"
+            }
+          ],
+          "hiddenChildren": false,
+          "remark": "",
+          "times": 15,
+          "variableIndex": "for_times_index"
+        },
+        "type": "forTimes"
+      },
+      {
+        "config": {
+          "remark": "",
+          "timeout": 120000,
+          "timeoutMax": 300000,
+          "timeoutMin": 1000,
+          "timeoutType": "fixedValue"
+        },
+        "type": "waitTime"
+      }
+    ]
+  }

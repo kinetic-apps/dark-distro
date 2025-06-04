@@ -16,7 +16,8 @@ import {
   Play,
   Image as ImageIcon,
   Activity,
-  Shield
+  Shield,
+  Heart
 } from 'lucide-react'
 import { ProfileOperationalStatus } from '@/components/profile-operational-status'
 import { ScreenshotViewer } from '@/components/screenshot-viewer'
@@ -390,6 +391,13 @@ export function ProfilesTableV2({ profiles, onBulkAction }: ProfilesTableV2Props
               {selectedIds.length} selected
             </span>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => onBulkAction('engage', selectedIds)}
+                className="btn-primary btn-sm flex items-center gap-1"
+              >
+                <Heart className="h-3 w-3" />
+                Engage
+              </button>
               <button
                 onClick={() => onBulkAction('start-phone', selectedIds)}
                 className="btn-secondary btn-sm"

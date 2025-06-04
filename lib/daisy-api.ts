@@ -236,19 +236,8 @@ export class DaisySMSAPI {
     }
   }
 
-  async getActiveRentalsCount(): Promise<number> {
-    const { count } = await supabaseAdmin
-      .from('sms_rentals')
-      .select('*', { count: 'exact', head: true })
-      .in('status', ['waiting', 'received'])
-
-    return count || 0
-  }
-
-  async canRentNewNumber(): Promise<boolean> {
-    const count = await this.getActiveRentalsCount()
-    return count < 20
-  }
+  // Removed getActiveRentalsCount and canRentNewNumber methods
+  // DaisySMS will handle their own rental limits and return appropriate errors
 
   async getBalance(): Promise<number> {
     const response = await this.request({

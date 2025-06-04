@@ -1,0 +1,506 @@
+{
+  "startParamMap": [
+    {
+      "isNotRequired": false,
+      "key": "usernames",
+      "type": "textarea",
+      "value": []
+    },
+    {
+      "isNotRequired": false,
+      "key": "comments",
+      "type": "textarea",
+      "value": []
+    },
+    {
+      "isNotRequired": false,
+      "key": "postsPerUser",
+      "type": "string",
+      "value": "3"
+    },
+    {
+      "isNotRequired": false,
+      "key": "likeOnly",
+      "type": "string",
+      "value": "false"
+    }
+  ],
+  "content": [
+    {
+      "config": {
+        "timeout": 5000,
+        "timeoutMax": 8000,
+        "timeoutMin": 3000,
+        "timeoutType": "randomInterval"
+      },
+      "name": "Initial wait",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "packgename": "com.zhiliaoapp.musically"
+      },
+      "name": "Open TikTok",
+      "type": "openApp"
+    },
+    {
+      "config": {
+        "timeout": 8000,
+        "timeoutMax": 10000,
+        "timeoutMin": 5000,
+        "timeoutType": "randomInterval"
+      },
+      "name": "Wait for app to load",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
+            "content": "Discover",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "randomDistance": 0,
+        "searchTime": 10000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "useOffset": false
+      },
+      "name": "Click Discover/Search",
+      "type": "click"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 5000,
+        "timeoutMin": 2000,
+        "timeoutType": "randomInterval"
+      },
+      "name": "Wait for search page",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "content": [
+          "${usernames}"
+        ],
+        "reversal": false,
+        "variable": "currentUsername",
+        "variableIndex": "usernameIndex",
+        "children": [
+          {
+            "config": {
+              "filterType": "contain",
+              "filters": [
+                {
+                  "content": "Search",
+                  "type": "desc"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 5000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click search bar",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 2000,
+              "timeoutMax": 3000,
+              "timeoutMin": 1500,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait for keyboard",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "keyType": "clearAll"
+            },
+            "name": "Clear search field",
+            "type": "keyOption"
+          },
+          {
+            "config": {
+              "content": [
+                "${currentUsername}"
+              ],
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "inputType": "taskOrder",
+              "searchTime": 5000,
+              "serial": 1,
+              "serialType": "fixedValue"
+            },
+            "name": "Enter username",
+            "type": "inputContent"
+          },
+          {
+            "config": {
+              "timeout": 2000,
+              "timeoutMax": 3000,
+              "timeoutMin": 1500,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait after typing",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "keyType": "enter"
+            },
+            "name": "Press enter",
+            "type": "keyOption"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 5000,
+              "timeoutMin": 2000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait for search results",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Users",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 5000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click Users tab",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 4000,
+              "timeoutMin": 2000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait for users list",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "contain",
+              "filters": [
+                {
+                  "content": "@${currentUsername}",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 10000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click on user profile",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 5000,
+              "timeoutMax": 7000,
+              "timeoutMin": 3000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait for profile to load",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "maxTimes": "${postsPerUser}",
+              "minTimes": 1,
+              "serialType": "fixedValue",
+              "children": [
+                {
+                  "config": {
+                    "filterType": "equal",
+                    "filters": [
+                      {
+                        "content": "com.zhiliaoapp.musically:id/cover",
+                        "type": "id"
+                      }
+                    ],
+                    "hiddenChildren": false,
+                    "randomDistance": 0,
+                    "searchTime": 5000,
+                    "serial": "${postIndex}",
+                    "serialType": "fixedValue",
+                    "useOffset": false
+                  },
+                  "name": "Click on post",
+                  "type": "click"
+                },
+                {
+                  "config": {
+                    "timeout": 5000,
+                    "timeoutMax": 7000,
+                    "timeoutMin": 3000,
+                    "timeoutType": "randomInterval"
+                  },
+                  "name": "Wait for video to load",
+                  "type": "waitTime"
+                },
+                {
+                  "config": {
+                    "filterType": "contain",
+                    "filters": [
+                      {
+                        "content": "Like",
+                        "type": "desc"
+                      }
+                    ],
+                    "hiddenChildren": false,
+                    "searchTime": 3000,
+                    "serial": 1,
+                    "serialType": "fixedValue",
+                    "variable": "likeButton"
+                  },
+                  "name": "Check if like button exists",
+                  "type": "waitEle"
+                },
+                {
+                  "config": {
+                    "apposition": "and",
+                    "children": [
+                      {
+                        "config": {
+                          "filterType": "contain",
+                          "filters": [
+                            {
+                              "content": "Like",
+                              "type": "desc"
+                            }
+                          ],
+                          "hiddenChildren": false,
+                          "randomDistance": 0,
+                          "searchTime": 3000,
+                          "serial": 1,
+                          "serialType": "fixedValue",
+                          "useOffset": false
+                        },
+                        "name": "Click like button",
+                        "type": "click"
+                      },
+                      {
+                        "config": {
+                          "timeout": 2000,
+                          "timeoutMax": 3000,
+                          "timeoutMin": 1000,
+                          "timeoutType": "randomInterval"
+                        },
+                        "name": "Wait after like",
+                        "type": "waitTime"
+                      }
+                    ],
+                    "conditionList": [
+                      {
+                        "probability": 50,
+                        "relation": "exist",
+                        "useVariable": "likeButton"
+                      }
+                    ]
+                  },
+                  "name": "Like if not already liked",
+                  "type": "ifElse"
+                },
+                {
+                  "config": {
+                    "apposition": "and",
+                    "children": [
+                      {
+                        "config": {
+                          "filterType": "contain",
+                          "filters": [
+                            {
+                              "content": "Comment",
+                              "type": "desc"
+                            }
+                          ],
+                          "hiddenChildren": false,
+                          "randomDistance": 0,
+                          "searchTime": 5000,
+                          "serial": 1,
+                          "serialType": "fixedValue",
+                          "useOffset": false
+                        },
+                        "name": "Click comment button",
+                        "type": "click"
+                      },
+                      {
+                        "config": {
+                          "timeout": 3000,
+                          "timeoutMax": 4000,
+                          "timeoutMin": 2000,
+                          "timeoutType": "randomInterval"
+                        },
+                        "name": "Wait for comment section",
+                        "type": "waitTime"
+                      },
+                      {
+                        "config": {
+                          "content": [
+                            "${comments}"
+                          ],
+                          "reversal": false,
+                          "variable": "selectedComment",
+                          "children": [
+                            {
+                              "config": {
+                                "content": [
+                                  "${selectedComment}"
+                                ],
+                                "filterType": "contain",
+                                "filters": [
+                                  {
+                                    "content": "Add comment",
+                                    "type": "desc"
+                                  }
+                                ],
+                                "hiddenChildren": false,
+                                "inputType": "taskOrder",
+                                "searchTime": 5000,
+                                "serial": 1,
+                                "serialType": "fixedValue"
+                              },
+                              "name": "Enter comment",
+                              "type": "inputContent"
+                            }
+                          ]
+                        },
+                        "name": "Select random comment",
+                        "type": "forData"
+                      },
+                      {
+                        "config": {
+                          "timeout": 2000,
+                          "timeoutMax": 3000,
+                          "timeoutMin": 1000,
+                          "timeoutType": "randomInterval"
+                        },
+                        "name": "Wait before posting",
+                        "type": "waitTime"
+                      },
+                      {
+                        "config": {
+                          "filterType": "contain",
+                          "filters": [
+                            {
+                              "content": "Post",
+                              "type": "text"
+                            }
+                          ],
+                          "hiddenChildren": false,
+                          "randomDistance": 0,
+                          "searchTime": 5000,
+                          "serial": 1,
+                          "serialType": "fixedValue",
+                          "useOffset": false
+                        },
+                        "name": "Click post comment",
+                        "type": "click"
+                      },
+                      {
+                        "config": {
+                          "timeout": 3000,
+                          "timeoutMax": 5000,
+                          "timeoutMin": 2000,
+                          "timeoutType": "randomInterval"
+                        },
+                        "name": "Wait after comment",
+                        "type": "waitTime"
+                      }
+                    ],
+                    "conditionList": [
+                      {
+                        "probability": 50,
+                        "relation": "notEqual",
+                        "result": "true",
+                        "useVariable": "likeOnly"
+                      }
+                    ]
+                  },
+                  "name": "Comment if not like only",
+                  "type": "ifElse"
+                },
+                {
+                  "config": {},
+                  "name": "Go back to profile",
+                  "type": "goBack"
+                },
+                {
+                  "config": {
+                    "timeout": 3000,
+                    "timeoutMax": 4000,
+                    "timeoutMin": 2000,
+                    "timeoutType": "randomInterval"
+                  },
+                  "name": "Wait for profile",
+                  "type": "waitTime"
+                }
+              ]
+            },
+            "name": "Process posts for user",
+            "type": "forTimes"
+          },
+          {
+            "config": {},
+            "name": "Go back to search",
+            "type": "goBack"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 4000,
+              "timeoutMin": 2000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait before next user",
+            "type": "waitTime"
+          }
+        ]
+      },
+      "name": "Process each username",
+      "type": "forData"
+    },
+    {
+      "config": {
+        "content": "Task completed successfully"
+      },
+      "name": "Log completion",
+      "type": "log"
+    },
+    {
+      "config": {},
+      "name": "End task",
+      "type": "endTask"
+    }
+  ]
+} 

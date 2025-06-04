@@ -6,10 +6,7 @@ export async function GET(request: NextRequest) {
     // Test 1: Check balance
     const balance = await daisyApi.getBalance()
     
-    // Test 2: Check active rentals
-    const activeCount = await daisyApi.getActiveRentalsCount()
-    
-    // Test 3: Get service prices (optional - for debugging)
+    // Test 2: Get service prices (optional - for debugging)
     let prices = null
     try {
       const pricesResponse = await fetch(
@@ -24,8 +21,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       balance: balance,
-      activeRentals: activeCount,
-      canRentNew: activeCount < 20,
       prices_preview: prices,
       api_configured: !!process.env.DAISYSMS_API_KEY
     })

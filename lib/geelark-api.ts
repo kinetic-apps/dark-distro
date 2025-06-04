@@ -301,12 +301,18 @@ export class GeeLarkAPI {
   }
 
   async queryTasks(taskIds: string[]): Promise<any> {
-    return await this.request('/open/v1/task/query', {
+    console.log('[GeeLark] Querying tasks:', taskIds)
+    
+    const response = await this.request('/open/v1/task/query', {
       method: 'POST',
       body: JSON.stringify({
         ids: taskIds
       })
     })
+    
+    console.log('[GeeLark] Query tasks response:', JSON.stringify(response, null, 2))
+    
+    return response
   }
 
   async getProfileStatus(profileId: string): Promise<ProfileStatus> {
@@ -1119,7 +1125,10 @@ export class GeeLarkAPI {
     profileId: string,
     flowId: string,
     phoneNumber: string,
-    otpCode: string
+    otpCode: string,
+    accountId: string,
+    username: string,
+    password: string
   ): Promise<{ taskId: string }> {
     const formattedPhone = phoneNumber.startsWith('1') ? phoneNumber.substring(1) : phoneNumber
     
@@ -1127,6 +1136,9 @@ export class GeeLarkAPI {
       profileId,
       flowId,
       {
+        accountId: accountId,
+        username: username,
+        password: password,
         phoneNumber: formattedPhone,
         otpCode: otpCode
       },

@@ -25,14 +25,17 @@ export interface ProfileStatusInfo {
 
 export function getProfileStatus(profile: any): ProfileStatusInfo {
   // Check phone status FIRST - if phone is off, nothing else matters
-  const phoneMetaStatus = profile.phone?.[0]?.meta?.phone_status || profile.phone?.meta?.phone_status
-  const phoneStatus = phoneMetaStatus || profile.phone?.[0]?.status || profile.phone?.status
+  // Handle both array and single object responses from the foreign key relation
+  const phoneData = Array.isArray(profile.phone) ? profile.phone[0] : profile.phone
+  
+  
+  // Priority: meta.phone_status > status column
+  const phoneStatus = phoneData?.meta?.phone_status || phoneData?.status
   const isPhoneOnline = phoneStatus === 'started' || phoneStatus === 'online' || phoneStatus === 'running'
   const isPhoneStarting = phoneStatus === 'starting'
   
   // If we have a phone status and it's not online/starting, phone is off
-  if (phoneStatus && phoneStatus !== 'started' && phoneStatus !== 'online' && 
-      phoneStatus !== 'running' && phoneStatus !== 'starting') {
+  if (phoneStatus && !isPhoneOnline && !isPhoneStarting) {
     return {
       status: 'paused',
       message: phoneStatus === 'expired' ? 'Phone expired' : 'Phone stopped',
@@ -105,7 +108,7 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
       status: 'installing',
       message: 'Installing TikTok...',
       progress: profile.setup_progress || 60,
-      isOnline: true,
+      isOnline: isPhoneOnline,
       canPerformActions: false
     }
   }
@@ -115,7 +118,7 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
       status: 'logging_in',
       message: 'Setting up TikTok account...',
       progress: profile.setup_progress || 80,
-      isOnline: true,
+      isOnline: isPhoneOnline,
       canPerformActions: false
     }
   }
@@ -125,7 +128,7 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
       status: 'verifying',
       message: profile.status === 'otp_received' ? 'Entering verification code...' : 'Waiting for SMS verification...',
       progress: profile.setup_progress || 90,
-      isOnline: true,
+      isOnline: isPhoneOnline,
       canPerformActions: false
     }
   }
@@ -136,7 +139,7 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
       status: 'warming_up',
       message: `Warming up account...`,
       progress: profile.warmup_progress || 0,
-      isOnline: true,
+      isOnline: isPhoneOnline,
       canPerformActions: false
     }
   }
@@ -146,7 +149,7 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
     return {
       status: 'posting',
       message: 'Posting content...',
-      isOnline: true,
+      isOnline: isPhoneOnline,
       canPerformActions: false
     }
   }
@@ -173,11 +176,28 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
 
   // Default states
   if (profile.status === 'new') {
-    return {
-      status: 'paused',
-      message: 'Not started',
-      isOnline: false,
-      canPerformActions: true
+    // Even if status is 'new', respect the actual phone status
+    if (isPhoneOnline) {
+      return {
+        status: 'ready',
+        message: 'Phone online',
+        isOnline: true,
+        canPerformActions: true
+      }
+    } else if (isPhoneStarting) {
+      return {
+        status: 'initializing',
+        message: 'Phone starting',
+        isOnline: false,
+        canPerformActions: false
+      }
+    } else {
+      return {
+        status: 'paused',
+        message: 'Not started',
+        isOnline: false,
+        canPerformActions: true
+      }
     }
   }
 

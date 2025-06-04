@@ -5,6 +5,7 @@ import { ProfilesTableV2 } from '@/components/tables/profiles-table-v2'
 import { ProfileBulkActions } from '@/components/profile-bulk-actions'
 import { AssignProxyModal } from '@/components/assign-proxy-modal'
 import { BulkDeleteModal } from '@/components/bulk-delete-modal'
+import { EngagementModal, EngagementConfig } from '@/components/engagement-modal'
 import { useNotification } from '@/lib/context/notification-context'
 
 interface ProfilesPageWrapperProps {
@@ -15,8 +16,10 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
   const [bulkAction, setBulkAction] = useState<{ action: string; ids: string[] } | null>(null)
   const [showProxyModal, setShowProxyModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showEngagementModal, setShowEngagementModal] = useState(false)
   const [pendingProxyAssignment, setPendingProxyAssignment] = useState<string[]>([])
   const [pendingDeletion, setPendingDeletion] = useState<{ ids: string[], names: string[] }>({ ids: [], names: [] })
+  const [pendingEngagement, setPendingEngagement] = useState<string[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const { notify } = useNotification()
 
@@ -33,6 +36,9 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
       
       setPendingDeletion({ ids, names: profileNames })
       setShowDeleteModal(true)
+    } else if (action === 'engage') {
+      setPendingEngagement(ids)
+      setShowEngagementModal(true)
     } else {
       setBulkAction({ action, ids })
     }
@@ -121,6 +127,62 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     }
   }
 
+  const handleEngagement = async (config: EngagementConfig) => {
+    setShowEngagementModal(false)
+    setIsProcessing(true)
+    
+    try {
+      // Get GeeLark profile IDs from accounts
+      const selectedProfiles = profiles
+        .filter(p => pendingEngagement.includes(p.id))
+        .filter(p => p.geelark_profile_id) // Only profiles with GeeLark IDs
+        .map(p => p.geelark_profile_id)
+      
+      if (selectedProfiles.length === 0) {
+        throw new Error('No valid profiles selected. Ensure profiles have GeeLark IDs.')
+      }
+      
+      const response = await fetch('/api/automation/tiktok-engage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile_ids: selectedProfiles,
+          target_usernames: config.target_usernames,
+          posts_per_user: config.posts_per_user,
+          like_only: config.like_only
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Engagement failed')
+      }
+
+      // Show summary
+      notify('success', `Engagement started: ${data.summary.successful_tasks} successful, ${data.summary.failed_tasks} failed`)
+
+      // Show individual errors if any
+      data.results
+        .filter((r: any) => r.status === 'failed')
+        .slice(0, 3)
+        .forEach((result: any) => {
+          notify('error', `${result.profile_id}: ${result.error || result.message}`)
+        })
+
+      // Don't refresh immediately - let user see the results
+      
+    } catch (error) {
+      console.error('Engagement error:', error)
+      notify('error', error instanceof Error ? error.message : 'Failed to start engagement')
+    } finally {
+      setIsProcessing(false)
+      setPendingEngagement([])
+    }
+  }
+
   return (
     <>
       <ProfilesTableV2
@@ -158,6 +220,18 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
           onCancel={() => {
             setShowDeleteModal(false)
             setPendingDeletion({ ids: [], names: [] })
+          }}
+        />
+      )}
+
+      {showEngagementModal && (
+        <EngagementModal
+          profileIds={pendingEngagement}
+          profileCount={pendingEngagement.length}
+          onConfirm={handleEngagement}
+          onCancel={() => {
+            setShowEngagementModal(false)
+            setPendingEngagement([])
           }}
         />
       )}

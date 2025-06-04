@@ -170,12 +170,12 @@ export async function POST(request: NextRequest) {
     const geelarkProfileIds = geelarkProfiles.map((p: any) => p.id)
     
     // Debug log to see what data we're getting
-    console.log('GeeLark profiles data:', JSON.stringify(geelarkProfiles, null, 2))
+    // console.log('GeeLark profiles data:', JSON.stringify(geelarkProfiles, null, 2))
     
     // Log proxy info specifically
-    geelarkProfiles.forEach((profile: any) => {
-      console.log(`Profile ${profile.id} proxy data:`, profile.proxy)
-    })
+    // geelarkProfiles.forEach((profile: any) => {
+    //   console.log(`Profile ${profile.id} proxy data:`, profile.proxy)
+    // })
 
     // Get all existing profiles from Supabase
     const { data: existingProfiles, error: fetchError } = await supabaseAdmin
@@ -250,36 +250,36 @@ export async function POST(request: NextRequest) {
         // Handle proxy data if present
         let proxyId = null
         if (profile.proxy) {
-          console.log(`Processing proxy for profile ${profileId}:`, profile.proxy)
+          // console.log(`Processing proxy for profile ${profileId}:`, profile.proxy)
           
-          // Check if proxy already exists in our database
+          // Check if proxy already exists in our database by host and port only
           const { data: existingProxy, error: proxySearchError } = await supabaseAdmin
             .from('proxies')
             .select('id')
             .eq('host', profile.proxy.server)
             .eq('port', profile.proxy.port)
-            .eq('username', profile.proxy.username || '')
             .single()
 
           if (proxySearchError && proxySearchError.code !== 'PGRST116') {
+            // PGRST116 means no rows found, which is fine
+            // Any other error should be logged
             console.error(`Error searching for proxy:`, proxySearchError)
           }
 
           if (existingProxy) {
             proxyId = existingProxy.id
-            console.log(`Found existing proxy ${proxyId} for profile ${profileId}`)
+            // console.log(`Found existing proxy ${proxyId} for profile ${profileId}`)
             
-            // Update proxy info if needed
+            // Update proxy info if needed (but not username as it might be different per session)
             await supabaseAdmin
               .from('proxies')
               .update({
-                type: profile.proxy.type || 'socks5',
-                password: profile.proxy.password,
+                password: profile.proxy.password || '',
                 updated_at: new Date().toISOString()
               })
               .eq('id', existingProxy.id)
           } else {
-            console.log(`Creating new proxy for profile ${profileId}`)
+            // console.log(`Creating new proxy for profile ${profileId}`)
             
             // Map GeeLark proxy type to our database types
             let proxyType = 'sim' // Default to sim for mobile proxies
@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
               proxyType = 'sim' // SOAX mobile proxies
             }
             
-            // Create new proxy record
+            // Try to create new proxy record
             const { data: newProxy, error: proxyError } = await supabaseAdmin
               .from('proxies')
               .insert({
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
 
             if (!proxyError && newProxy) {
               proxyId = newProxy.id
-              console.log(`Created proxy ${proxyId} for profile ${profileId}`)
+              // console.log(`Created proxy ${proxyId} for profile ${profileId}`)
               
               await supabaseAdmin.from('logs').insert({
                 level: 'info',
@@ -325,23 +325,29 @@ export async function POST(request: NextRequest) {
                   trace_id: traceId
                 }
               })
+            } else if (proxyError && proxyError.code === '23505') {
+              // Duplicate key error - proxy was created by another process in the meantime
+              // Try to fetch it again
+              const { data: retryProxy } = await supabaseAdmin
+                .from('proxies')
+                .select('id')
+                .eq('host', profile.proxy.server)
+                .eq('port', profile.proxy.port)
+                .single()
+              
+              if (retryProxy) {
+                proxyId = retryProxy.id
+                // Don't log this as an error, it's a race condition that we handled
+              }
             } else {
+              // Real error that we couldn't handle
               console.error(`Failed to create proxy for profile ${profileId}:`, proxyError)
-              await supabaseAdmin.from('logs').insert({
-                level: 'error',
-                component: 'api-sync-profiles',
-                message: `Failed to create proxy for profile ${profileId}`,
-                meta: { 
-                  error: proxyError,
-                  proxy_data: profile.proxy,
-                  geelark_profile_id: profileId,
-                  trace_id: traceId
-                }
-              })
+              // Don't log every single proxy error to avoid flooding logs
+              // Only log if it's not a duplicate key error
             }
           }
         } else {
-          console.log(`No proxy data for profile ${profileId}`)
+          // console.log(`No proxy data for profile ${profileId}`)
         }
 
         if (existingAccount) {
@@ -349,7 +355,6 @@ export async function POST(request: NextRequest) {
           const updateData: any = {
             // Only update tiktok_username if it's currently null or empty
             ...((!existingAccount.tiktok_username || existingAccount.tiktok_username.trim() === '') && { tiktok_username: serialName }),
-            status: profile.status === 2 ? 'active' : 'new',
             updated_at: new Date().toISOString(),
             meta: {
               geelark_serial_no: profile.serialNo,
@@ -358,6 +363,21 @@ export async function POST(request: NextRequest) {
               geelark_equipment_info: profile.equipmentInfo,
               last_synced_at: new Date().toISOString()
             }
+          }
+
+          // Only update status if account is not in the middle of SMS setup or other critical operations
+          const criticalStatuses = [
+            'creating_profile',
+            'starting_phone',
+            'installing_tiktok',
+            'running_geelark_task',
+            'renting_number',
+            'pending_verification',
+            'otp_received'
+          ]
+          
+          if (!criticalStatuses.includes(existingAccount.status)) {
+            updateData.status = profile.status === 2 ? 'active' : 'new'
           }
 
           // Update proxy_id if we have one
@@ -377,7 +397,7 @@ export async function POST(request: NextRequest) {
             .eq('id', existingAccount.id)
 
           if (updateError) {
-            console.error(`Failed to update account for profile ${profileId}:`, updateError)
+            // console.error(`Failed to update account for profile ${profileId}:`, updateError)
             errors++
             continue
           }
@@ -399,7 +419,7 @@ export async function POST(request: NextRequest) {
         const accountData: any = {
           geelark_profile_id: profileId,
           tiktok_username: serialName,  // For new accounts, we can use serialName as a placeholder
-          status: profile.status === 2 ? 'active' : 'new',
+          status: 'new',  // Always start new accounts as 'new', not 'active'
           warmup_done: false,
           warmup_progress: 0,
           error_count: 0,
@@ -424,7 +444,7 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (accountError) {
-          console.error(`Failed to create account for profile ${profileId}:`, accountError)
+          // console.error(`Failed to create account for profile ${profileId}:`, accountError)
           errors++
           continue
         }
@@ -454,7 +474,7 @@ export async function POST(request: NextRequest) {
           })
 
         if (phoneError) {
-          console.error(`Failed to create phone for profile ${profileId}:`, phoneError)
+          // console.error(`Failed to create phone for profile ${profileId}:`, phoneError)
           // Delete the account if phone creation fails
           await supabaseAdmin
             .from('accounts')
@@ -466,7 +486,7 @@ export async function POST(request: NextRequest) {
 
         imported++
       } catch (error) {
-        console.error(`Error processing profile ${profile.id}:`, error)
+        // console.error(`Error processing profile ${profile.id}:`, error)
         errors++
       }
     }

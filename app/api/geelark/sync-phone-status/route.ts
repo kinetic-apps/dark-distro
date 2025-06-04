@@ -46,12 +46,9 @@ export async function POST(request: NextRequest) {
           status: statusMap[detail.status] || 'unknown',
           status_code: detail.status
         })) || []
-
-        // Get list of profile IDs that were returned
-        const returnedProfileIds = new Set(phoneStatuses.map((s: any) => s.profile_id))
         
-        // Mark phones as stopped if they weren't returned by GeeLark
-        const stoppedPhones = batch.filter(p => !returnedProfileIds.has(p.geelark_profile_id!))
+        // Only update phones that were explicitly returned by GeeLark with a status
+        // Don't assume phones are stopped just because they weren't in the response
         
         // Update phone status in database
         await Promise.all([
@@ -94,32 +91,10 @@ export async function POST(request: NextRequest) {
                   })
               }
             }
-          }),
-          // Update phones that weren't returned (mark as stopped)
-          ...stoppedPhones.map(async (profile) => {
-            const { data: existingPhone } = await supabaseAdmin
-              .from('phones')
-              .select('profile_id, meta')
-              .eq('profile_id', profile.geelark_profile_id!)
-              .single()
-
-            if (existingPhone) {
-              await supabaseAdmin
-                .from('phones')
-                .update({
-                  meta: {
-                    ...(existingPhone.meta || {}),
-                    phone_status: 'stopped',
-                    phone_status_updated_at: new Date().toISOString()
-                  },
-                  updated_at: new Date().toISOString()
-                })
-                .eq('profile_id', profile.geelark_profile_id!)
-            }
           })
         ])
 
-        totalSynced += phoneStatuses.length + stoppedPhones.length
+        totalSynced += phoneStatuses.length
         totalErrors += statusResult.failDetails?.length || 0
 
       } catch (error) {

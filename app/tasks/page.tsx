@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, X, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react'
+import { Loader2, X, RotateCcw, CheckCircle, AlertCircle, Clock, Heart } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
 
 interface Task {
@@ -31,60 +31,103 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
-  const [autoRefresh] = useState(true) // Always enabled
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
 
-  const fetchTasks = async (skipGeeLarkSync = false) => {
+  const fetchTasks = async () => {
     const supabase = createClient()
-    const { data, error } = await supabase
+    
+    // Method 1: Get tasks from tasks table
+    const { data: dbTasks, error: dbError } = await supabase
       .from('tasks')
       .select('*, accounts(id, tiktok_username)')
       .order('started_at', { ascending: false })
       .limit(100)
 
-    if (data && !error) {
-      setTasks(data)
-      
-      // Automatically sync running/pending tasks with GeeLark
-      if (!skipGeeLarkSync && autoRefresh) {
-        const runningTasks = data.filter(t => t.status === 'running' || t.status === 'pending')
-        await syncTaskStatuses(runningTasks.map(t => t.geelark_task_id))
+    // Method 2: Get accounts with active GeeLark tasks (fallback for broken task tracking)
+    const { data: accountTasks, error: accountError } = await supabase
+      .from('accounts')
+      .select('id, tiktok_username, geelark_task_id, status, current_setup_step, meta, updated_at')
+      .not('geelark_task_id', 'is', null)
+      .in('status', ['creating_profile', 'starting_phone', 'installing_tiktok', 'running_geelark_task', 'renting_number', 'pending_verification'])
+      .order('updated_at', { ascending: false })
+
+    const allTasks: Task[] = []
+    
+    // Add tasks from tasks table
+    if (dbTasks && !dbError) {
+      allTasks.push(...dbTasks)
+    }
+    
+    // Add missing tasks from account records (accounts that have task IDs but no corresponding task record)
+    if (accountTasks && !accountError) {
+      for (const account of accountTasks) {
+        // Check if this task is already in our tasks list
+        const existingTask = allTasks.find(t => t.geelark_task_id === account.geelark_task_id)
+        
+        if (!existingTask && account.geelark_task_id) {
+          // Create a synthetic task record from account data
+          const syntheticTask: Task = {
+            id: `synthetic-${account.id}`,
+            type: 'login',
+            geelark_task_id: account.geelark_task_id,
+            account_id: account.id,
+            status: account.status === 'running_geelark_task' ? 'running' : 'pending',
+            started_at: account.updated_at,
+            completed_at: null,
+            meta: {
+              synthetic: true,
+              from_account_record: true,
+              setup_step: account.current_setup_step,
+              username: account.meta?.username
+            },
+            accounts: {
+              id: account.id,
+              tiktok_username: account.tiktok_username
+            }
+          }
+          allTasks.push(syntheticTask)
+        }
       }
     }
+
+    // Sort all tasks by started_at
+    allTasks.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+    
+    setTasks(allTasks)
     setIsLoading(false)
   }
 
   useEffect(() => {
     fetchTasks()
     
-    // Always auto-refresh every 10 seconds
-    const interval = setInterval(fetchTasks, 10000)
+    // Refresh every 30 seconds to show updated data
+    const interval = setInterval(fetchTasks, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  const syncTaskStatuses = async (taskIds: string[]) => {
+  const syncAllTasks = async () => {
     setIsSyncing(true)
     try {
-      // Always update the sync time when called
-      setLastSyncTime(new Date())
+      // Get all running/pending tasks
+      const tasksToSync = tasks.filter(t => t.status === 'running' || t.status === 'pending')
       
-      if (taskIds.length === 0) {
-        // No tasks to sync
+      if (tasksToSync.length === 0) {
+        setLastSyncTime(new Date())
         return
       }
 
       const response = await fetch('/api/geelark/task-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task_ids: taskIds })
+        body: JSON.stringify({ task_ids: tasksToSync.map(t => t.geelark_task_id) })
       })
 
       if (response.ok) {
         const data = await response.json()
-        console.log('Auto-synced task statuses:', data)
-        // Fetch again to get updated data from database
-        await fetchTasks(true) // Skip GeeLark sync to avoid infinite loop
+        setLastSyncTime(new Date())
+        // Refresh tasks to show updated data
+        await fetchTasks()
       }
     } catch (error) {
       console.error('Failed to sync task statuses:', error)
@@ -188,7 +231,8 @@ export default function TasksPage() {
       warmup: 'Warmup',
       post: 'Post',
       login: 'Login',
-      profile_edit: 'Profile Edit'
+      profile_edit: 'Profile Edit',
+      engagement: 'Engagement'
     }
     return labels[type] || type
   }
@@ -207,35 +251,37 @@ export default function TasksPage() {
         <div>
           <h1 className="page-title">Tasks</h1>
           <p className="page-description">
-            Monitor and manage automation tasks
+            Monitor and manage automation tasks. Tasks are sourced from both the database and active account records for complete visibility.
             {tasks.filter(t => t.status === 'running' || t.status === 'pending').length > 0 && (
               <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
                 ({tasks.filter(t => t.status === 'running' || t.status === 'pending').length} active)
+              </span>
+            )}
+            {tasks.filter(t => t.meta?.synthetic).length > 0 && (
+              <span className="ml-2 text-sm text-amber-600 dark:text-amber-400">
+                ({tasks.filter(t => t.meta?.synthetic).length} from account records)
               </span>
             )}
           </p>
         </div>
         
         <div className="flex items-center gap-4">
-          {/* Sync Status Indicator */}
-          <div className="flex items-center gap-2">
-            {isSyncing ? (
-              <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Syncing with GeeLark...</span>
-              </div>
-            ) : lastSyncTime ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <span>Auto-syncing • Last update: {formatRelativeTime(lastSyncTime.toISOString())}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
-                <Clock className="h-4 w-4" />
-                <span>Waiting for first sync...</span>
-              </div>
-            )}
-          </div>
+          {/* Sync Button */}
+          <button
+            onClick={syncAllTasks}
+            disabled={isSyncing}
+            className="btn-secondary"
+          >
+            <RotateCcw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync Tasks'}
+          </button>
+
+          {/* Sync Status */}
+          {lastSyncTime && !isSyncing && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Last synced: {formatRelativeTime(lastSyncTime.toISOString())}
+            </span>
+          )}
 
           {selectedTasks.length > 0 && (
             <>
@@ -305,20 +351,33 @@ export default function TasksPage() {
                   />
                 </td>
                 <td className="table-cell">
+                  <div className="flex items-center gap-2">
+                    {task.type === 'engagement' && <Heart className="h-4 w-4 text-pink-500" />}
                   <div className="text-sm font-medium text-gray-900 dark:text-dark-100">
                     {getTaskTypeLabel(task.type)}
+                    </div>
                   </div>
                   {task.meta?.debug && (
                     <div className="text-xs text-blue-600 dark:text-blue-400">DEBUG</div>
                   )}
+                  {task.meta?.synthetic && (
+                    <div className="text-xs text-amber-600 dark:text-amber-400">
+                      FROM ACCOUNT RECORD
+                    </div>
+                  )}
                 </td>
                 <td className="table-cell">
                   <div className="text-sm text-gray-900 dark:text-dark-100">
-                    {task.accounts?.tiktok_username || task.meta?.email || 'Unknown'}
+                    {task.accounts?.tiktok_username || task.meta?.email || task.meta?.username || 'Unknown'}
                   </div>
                   {task.profile_id && (
                     <div className="text-xs text-gray-500 dark:text-dark-400">
                       Profile: {task.profile_id}
+                    </div>
+                  )}
+                  {task.meta?.synthetic && (
+                    <div className="text-xs text-amber-500 dark:text-amber-400">
+                      Step: {task.meta.setup_step}
                     </div>
                   )}
                 </td>
@@ -356,6 +415,12 @@ export default function TasksPage() {
                     : task.meta?.cost_seconds ? `${task.meta.cost_seconds}s` : '-'}
                 </td>
                 <td className="table-cell text-sm text-gray-500 dark:text-dark-400">
+                  {task.type === 'engagement' && task.meta?.target_usernames && (
+                    <div className="text-gray-600 dark:text-dark-400">
+                      Targets: {task.meta.target_usernames.slice(0, 3).join(', ')}
+                      {task.meta.target_usernames.length > 3 && ` +${task.meta.target_usernames.length - 3} more`}
+                    </div>
+                  )}
                   {task.meta?.fail_desc && (
                     <div className="text-red-600 dark:text-red-400 max-w-xs truncate" title={task.meta.fail_desc}>
                       {task.meta.fail_desc}

@@ -198,7 +198,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { task_ids } = body
 
+    console.log('[API] Task status sync request received for task IDs:', task_ids)
+
     if (!Array.isArray(task_ids) || task_ids.length === 0) {
+      console.log('[API] No task IDs provided, returning early')
       return NextResponse.json(
         { error: 'Invalid task IDs' },
         { status: 400 }
@@ -206,7 +209,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Query task status from GeeLark
+    console.log(`[API] Querying GeeLark for ${task_ids.length} tasks...`)
     const taskStatus = await geelarkApi.queryTasks(task_ids)
+    
+    console.log('[API] GeeLark response:', JSON.stringify(taskStatus, null, 2))
 
     // Update local task records
     const updatePromises = taskStatus.items?.map(async (task: any) => {
@@ -215,11 +221,13 @@ export async function POST(request: NextRequest) {
                     task.status === 7 ? 'cancelled' :
                     task.status === 2 ? 'running' : 'pending'
 
-      await supabaseAdmin
+      console.log(`[API] Updating task ${task.id}: GeeLark status ${task.status} -> ${status}`)
+
+      const { data, error } = await supabaseAdmin
         .from('tasks')
         .update({
           status,
-          completed_at: status === 'completed' || status === 'failed' ? new Date().toISOString() : null,
+          completed_at: status === 'completed' || status === 'failed' || status === 'cancelled' ? new Date().toISOString() : null,
           error_message: task.failDesc || null,
           meta: {
             geelark_status: task.status,
@@ -230,16 +238,29 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString()
         })
         .eq('geelark_task_id', task.id)
+        .select()
+
+      if (error) {
+        console.error(`[API] Failed to update task ${task.id}:`, error)
+      } else {
+        console.log(`[API] Successfully updated task ${task.id}`)
+      }
+
+      return { task_id: task.id, status, error }
     }) || []
 
-    await Promise.all(updatePromises)
+    const results = await Promise.all(updatePromises)
+    const updatedCount = results.filter(r => !r.error).length
+
+    console.log(`[API] Updated ${updatedCount}/${taskStatus.items?.length || 0} tasks`)
 
     return NextResponse.json({
       success: true,
-      tasks: taskStatus.items || []
+      tasks: taskStatus.items || [],
+      updated: updatedCount
     })
   } catch (error) {
-    console.error('Task status error:', error)
+    console.error('[API] Task status error:', error)
     
     await supabaseAdmin.from('logs').insert({
       level: 'error',

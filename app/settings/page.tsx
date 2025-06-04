@@ -864,6 +864,13 @@ export default function SettingsPage() {
                   <span className="text-sm text-gray-600 dark:text-dark-400">Import Proxies</span>
                   <ChevronRight className="h-4 w-4 text-gray-400" />
                 </Link>
+                <Link 
+                  href="/settings/comments" 
+                  className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
+                >
+                  <span className="text-sm text-gray-600 dark:text-dark-400">Manage Comments Pool</span>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </Link>
               </div>
             </div>
           </div>

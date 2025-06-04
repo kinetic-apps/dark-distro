@@ -70,31 +70,12 @@ export default function ScreenshotsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
 
-  // Fetch phones with account data and tasks
+  // Fetch accounts with phone status
   const fetchPhones = async () => {
     const supabase = createClient()
     
-    // Get phones with their associated accounts
-    const { data: phonesData, error: phonesError } = await supabase
-      .from('phones')
-      .select(`
-        id,
-        profile_id,
-        account_id,
-        status,
-        meta,
-        updated_at
-      `)
-      .order('updated_at', { ascending: false })
-
-    if (phonesError) {
-      console.error('Error fetching phones:', phonesError)
-      return
-    }
-
-    // Get account details
-    const accountIds = phonesData?.map(p => p.account_id).filter(Boolean) || []
-    const { data: accountsData } = await supabase
+    // Get accounts with geelark profiles
+    const { data: accountsData, error: accountsError } = await supabase
       .from('accounts')
       .select(`
         id,
@@ -102,11 +83,38 @@ export default function ScreenshotsPage() {
         geelark_profile_id,
         status,
         current_setup_step,
-        setup_progress
+        setup_progress,
+        meta,
+        updated_at
       `)
-      .in('id', accountIds)
+      .not('geelark_profile_id', 'is', null)
+      .order('updated_at', { ascending: false })
+
+    if (accountsError) {
+      console.error('Error fetching accounts:', accountsError)
+      return
+    }
+
+    if (!accountsData || accountsData.length === 0) {
+      setIsLoading(false)
+      return
+    }
+
+    // Get phone status from phones table for accounts
+    const profileIds = accountsData.map(a => a.geelark_profile_id).filter(Boolean)
+    const { data: phonesData } = await supabase
+      .from('phones')
+      .select('profile_id, meta')
+      .in('profile_id', profileIds)
+
+    // Create a map of phone statuses
+    const phoneStatusMap = new Map<string, any>()
+    phonesData?.forEach(phone => {
+      phoneStatusMap.set(phone.profile_id, phone.meta)
+    })
 
     // Get active tasks
+    const accountIds = accountsData.map(a => a.id)
     const { data: tasksData } = await supabase
       .from('tasks')
       .select(`
@@ -124,10 +132,8 @@ export default function ScreenshotsPage() {
       .in('status', ['running', 'pending'])
       .order('created_at', { ascending: false })
 
-    // Combine data
-    const accountsMap = new Map(accountsData?.map(a => [a.id, a]) || [])
+    // Create tasks map
     const tasksMap = new Map<string, TaskInfo[]>()
-    
     tasksData?.forEach(task => {
       if (!tasksMap.has(task.account_id)) {
         tasksMap.set(task.account_id, [])
@@ -135,10 +141,19 @@ export default function ScreenshotsPage() {
       tasksMap.get(task.account_id)!.push(task)
     })
 
-    const phonesWithAccounts = phonesData?.map(phone => ({
-      ...phone,
-      account: accountsMap.get(phone.account_id)
-    })) || []
+    // Create phone-like objects for compatibility
+    const phonesWithAccounts = accountsData.map(account => {
+      const phoneMeta = phoneStatusMap.get(account.geelark_profile_id!) || {}
+      return {
+        id: account.id,
+        profile_id: account.geelark_profile_id,
+        account_id: account.id,
+        status: 'unknown',
+        meta: phoneMeta,
+        updated_at: account.updated_at,
+        account: account
+      }
+    })
 
     setPhones(phonesWithAccounts)
 

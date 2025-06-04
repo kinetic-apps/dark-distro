@@ -17,16 +17,7 @@ export async function POST(request: NextRequest) {
     
     const { account_id } = body
 
-    // Check current rental count
-    const canRent = await daisyApi.canRentNewNumber()
-    if (!canRent) {
-      return NextResponse.json(
-        { error: 'Maximum concurrent rentals (20) reached' },
-        { status: 429 }
-      )
-    }
-
-    // Rent number
+    // Rent number - let DaisySMS handle their own limits
     const rental = await daisyApi.rentNumber(account_id)
 
     await supabaseAdmin.from('logs').insert({

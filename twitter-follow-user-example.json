@@ -1,0 +1,618 @@
+{
+    "startParamMap": [
+      {
+        "key": "AccountID",
+        "type": "textarea",
+        "value": [
+          "@Wikipedia",
+          ""
+        ],
+        "isNotRequired": false
+      }
+    ],
+    "content": [
+      {
+        "name": "打开应用",
+        "type": "openApp",
+        "config": {
+          "packgename": "com.twitter.android"
+        }
+      },
+      {
+        "name": "等待时间",
+        "type": "waitTime",
+        "config": {
+          "timeout": 3000,
+          "timeoutMax": 8847,
+          "timeoutMin": 7847,
+          "timeoutType": "randomInterval"
+        }
+      },
+      {
+        "name": "For循环次数",
+        "type": "forTimes",
+        "config": {
+          "children": [
+            {
+              "name": "滑动页面",
+              "type": "scrollPage",
+              "config": {
+                "_a": 200,
+                "_b": 300,
+                "position": [
+                  "112",
+                  "785"
+                ],
+                "direction": "bottom",
+                "distanceMax": "400",
+                "distanceMin": "300",
+                "randomDistance": 16,
+                "randomWheelSleepTime": [
+                  200,
+                  300
+                ]
+              }
+            },
+            {
+              "name": "等待时间",
+              "type": "waitTime",
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 1000,
+                "timeoutMin": 898,
+                "timeoutType": "randomInterval"
+              }
+            }
+          ],
+          "maxTimes": 3,
+          "minTimes": 2,
+          "serialType": "randomInterval"
+        }
+      },
+      {
+        "name": "等待时间",
+        "type": "waitTime",
+        "config": {
+          "timeout": 3000,
+          "timeoutMax": 2234,
+          "timeoutMin": 1234,
+          "timeoutType": "randomInterval"
+        }
+      },
+      {
+        "name": "点击元素",
+        "type": "click",
+        "config": {
+          "remark": "Click \"Search\" icon",
+          "serial": 1,
+          "filters": [
+            {
+              "type": "desc",
+              "content": "Search and Explore"
+            }
+          ],
+          "useOffset": false,
+          "filterType": "equal",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "randomDistance": 0
+        }
+      },
+      {
+        "name": "等待时间",
+        "type": "waitTime",
+        "config": {
+          "timeout": 3000,
+          "timeoutMax": 6687,
+          "timeoutMin": 5647,
+          "timeoutType": "randomInterval"
+        }
+      },
+      {
+        "name": "点击元素",
+        "type": "click",
+        "config": {
+          "remark": "Click Search Bar",
+          "serial": 1,
+          "filters": [
+            {
+              "type": "id",
+              "content": "com.twitter.android:id/query_view"
+            }
+          ],
+          "offsetX": 1,
+          "offsetY": 3,
+          "useOffset": false,
+          "filterType": "equal",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "randomDistance": 14
+        }
+      },
+      {
+        "name": "For循环数据",
+        "type": "forData",
+        "config": {
+          "content": [
+            "${AccountID}"
+          ],
+          "children": [
+            {
+              "name": "等待时间",
+              "type": "waitTime",
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 2343,
+                "timeoutMin": 1874,
+                "timeoutType": "randomInterval"
+              }
+            },
+            {
+              "name": "输入内容",
+              "type": "inputContent",
+              "config": {
+                "remark": "",
+                "serial": 1,
+                "content": [
+                  "${twitterid}"
+                ],
+                "filters": [
+                  {
+                    "type": "class",
+                    "content": "android.widget.EditText"
+                  }
+                ],
+                "inputType": "taskOrder",
+                "filterType": "equal",
+                "searchTime": 3000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false
+              }
+            },
+            {
+              "name": "等待时间",
+              "type": "waitTime",
+              "config": {
+                "timeout": 3000,
+                "timeoutMax": 3354,
+                "timeoutMin": 2215,
+                "timeoutType": "randomInterval"
+              }
+            },
+            {
+              "name": "等待元素出现",
+              "type": "waitEle",
+              "config": {
+                "serial": 1,
+                "filters": [
+                  {
+                    "type": "text",
+                    "content": "Following"
+                  }
+                ],
+                "variable": "following",
+                "filterType": "equal",
+                "searchTime": 5000,
+                "serialType": "fixedValue",
+                "hiddenChildren": false
+              }
+            },
+            {
+              "name": "IF条件",
+              "type": "ifElse",
+              "config": {
+                "other": [
+                  {
+                    "name": "点击元素",
+                    "type": "click",
+                    "config": {
+                      "serial": 1,
+                      "filters": [
+                        {
+                          "type": "id",
+                          "content": "com.twitter.android:id/clear_text"
+                        }
+                      ],
+                      "useOffset": false,
+                      "filterType": "equal",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false,
+                      "randomDistance": 6
+                    }
+                  }
+                ],
+                "children": [
+                  {
+                    "name": "获取单个元素文本数据",
+                    "type": "getOneTextToVariable",
+                    "config": {
+                      "serial": 1,
+                      "filters": [
+                        {
+                          "type": "id",
+                          "content": "com.twitter.android:id/screenname_item"
+                        },
+                        {
+                          "type": "text",
+                          "content": "${twitterid}"
+                        }
+                      ],
+                      "variable": "accountid",
+                      "filterType": "equal",
+                      "searchTime": 3000,
+                      "serialType": "fixedValue",
+                      "hiddenChildren": false
+                    }
+                  },
+                  {
+                    "name": "IF条件",
+                    "type": "ifElse",
+                    "config": {
+                      "other": [
+                        {
+                          "name": "点击元素",
+                          "type": "click",
+                          "config": {
+                            "serial": 1,
+                            "filters": [
+                              {
+                                "type": "id",
+                                "content": "com.twitter.android:id/clear_text"
+                              }
+                            ],
+                            "useOffset": false,
+                            "filterType": "equal",
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "hiddenChildren": false,
+                            "randomDistance": 6
+                          }
+                        }
+                      ],
+                      "remark": "If the entered account ID matches the ID of the first search result, click on that search result",
+                      "children": [
+                        {
+                          "name": "点击元素",
+                          "type": "click",
+                          "config": {
+                            "remark": "Click on the search result that matches the account ID",
+                            "serial": 1,
+                            "filters": [
+                              {
+                                "type": "id",
+                                "content": "com.twitter.android:id/screenname_item"
+                              },
+                              {
+                                "type": "text",
+                                "content": "${twitterid}"
+                              }
+                            ],
+                            "useOffset": false,
+                            "filterType": "equal",
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "hiddenChildren": false,
+                            "randomDistance": 0
+                          }
+                        },
+                        {
+                          "name": "等待时间",
+                          "type": "waitTime",
+                          "config": {
+                            "timeout": 3000,
+                            "timeoutMax": 7847,
+                            "timeoutMin": 5789,
+                            "timeoutType": "randomInterval"
+                          }
+                        },
+                        {
+                          "name": "For循环次数",
+                          "type": "forTimes",
+                          "config": {
+                            "remark": "Browse the tweets",
+                            "children": [
+                              {
+                                "name": "滑动页面",
+                                "type": "scrollPage",
+                                "config": {
+                                  "_a": 200,
+                                  "_b": 300,
+                                  "position": [
+                                    "120",
+                                    "687"
+                                  ],
+                                  "direction": "top",
+                                  "distanceMax": "400",
+                                  "distanceMin": "300",
+                                  "randomDistance": 13,
+                                  "randomWheelSleepTime": [
+                                    200,
+                                    300
+                                  ]
+                                }
+                              },
+                              {
+                                "name": "等待时间",
+                                "type": "waitTime",
+                                "config": {
+                                  "timeout": 3000,
+                                  "timeoutMax": 4614,
+                                  "timeoutMin": 3125,
+                                  "timeoutType": "randomInterval"
+                                }
+                              }
+                            ],
+                            "maxTimes": 5,
+                            "minTimes": 3,
+                            "serialType": "randomInterval"
+                          }
+                        },
+                        {
+                          "name": "For循环次数",
+                          "type": "forTimes",
+                          "config": {
+                            "remark": "Scroll to the top",
+                            "children": [
+                              {
+                                "name": "滑动页面",
+                                "type": "scrollPage",
+                                "config": {
+                                  "_a": 200,
+                                  "_b": 300,
+                                  "position": [
+                                    "120",
+                                    "687"
+                                  ],
+                                  "direction": "bottom",
+                                  "distanceMax": "400",
+                                  "distanceMin": "300",
+                                  "randomDistance": 13,
+                                  "randomWheelSleepTime": [
+                                    200,
+                                    300
+                                  ]
+                                }
+                              },
+                              {
+                                "name": "等待时间",
+                                "type": "waitTime",
+                                "config": {
+                                  "timeout": 3000,
+                                  "timeoutMax": 1432,
+                                  "timeoutMin": 1234,
+                                  "timeoutType": "randomInterval"
+                                }
+                              }
+                            ],
+                            "maxTimes": 7,
+                            "minTimes": 6,
+                            "serialType": "randomInterval"
+                          }
+                        },
+                        {
+                          "name": "等待元素出现",
+                          "type": "waitEle",
+                          "config": {
+                            "remark": "Wait for the Follow button to appear",
+                            "serial": 1,
+                            "filters": [
+                              {
+                                "type": "id",
+                                "content": "com.twitter.android:id/button_bar_follow"
+                              }
+                            ],
+                            "variable": "followbtn",
+                            "filterType": "equal",
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "hiddenChildren": false
+                          }
+                        },
+                        {
+                          "name": "IF条件",
+                          "type": "ifElse",
+                          "config": {
+                            "remark": "",
+                            "children": [
+                              {
+                                "name": "点击元素",
+                                "type": "click",
+                                "config": {
+                                  "remark": "Click Follow button",
+                                  "serial": 1,
+                                  "filters": [
+                                    {
+                                      "type": "id",
+                                      "content": ""
+                                    }
+                                  ],
+                                  "useOffset": false,
+                                  "filterType": "equal",
+                                  "searchTime": 3000,
+                                  "serialType": "fixedValue",
+                                  "saveItemName": "followbtn",
+                                  "hiddenChildren": false,
+                                  "randomDistance": 12
+                                }
+                              },
+                              {
+                                "name": "等待时间",
+                                "type": "waitTime",
+                                "config": {
+                                  "timeout": 3000,
+                                  "timeoutMax": 2214,
+                                  "timeoutMin": 1245,
+                                  "timeoutType": "randomInterval"
+                                }
+                              }
+                            ],
+                            "apposition": "and",
+                            "conditionList": [
+                              {
+                                "relation": "exist",
+                                "probability": 50,
+                                "useVariable": "followbtn"
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "name": "页面后退",
+                          "type": "goBack",
+                          "config": {}
+                        },
+                        {
+                          "name": "点击元素",
+                          "type": "click",
+                          "config": {
+                            "remark": "Click Search Bar",
+                            "serial": 1,
+                            "filters": [
+                              {
+                                "type": "id",
+                                "content": "com.twitter.android:id/query_view"
+                              }
+                            ],
+                            "offsetX": 1,
+                            "offsetY": 3,
+                            "useOffset": false,
+                            "filterType": "equal",
+                            "searchTime": 3000,
+                            "serialType": "fixedValue",
+                            "hiddenChildren": false,
+                            "randomDistance": 14
+                          }
+                        },
+                        {
+                          "name": "等待时间",
+                          "type": "waitTime",
+                          "config": {
+                            "timeout": 3000,
+                            "timeoutMax": 5514,
+                            "timeoutMin": 3456,
+                            "timeoutType": "randomInterval"
+                          }
+                        }
+                      ],
+                      "apposition": "and",
+                      "conditionList": [
+                        {
+                          "result": "${accountid}",
+                          "relation": "equal",
+                          "probability": 50,
+                          "useVariable": "twitterid"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "apposition": "and",
+                "conditionList": [
+                  {
+                    "relation": "notExist",
+                    "probability": 50,
+                    "useVariable": "following"
+                  }
+                ]
+              }
+            }
+          ],
+          "reversal": false,
+          "variable": "twitterid"
+        }
+      },
+      {
+        "name": "点击元素",
+        "type": "click",
+        "config": {
+          "remark": "",
+          "serial": 1,
+          "filters": [
+            {
+              "type": "desc",
+              "content": "Collapse"
+            }
+          ],
+          "useOffset": false,
+          "filterType": "equal",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "randomDistance": 0
+        }
+      },
+      {
+        "name": "等待时间",
+        "type": "waitTime",
+        "config": {
+          "timeout": 3000,
+          "timeoutMax": 2145,
+          "timeoutMin": 1234,
+          "timeoutType": "randomInterval"
+        }
+      },
+      {
+        "name": "点击元素",
+        "type": "click",
+        "config": {
+          "remark": "Click on the profile icon in the top left corner",
+          "serial": 1,
+          "filters": [
+            {
+              "type": "desc",
+              "content": "Show navigation drawer"
+            }
+          ],
+          "useOffset": false,
+          "filterType": "equal",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "randomDistance": 0
+        }
+      },
+      {
+        "name": "等待时间",
+        "type": "waitTime",
+        "config": {
+          "timeout": 3000,
+          "timeoutMax": 3387,
+          "timeoutMin": 2214,
+          "timeoutType": "randomInterval"
+        }
+      },
+      {
+        "name": "点击元素",
+        "type": "click",
+        "config": {
+          "remark": "Click on \"Following\" to view the following list",
+          "serial": 1,
+          "filters": [
+            {
+              "type": "text",
+              "content": "Following"
+            }
+          ],
+          "useOffset": false,
+          "filterType": "equal",
+          "searchTime": 3000,
+          "serialType": "fixedValue",
+          "hiddenChildren": false,
+          "randomDistance": 0
+        }
+      },
+      {
+        "name": "等待时间",
+        "type": "waitTime",
+        "config": {
+          "timeout": 3000,
+          "timeoutMax": 3387,
+          "timeoutMin": 2214,
+          "timeoutType": "randomInterval"
+        }
+      }
+    ]
+  }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X, Smartphone, Loader2, Phone } from 'lucide-react'
 import { useNotification } from '@/lib/context/notification-context'
+import { BatchSetupStatus } from '@/components/batch-setup-status'
 
 interface TikTokSMSSetupModalProps {
   onClose: () => void
@@ -15,6 +16,7 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
   const { notify } = useNotification()
   const [isLoading, setIsLoading] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [batchAccountIds, setBatchAccountIds] = useState<string[]>([])
 
 
   const handleSetup = async () => {
@@ -32,8 +34,6 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
         long_term_rental: true,
         assign_proxy: true,
         proxy_type: 'auto', // Will randomly select from GeeLark
-        // No warmup settings - warmup is disabled
-        warmup_duration_minutes: 0,
         // Quantity for batch creation
         quantity: quantity
       }
@@ -62,18 +62,13 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
       if (data.success) {
         if (data.batch_results) {
           // Handle batch results
-          const { successful_setups, failed_setups, total_requested } = data.batch_results
-          notify('success', `Batch setup completed! ${successful_setups}/${total_requested} phones created successfully.`)
+          const { successful_setups, failed_setups, total_requested, account_ids } = data.batch_results
+          notify('success', `Batch setup initiated! Processing ${total_requested} phones in parallel.`)
           
-          if (failed_setups > 0) {
-            notify('error', `${failed_setups} phones failed to create.`)
-          }
+          // Set account IDs for status tracking
+          setBatchAccountIds(account_ids || [])
           
-          // Navigate to profiles page to see all created phones
-          if (onSuccess && data.batch_results.account_ids.length > 0) {
-            // For batch, just close modal and let user see the profiles table
-            onClose()
-          }
+          // Don't close modal yet - let the status tracker show progress
         } else {
           // Handle single setup
           notify('success', 'SMS Setup completed successfully!')
@@ -196,10 +191,27 @@ export function TikTokSMSSetupModal({ onClose, onSuccess }: TikTokSMSSetupModalP
                     Setting up {quantity} phone{quantity !== 1 ? 's' : ''}...
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-500">
-                    This may take a few minutes
+                    {quantity > 1 
+                      ? `Running in parallel (up to 5 at once). This typically takes ${Math.ceil(quantity / 5) * 5}-${Math.ceil(quantity / 5) * 10} minutes.`
+                      : 'This may take a few minutes'
+                    }
                   </p>
                 </div>
               </div>
+              
+              {/* Show batch status if we have account IDs */}
+              {batchAccountIds.length > 0 && (
+                <BatchSetupStatus 
+                  accountIds={batchAccountIds}
+                  onComplete={() => {
+                    notify('info', 'All phones have been processed!')
+                    // Allow modal to be closed after a short delay
+                    setTimeout(() => {
+                      setIsLoading(false)
+                    }, 2000)
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
