@@ -3,8 +3,8 @@ import { geelarkApi } from '@/lib/geelark-api'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { monitorEngagementCompletion } from '@/lib/utils/engagement-monitor'
 
-// Set maximum duration to 1800 seconds (30 minutes) for engagement tasks
-export const maxDuration = 1800
+// Set maximum duration to 800 seconds (13.3 minutes) for engagement tasks - Vercel Pro plan limit
+export const maxDuration = 800
 
 interface EngagementOptions {
   profile_ids: string[]
