@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
     // Get all existing profiles from Supabase
     const { data: existingProfiles, error: fetchError } = await supabaseAdmin
       .from('accounts')
-      .select('id, geelark_profile_id, tiktok_username')
+      .select('id, geelark_profile_id, tiktok_username, status')
       .not('geelark_profile_id', 'is', null)
 
     if (fetchError) {
