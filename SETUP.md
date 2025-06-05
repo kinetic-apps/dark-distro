@@ -1,102 +1,131 @@
-# Setup Guide for SPECTRE
+# Spectre Setup Guide
 
 ## Prerequisites
 
-- Node.js 18+ installed
-- Supabase project created
-- GeeLark, SOAX, and DaisySMS accounts set up
+- Node.js 18+ and npm
+- Supabase account
+- GeeLark account
+- DaisySMS account
+- Vercel account (for deployment)
 
-## Step-by-Step Setup
+## Initial Setup
 
-### 1. Environment Configuration
+### 1. Clone and Install
 
-Your `.env.local` file is already configured with the necessary credentials. No changes needed here.
+```bash
+git clone [repository-url]
+cd spectre
+npm install
+```
 
-### 2. Database Migration
+### 2. Environment Variables
 
-Since your tables already exist, you need to run the migration to add missing columns and constraints:
+Copy `.env.example` to `.env.local` and fill in all required values:
 
-1. Go to your Supabase Dashboard > SQL Editor
-2. Run the following migrations in order:
-   - `/supabase/migrations/002_rpc_functions.sql` (creates the increment function)
-   - `/supabase/migrations/003_add_missing_elements.sql` (adds missing columns and constraints)
+```bash
+cp .env.example .env.local
+```
 
-### 3. Supabase Storage Setup
+### 3. Database Setup
 
-1. In Supabase Dashboard, go to Storage
-2. Ensure you have a bucket named `ghostpost-outbox` (should already exist)
-3. Make sure the bucket is private (not public)
+1. Create a new Supabase project
+2. Run the migrations in order from `supabase/migrations/`
+3. Enable Row Level Security (RLS) on all tables
+4. Set up storage buckets:
+   - `screenshots` (public)
+   - `assets` (public)
+   - `exports` (private)
 
 ### 4. Authentication Setup
 
 1. In Supabase Dashboard, go to Authentication > Providers
-2. Enable Email authentication if not already enabled
-3. Create a user account for yourself:
-   - Go to Authentication > Users
-   - Click "Add user"
-   - Enter your email and password
+2. Enable Email provider
+3. Configure Google OAuth (optional)
+4. Add your domain to the redirect URLs
 
-### 5. Local Development
+## Development
 
-1. Install dependencies (if not already done):
-   ```bash
-   npm install
-   ```
-
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-3. Open http://localhost:3000 in your browser
-
-4. Sign in with the account you created in step 4
-
-### 6. Initial Data Setup (Optional)
-
-If you want to add some test proxies manually:
-
-```sql
--- Add test SOAX proxies
-INSERT INTO proxies (label, type, host, port, username, password, health)
-VALUES 
-  ('Sticky-Test-1', 'sticky', 'proxy.soax.com', 9000, 'test-user', 'test-pass', 'unknown'),
-  ('SIM-Test-1', 'sim', 'us5.sim.soax.com', 12000, 't31S07sq7dYC3SkE', 'mobile;;;;', 'unknown'),
-  ('SIM-Test-2', 'sim', 'us5.sim.soax.com', 12001, 't31S07sq7dYC3SkE', 'mobile;;;;', 'unknown');
+```bash
+npm run dev
 ```
 
-### 7. Test the Application
+Visit `http://localhost:3000`
 
-1. **Create a Profile**: Go to Profiles > New Profile
-2. **Check Logs**: Go to Logs to see if operations are being logged correctly
-3. **Test SMS**: Try renting a number in the SMS section
-4. **Upload Test Video**: Upload a test MP4 to the `ghostpost-outbox` bucket via Supabase Dashboard
+## Testing the Setup
 
-### 8. Troubleshooting
+### 1. Create Test Data
 
-If you encounter issues:
+After setting up, you can add test data to verify everything works:
 
-1. **Database errors**: Check the browser console and Supabase logs
-2. **API errors**: Check the Logs page in the app
-3. **Authentication issues**: Ensure your Supabase URL and keys are correct
-4. **Storage issues**: Verify the bucket name and permissions
+```sql
+-- Add test proxies (these will be replaced by GeeLark sync)
+INSERT INTO proxies (geelark_id, scheme, server, port, username, password, group_name, is_active)
+VALUES 
+  ('test-1', 'socks5', 'proxy.example.com', 9000, 'user1', 'pass1', 'residential', true),
+  ('test-2', 'socks5', 'proxy.example.com', 9001, 'user2', 'pass2', 'mobile', true);
 
-### 9. Production Deployment
+-- Add proxy group settings
+INSERT INTO proxy_group_settings (group_name, allowed_for_phone_creation, priority)
+VALUES 
+  ('residential', true, 1),
+  ('mobile', true, 2),
+  ('datacenter', false, 3);
+```
 
-When ready to deploy:
+### 2. Verify Integrations
+
+1. **GeeLark**: Test connection at `/api/geelark/test-auth`
+2. **DaisySMS**: Test connection at `/api/daisysms/test-auth`
+3. **Proxy Sync**: Manually trigger at `/api/geelark/sync-proxies-from-geelark`
+
+### 3. Create Your First Profile
+
+1. Navigate to `/profiles/new`
+2. Fill in device details
+3. Select proxy configuration (auto-assign recommended)
+4. Submit to create a new GeeLark profile
+
+## Deployment
+
+### Vercel Deployment
 
 1. Push to GitHub
-2. Deploy to Vercel:
-   ```bash
-   vercel
-   ```
-3. Add environment variables in Vercel dashboard
-4. The cron jobs will automatically start running based on `vercel.json`
+2. Import project in Vercel
+3. Add all environment variables
+4. Deploy
 
-## Notes
+### Post-Deployment
 
-- The `rental_id` column was renamed from `daisy_id` in the migration
-- The `asset_path` column was renamed from `video_path` in the migration
-- All tables now have `meta` JSONB columns for flexible data storage
-- All tables now have proper `updated_at` triggers
-- The logs table was created fresh as it didn't exist before
+1. Update `NEXT_PUBLIC_APP_URL` to your production URL
+2. Add production domain to Supabase redirect URLs
+3. Test all integrations in production
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database connection errors**: Check Supabase service role key
+2. **GeeLark API errors**: Verify API key and check GeeLark account status
+3. **Proxy sync not working**: Ensure GeeLark has proxies configured
+4. **SMS verification failing**: Check DaisySMS balance and API key
+
+### Logs
+
+- Check browser console for client-side errors
+- View server logs in Vercel dashboard
+- Database logs available in Supabase dashboard
+
+## Maintenance
+
+### Regular Tasks
+
+1. Monitor proxy sync status
+2. Clean up old screenshots (30+ days)
+3. Review error logs weekly
+4. Update dependencies monthly
+
+### Backup
+
+1. Export Supabase data regularly
+2. Backup environment variables
+3. Document any custom configurations

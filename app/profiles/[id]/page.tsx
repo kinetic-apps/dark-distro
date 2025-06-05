@@ -49,7 +49,6 @@ export default async function ProfileDetailPage({
     .from('accounts')
     .select(`
       *,
-      proxy:proxies!proxy_id(*),
       phone:phones!fk_account(*),
       tasks(*)
     `)
@@ -87,10 +86,8 @@ export default async function ProfileDetailPage({
     successRate: completedTasks.length > 0 
       ? Math.round((completedTasks.length / (completedTasks.length + failedTasks.length)) * 100)
       : 0,
-    lastActive: profile.phone?.[0]?.last_heartbeat || profile.updated_at,
-    uptime: profile.phone?.[0]?.last_heartbeat 
-      ? Math.round((Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24))
-      : 0
+    lastActive: profile.updated_at,
+    uptime: Math.round((Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24))
   }
 
   const getStatusColor = (status: string) => {
@@ -191,7 +188,7 @@ export default async function ProfileDetailPage({
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
                     <div 
-                      className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500"
+                      className="bg-green-500 h-2 rounded-full transition-all duration-500"
                       style={{ width: `${profile.warmup_progress}%` }}
                     />
                   </div>
@@ -313,40 +310,48 @@ export default async function ProfileDetailPage({
                   <Smartphone className="h-4 w-4" />
                   Device
                 </h4>
-                {profile.phone?.[0] ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-dark-400">Status</span>
-                      {profile.geelark_profile_id && (
-                        <ProfileStatus 
-                          profileId={profile.geelark_profile_id} 
-                          accountId={profile.id}
-                          showProgress={true}
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-dark-400">Battery</span>
-                      <div className="flex items-center gap-2">
-                        <Battery className={`h-4 w-4 ${
-                          (profile.phone[0].battery || 0) > 50 ? 'text-green-500' :
-                          (profile.phone[0].battery || 0) > 20 ? 'text-yellow-500' :
-                          'text-red-500'
-                        }`} />
-                        <span className="text-sm font-medium">{profile.phone[0].battery || 0}%</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-dark-400">Model</span>
-                      <span className="text-sm font-medium">{profile.phone[0].device_model || 'Unknown'}</span>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 dark:text-dark-400">Status</span>
+                    {profile.geelark_profile_id && (
+                      <ProfileStatus 
+                        profileId={profile.geelark_profile_id} 
+                        accountId={profile.id}
+                        showProgress={true}
+                      />
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <Smartphone className="mx-auto h-8 w-8 text-gray-400 dark:text-dark-500" />
-                    <p className="mt-2 text-sm text-gray-500 dark:text-dark-400">No device assigned</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 dark:text-dark-400">Model</span>
+                    <span className="text-sm font-medium">
+                      {profile.meta?.geelark_equipment_info?.deviceModel || 
+                       profile.meta?.geelark_equipment_info?.surfaceModelName || 
+                       'Virtual Android Device'}
+                    </span>
                   </div>
-                )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600 dark:text-dark-400">Android Version</span>
+                    <span className="text-sm font-medium">
+                      {profile.meta?.geelark_equipment_info?.osVersion || 'Android'}
+                    </span>
+                  </div>
+                  {profile.meta?.geelark_serial_no && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-dark-400">Serial</span>
+                      <span className="text-sm font-mono text-gray-500">{profile.meta.geelark_serial_no}</span>
+                    </div>
+                  )}
+                  {profile.meta?.geelark_group && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-dark-400">Group</span>
+                      <span className="text-sm font-medium">
+                        {typeof profile.meta.geelark_group === 'object' 
+                          ? (profile.meta.geelark_group.name || JSON.stringify(profile.meta.geelark_group))
+                          : profile.meta.geelark_group}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <hr className="border-gray-200 dark:border-dark-700" />

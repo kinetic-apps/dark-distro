@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { geelarkApi } from '@/lib/geelark-api'
-import { soaxApi } from '@/lib/soax-api'
+import { nanoid } from 'nanoid'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
@@ -55,111 +56,85 @@ export async function POST(request: NextRequest) {
     let proxyData: any = null
 
     if (proxy_id) {
-      // Using GeeLark proxy by ID
+      // Using GeeLark proxy ID directly
       profileParams.proxyId = proxy_id
-      
-      // We don't have the proxy details in our database for GeeLark proxies
-      // Create a placeholder record
-      proxyData = {
-        id: null,
-        type: 'geelark',
-        label: `GeeLark Proxy ${proxy_id}`,
-        geelark_proxy_id: proxy_id
-      }
-    } else if (database_proxy_id) {
-      // Using database proxy by ID
-      const { data: dbProxy } = await supabaseAdmin
-        .from('proxies')
-        .select('*')
-        .eq('id', database_proxy_id)
-        .single()
-
-      if (dbProxy) {
-        profileParams.proxyConfig = {
-          typeId: 1, // SOCKS5
-          server: dbProxy.host,
-          port: dbProxy.port,
-          username: dbProxy.username,
-          password: dbProxy.password
-        }
-        proxyData = dbProxy
-      }
     } else if (proxy_config) {
-      // Using manual or dynamic proxy configuration
+      // Manual proxy configuration
       profileParams.proxyConfig = proxy_config
       
-      // Create a record in our database for tracking
+      // Store proxy info for account record
       const proxyLabel = proxy_config.typeId >= 20 
-        ? `Dynamic-${['IPIDEA', 'IPHTML', 'kookeey', 'Lumatuo'][proxy_config.typeId - 20]}`
-        : `Manual-${proxy_config.server}:${proxy_config.port}`
+        ? `${proxy_config.server}:${proxy_config.port} (HTTP)`
+        : `${proxy_config.server}:${proxy_config.port} (SOCKS5)`
       
       proxyData = {
         id: null,
-        type: proxy_config.typeId >= 20 ? 'dynamic' : 'manual',
         label: proxyLabel,
-        meta: proxy_config
+        server: proxy_config.server,
+        port: proxy_config.port
       }
     } else if (assign_proxy) {
-      // Auto-assign proxy from local database
-      const useProxyType = proxy_type || 'sim'
+      // Auto-assign proxy from database
+      // Get allowed proxy groups
+      const { data: allowedGroups } = await supabaseAdmin
+        .from('proxy_group_settings')
+        .select('group_name')
+        .eq('allowed_for_phone_creation', true)
+        .order('priority', { ascending: true })
 
-      if (useProxyType === 'sticky') {
-        // Create new sticky proxy
-        const proxyCredentials = soaxApi.getStickyPoolProxy()
+      if (allowedGroups && allowedGroups.length > 0) {
+        const groupNames = allowedGroups.map(g => g.group_name)
         
-        const { data: newProxy } = await supabaseAdmin
-          .from('proxies')
-          .insert({
-            label: `Sticky-${Date.now()}`,
-            type: 'sticky',
-            host: proxyCredentials.host,
-            port: proxyCredentials.port,
-            username: proxyCredentials.username,
-            password: proxyCredentials.password,
-            session_id: proxyCredentials.sessionId,
-            health: 'unknown'
-          })
-          .select()
-          .single()
-        
-        proxyData = newProxy
-
-        // Configure proxy for GeeLark profile creation
-        profileParams.proxyConfig = {
-          typeId: 1, // SOCKS5
-          server: proxyCredentials.host,
-          port: proxyCredentials.port,
-          username: proxyCredentials.username,
-          password: proxyCredentials.password
-        }
-      } else {
-        // Find available proxy based on type preference
-        let proxyQuery = supabaseAdmin
+        const { data: availableProxies } = await supabaseAdmin
           .from('proxies')
           .select('*')
-          .is('assigned_account_id', null)
+          .in('group_name', groupNames)
+          .eq('is_active', true)
           .limit(1)
 
-        if (useProxyType !== 'auto') {
-          proxyQuery = proxyQuery.eq('type', useProxyType)
+        if (availableProxies && availableProxies.length > 0) {
+          const proxy = availableProxies[0]
+          profileParams.proxyConfig = {
+            typeId: 1, // SOCKS5
+            server: proxy.server,
+            port: proxy.port,
+            username: proxy.username,
+            password: proxy.password
+          }
+          
+          proxyData = {
+            id: proxy.id,
+            label: `${proxy.server}:${proxy.port}`,
+            server: proxy.server,
+            port: proxy.port
+          }
+        } else {
+          console.log('No database proxies available in allowed groups, checking GeeLark proxies...')
+          
+          try {
+            const geelarkProxiesResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/list-proxies`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            })
+            
+            if (geelarkProxiesResponse.ok) {
+              const geelarkData = await geelarkProxiesResponse.json()
+              if (geelarkData.proxies && geelarkData.proxies.length > 0) {
+                profileParams.proxyId = geelarkData.proxies[0].id
+                console.log('Using GeeLark proxy as fallback:', geelarkData.proxies[0].id)
+              } else {
+                throw new Error('No proxies available in database or GeeLark')
+              }
+            } else {
+              throw new Error('No available proxies found in allowed groups and GeeLark proxy check failed')
+            }
+          } catch (fallbackError) {
+            console.error('Fallback to GeeLark proxy failed:', fallbackError)
+            throw new Error('No available proxies found in allowed groups')
+          }
         }
-
-        const { data: availableProxy } = await proxyQuery.single()
-        
-        if (!availableProxy) {
-          throw new Error(`No available ${useProxyType} proxies. Please add more proxies or use a different type.`)
-        }
-
-        proxyData = availableProxy
-
-        // Configure proxy for GeeLark
-        profileParams.proxyConfig = {
-          typeId: 1, // SOCKS5
-          server: availableProxy.host,
-          port: availableProxy.port,
-          username: availableProxy.username,
-          password: availableProxy.password
-        }
+      } else {
+        throw new Error('No proxy groups are allowed for phone creation')
       }
     }
 
@@ -244,15 +219,6 @@ export async function POST(request: NextRequest) {
 
         if (phoneError) {
           console.error('Failed to create phone record:', phoneError)
-        }
-
-        // Update proxy assignment if we have a database proxy
-        if (proxyData && proxyData.id && amount === 1) {
-          // Only assign proxy to single profile creation
-          await supabaseAdmin
-            .from('proxies')
-            .update({ assigned_account_id: accountData.id })
-            .eq('id', proxyData.id)
         }
 
         createdProfiles.push({

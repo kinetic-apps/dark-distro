@@ -148,25 +148,57 @@ export async function POST(request: NextRequest) {
           language: 'default'
         }
 
-        // Get available GeeLark proxies for retry logic
+        // Get available proxies from our database filtered by allowed groups
         let availableProxies: any[] = []
         try {
-          const geelarkProxiesResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/list-proxies`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          })
+          // First get allowed proxy groups
+          const { data: allowedGroups } = await supabaseAdmin
+            .from('proxy_group_settings')
+            .select('group_name')
+            .eq('allowed_for_phone_creation', true)
+            .order('priority', { ascending: false })
           
-          if (geelarkProxiesResponse.ok) {
-            const geelarkData = await geelarkProxiesResponse.json()
-            if (geelarkData.proxies && geelarkData.proxies.length > 0) {
-              availableProxies = geelarkData.proxies
-              console.log(`Found ${availableProxies.length} available GeeLark proxies`)
-            } else {
-              console.warn('No GeeLark proxies available')
+          if (allowedGroups && allowedGroups.length > 0) {
+            // Get proxies from allowed groups
+            const { data: dbProxies } = await supabaseAdmin
+              .from('proxies')
+              .select('*')
+              .in('group_name', allowedGroups.map(g => g.group_name))
+              .eq('is_active', true)
+              .order('updated_at', { ascending: true }) // Prefer less recently used
+            
+            availableProxies = dbProxies || []
+          }
+          
+          if (availableProxies.length === 0) {
+            // If no proxies in allowed groups, get any active proxy as fallback
+            const { data: anyProxies } = await supabaseAdmin
+              .from('proxies')
+              .select('*')
+              .eq('is_active', true)
+              .limit(10)
+            
+            if (anyProxies && anyProxies.length > 0) {
+              availableProxies = anyProxies
+              await supabaseAdmin.from('logs').insert({
+                level: 'warning',
+                component: 'automation-tiktok-sms',
+                message: 'No proxies found in allowed groups, using any available proxy',
+                meta: { 
+                  allowed_groups: allowedGroups?.map(g => g.group_name) || [],
+                  fallback_proxy_count: anyProxies.length
+                }
+              })
             }
           }
         } catch (proxyError) {
-          console.error('Error fetching GeeLark proxies:', proxyError)
+          const errorMessage = proxyError instanceof Error ? proxyError.message : String(proxyError)
+          await supabaseAdmin.from('logs').insert({
+            level: 'error',
+            component: 'automation-tiktok-sms',
+            message: 'Failed to fetch proxies from database',
+            meta: { error: errorMessage }
+          })
         }
 
         // Try to create profile with retry logic for proxy failures
@@ -179,20 +211,28 @@ export async function POST(request: NextRequest) {
           try {
             // Select a proxy that hasn't been tried yet
             if (availableProxies.length > 0 && attempt < availableProxies.length) {
-              const untried = availableProxies.filter(p => !triedProxies.has(p.id))
+              const untried = availableProxies.filter(p => !triedProxies.has(p.geelark_id))
               if (untried.length > 0) {
                 const randomIndex = Math.floor(Math.random() * untried.length)
                 const selectedProxy = untried[randomIndex]
-                profileParams.proxy_id = selectedProxy.id
-                triedProxies.add(selectedProxy.id)
-                console.log(`Attempt ${attempt + 1}: Using GeeLark proxy ${selectedProxy.id}`)
-              } else if (attempt === 0) {
-                // First attempt with no untried proxies
-                console.log('No proxies available, attempting without proxy')
-                delete profileParams.proxy_id
+                profileParams.proxy_id = selectedProxy.geelark_id // Use GeeLark ID
+                triedProxies.add(selectedProxy.geelark_id)
+                
+                // Log proxy selection
+                await supabaseAdmin.from('logs').insert({
+                  level: 'info',
+                  component: 'automation-tiktok-sms',
+                  message: 'Selected proxy for profile creation',
+                  meta: { 
+                    proxy_id: selectedProxy.id,
+                    geelark_id: selectedProxy.geelark_id,
+                    group_name: selectedProxy.group_name,
+                    server: selectedProxy.server,
+                    port: selectedProxy.port,
+                    attempt: attempt + 1
+                  }
+                })
               }
-            } else if (attempt === 0) {
-              console.log('No proxies available, attempting without proxy')
             }
 
             const createProfileResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/create-profile`, {
@@ -203,8 +243,43 @@ export async function POST(request: NextRequest) {
 
             profileData = await createProfileResponse.json()
             
-            if (createProfileResponse.ok) {
-              console.log('Profile created successfully')
+            if (createProfileResponse.ok && profileData.success) {
+              result.profile_id = profileData.profile_id
+              result.profile_name = profileData.profile_name
+              result.account_id = profileData.account_id
+              accountId = result.account_id
+
+              // Update account with setup tracking
+              await supabaseAdmin
+                .from('accounts')
+                .update({
+                  status: 'creating_profile',
+                  setup_started_at: new Date().toISOString(),
+                  current_setup_step: 'Create Profile',
+                  setup_progress: 20,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', accountId)
+
+              // No database proxy assignment needed - using GeeLark proxies only
+
+              result.tasks.push({
+                step: 'Create Profile',
+                status: 'success',
+                message: `Profile created: ${profileData.profile_name} (${profileData.profile_id})`
+              })
+
+              await supabaseAdmin.from('logs').insert({
+                level: 'info',
+                component: 'automation-tiktok-sms',
+                message: 'Profile created successfully',
+                meta: { 
+                  account_id: result.account_id,
+                  profile_id: result.profile_id,
+                  profile_name: result.profile_name,
+                  proxy_configured: !!profileParams.proxy_config || !!profileParams.proxy_id
+                }
+              })
               break // Success, exit retry loop
             }
             
@@ -216,7 +291,7 @@ export async function POST(request: NextRequest) {
                                errorMessage.includes('45001')    // Proxy does not exist
             
             if (isProxyError && attempt < maxRetries) {
-              console.warn(`Proxy error on attempt ${attempt + 1}: ${errorMessage}`)
+              // Removed: console.warn(`Proxy error on attempt ${attempt + 1}: ${errorMessage}`)
               lastError = new Error(errorMessage)
               // Continue to next attempt with different proxy
             } else {
@@ -339,20 +414,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Check if TikTok is installed (GeeLark handles installation automatically)
     try {
-      // Update status to installing_tiktok
-      if (accountId) {
-        await supabaseAdmin
-          .from('accounts')
-          .update({
-            status: 'installing_tiktok',
-            current_setup_step: 'Install TikTok',
-            setup_progress: 60,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', accountId)
-      }
-
-      console.log('Checking if TikTok is installed...')
+      // Wait for TikTok to be installed (GeeLark should handle this)
       
       // Poll to check if TikTok is installed
       let isInstalled = false
@@ -365,7 +427,6 @@ export async function POST(request: NextRequest) {
           isInstalled = await geelarkApi.isTikTokInstalled(result.profile_id!)
           
           if (isInstalled) {
-            console.log('TikTok is installed!')
             result.tasks.push({
               step: 'Install TikTok',
               status: 'success',
@@ -383,15 +444,14 @@ export async function POST(request: NextRequest) {
                 .eq('profile_id', result.profile_id)
             }
           } else {
-            // Log every 10 attempts (20 seconds)
-            if (checkAttempts % 10 === 1) {
-              console.log(`TikTok not yet installed, waiting... (${Math.floor(checkAttempts * 2 / 60)} minutes elapsed)`)
+            // Log progress every 30 seconds
+            if (checkAttempts > 0 && checkAttempts % 15 === 0) {
             }
             await new Promise(resolve => setTimeout(resolve, 2000))
           }
         } catch (checkError) {
-          console.error('Error checking TikTok installation:', checkError)
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          // Removed: console.error('Error checking TikTok installation:', checkError)
+          // Continue checking
         }
       }
       
@@ -461,7 +521,6 @@ export async function POST(request: NextRequest) {
         .eq('id', result.account_id)
       
       // Create a placeholder RPA task that will wait for phone number
-      console.log('Creating RPA task for phone login...')
       
       // Pass accountId, username, and password to Geelark
       const loginTask = await geelarkApi.createCustomRPATask(
@@ -479,7 +538,6 @@ export async function POST(request: NextRequest) {
       )
       
       loginTaskId = loginTask.taskId
-      console.log(`GeeLark task created successfully: ${loginTaskId}`)
       
       // CRITICAL: Store task ID in account FIRST (this is what auto-stop monitor reads)
       const accountUpdateResult = await supabaseAdmin
@@ -517,45 +575,41 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to store task ID in account: ${accountUpdateResult.error.message}`)
       }
       
-      console.log('Account updated with task ID successfully')
-      
       // SECONDARY: Store task in tasks table (this is what tasks page reads)
       const taskInsertResult = await supabaseAdmin.from('tasks').insert({
-        type: 'login',
-        task_type: 'sms_login',
-        geelark_task_id: loginTaskId,
-        account_id: result.account_id,
+          type: 'login',
+          task_type: 'sms_login',
+          geelark_task_id: loginTaskId,
+          account_id: result.account_id,
         status: 'pending',
-        setup_step: 'Start TikTok Login',
-        progress: 85,
-        started_at: new Date().toISOString(),
-        meta: {
-          profile_id: result.profile_id,
-          method: 'phone_rpa',
-          flow_id: TIKTOK_FLOW_ID,
-          waiting_for_phone: true,
+          setup_step: 'Start TikTok Login',
+          progress: 85,
+          started_at: new Date().toISOString(),
+          meta: {
+            profile_id: result.profile_id,
+            method: 'phone_rpa',
+            flow_id: TIKTOK_FLOW_ID,
+            waiting_for_phone: true,
           username: username,
           has_password: true
-        }
+          }
       }).select()
 
       if (taskInsertResult.error) {
         console.error('Failed to create task record (tasks page will be incomplete):', taskInsertResult.error)
-        await supabaseAdmin.from('logs').insert({
+      await supabaseAdmin.from('logs').insert({
           level: 'error',
-          component: 'automation-tiktok-sms',
+        component: 'automation-tiktok-sms',
           message: 'Failed to create task record - tasks page will not show this task',
-          meta: { 
+        meta: { 
             error: taskInsertResult.error.message,
             error_code: taskInsertResult.error.code,
             error_details: taskInsertResult.error.details,
-            account_id: result.account_id,
+          account_id: result.account_id,
             geelark_task_id: loginTaskId
-          }
-        })
+        }
+      })
         // Don't throw - account task ID is stored, auto-stop will work
-      } else {
-        console.log('Task record created successfully:', taskInsertResult.data?.[0]?.id)
       }
       
       result.tasks.push({
@@ -570,6 +624,40 @@ export async function POST(request: NextRequest) {
         step: 'Create RPA Task',
         status: 'failed',
         message: 'Failed to create RPA task',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      throw error
+    }
+
+    // Step 4.5: Wait for RPA task to start (status = 2 "In progress")
+    try {
+      // Update status
+      if (accountId) {
+        await supabaseAdmin
+          .from('accounts')
+          .update({
+            status: 'waiting_for_task_start',
+            current_setup_step: 'Waiting for Task to Start',
+            setup_progress: 90,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', accountId)
+      }
+      
+      // Wait for task to be in progress
+      await waitForTaskToStart(loginTaskId, false)
+      
+      result.tasks.push({
+        step: 'Wait for Task Start',
+        status: 'success',
+        message: 'RPA task is now in progress'
+      })
+      
+    } catch (error) {
+      result.tasks.push({
+        step: 'Wait for Task Start',
+        status: 'failed',
+        message: 'RPA task failed to start',
         error: error instanceof Error ? error.message : String(error)
       })
       throw error
@@ -702,7 +790,6 @@ export async function POST(request: NextRequest) {
       })
 
       // RPA task handles OTP monitoring through proxy endpoints
-      console.log('RPA task will monitor OTP through proxy endpoints')
       
       // Start background task to monitor completion and auto-stop phone
       if (result.profile_id && result.account_id) {
@@ -798,25 +885,57 @@ async function handleBatchSetup(
       message: `Starting individual creation of ${quantity} phones with unique proxies...`
     })
 
-    // Get available GeeLark proxies
+    // Get available proxies from our database filtered by allowed groups
     let availableProxies: any[] = []
     try {
-      const geelarkProxiesResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/list-proxies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
+      // First get allowed proxy groups
+      const { data: allowedGroups } = await supabaseAdmin
+        .from('proxy_group_settings')
+        .select('group_name')
+        .eq('allowed_for_phone_creation', true)
+        .order('priority', { ascending: false })
       
-      if (geelarkProxiesResponse.ok) {
-        const geelarkData = await geelarkProxiesResponse.json()
-        if (geelarkData.proxies && geelarkData.proxies.length > 0) {
-          availableProxies = geelarkData.proxies
-          console.log(`[BATCH] Found ${availableProxies.length} available GeeLark proxies`)
-        } else {
-          console.warn('[BATCH] No GeeLark proxies available')
+      if (allowedGroups && allowedGroups.length > 0) {
+        // Get proxies from allowed groups
+        const { data: dbProxies } = await supabaseAdmin
+          .from('proxies')
+          .select('*')
+          .in('group_name', allowedGroups.map(g => g.group_name))
+          .eq('is_active', true)
+          .order('updated_at', { ascending: true }) // Prefer less recently used
+        
+        availableProxies = dbProxies || []
+      }
+      
+      if (availableProxies.length === 0) {
+        // If no proxies in allowed groups, get any active proxy as fallback
+        const { data: anyProxies } = await supabaseAdmin
+          .from('proxies')
+          .select('*')
+          .eq('is_active', true)
+          .limit(10)
+        
+        if (anyProxies && anyProxies.length > 0) {
+          availableProxies = anyProxies
+          await supabaseAdmin.from('logs').insert({
+            level: 'warning',
+            component: 'automation-tiktok-sms',
+            message: 'No proxies found in allowed groups, using any available proxy',
+            meta: { 
+              allowed_groups: allowedGroups?.map(g => g.group_name) || [],
+              fallback_proxy_count: anyProxies.length
+            }
+          })
         }
       }
     } catch (proxyError) {
-      console.error('[BATCH] Error fetching GeeLark proxies:', proxyError)
+      const errorMessage = proxyError instanceof Error ? proxyError.message : String(proxyError)
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'automation-tiktok-sms',
+        message: 'Failed to fetch proxies from database',
+        meta: { error: errorMessage }
+      })
     }
 
     // Prepare individual profile creation jobs
@@ -828,13 +947,13 @@ async function handleBatchSetup(
       let selectedProxy = null
       if (availableProxies.length > 0) {
         // Filter out already used proxies
-        const unusedProxies = availableProxies.filter(p => !usedProxies.has(p.id))
+        const unusedProxies = availableProxies.filter(p => !usedProxies.has(p.geelark_id))
         
         if (unusedProxies.length > 0) {
           // Randomly select from unused proxies
           const randomIndex = Math.floor(Math.random() * unusedProxies.length)
           selectedProxy = unusedProxies[randomIndex]
-          usedProxies.add(selectedProxy.id)
+          usedProxies.add(selectedProxy.geelark_id)
         } else if (availableProxies.length > 0) {
           // All proxies used, start reusing randomly
           const randomIndex = Math.floor(Math.random() * availableProxies.length)
@@ -848,8 +967,6 @@ async function handleBatchSetup(
         options: options
       })
     }
-
-    console.log(`[BATCH] Created ${profileCreationJobs.length} jobs with ${usedProxies.size} unique proxies`)
 
     // Process profile creation sequentially with rate limiting
     const createdProfiles = []
@@ -880,10 +997,7 @@ async function handleBatchSetup(
 
           // Add proxy if available
           if (job.proxy) {
-            profileParams.proxy_id = job.proxy.id
-            console.log(`[BATCH] Job ${job.index + 1}: Using proxy ${job.proxy.id}`)
-          } else {
-            console.log(`[BATCH] Job ${job.index + 1}: No proxy available`)
+            profileParams.proxy_id = job.proxy.geelark_id
           }
 
           const createProfileResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/create-profile`, {
@@ -895,7 +1009,6 @@ async function handleBatchSetup(
           const profileData = await createProfileResponse.json()
           
           if (createProfileResponse.ok && profileData.success) {
-            console.log(`[BATCH] Job ${job.index + 1}: Profile created successfully`)
             createdProfiles.push({
               success: true,
               profileData: profileData,
@@ -909,14 +1022,13 @@ async function handleBatchSetup(
               retryCount++
               if (retryCount < maxRetries) {
                 const delay = baseDelay * Math.pow(2, retryCount - 1) // Exponential backoff
-                console.log(`[BATCH] Job ${job.index + 1}: Rate limited, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`)
                 await new Promise(resolve => setTimeout(resolve, delay))
                 continue
               }
             }
             
             lastError = profileData.error || 'Unknown error'
-            console.error(`[BATCH] Job ${job.index + 1}: Failed - ${lastError}`)
+            // Removed: console.error(`[BATCH] Job ${job.index + 1}: Failed - ${lastError}`)
             break
           }
         } catch (error) {
@@ -925,10 +1037,9 @@ async function handleBatchSetup(
           
           if (retryCount < maxRetries) {
             const delay = baseDelay * Math.pow(2, retryCount - 1)
-            console.log(`[BATCH] Job ${job.index + 1}: Exception, retrying in ${delay}ms - ${lastError}`)
             await new Promise(resolve => setTimeout(resolve, delay))
           } else {
-            console.error(`[BATCH] Job ${job.index + 1}: Exception after ${maxRetries} attempts - ${lastError}`)
+            // Removed: console.error(`[BATCH] Job ${job.index + 1}: Exception after ${maxRetries} attempts - ${lastError}`)
           }
         }
       }
@@ -947,12 +1058,6 @@ async function handleBatchSetup(
       }
     }
 
-    console.log(`[BATCH] Profile creation completed: ${createdProfiles.length} successful, ${failedProfiles.length} failed`)
-    
-    if (createdProfiles.length === 0) {
-      throw new Error('Failed to create any profiles')
-    }
-
     // Process batch results
     const batchResults = {
       total_requested: quantity,
@@ -966,8 +1071,6 @@ async function handleBatchSetup(
     // Process each created profile
     for (const profileResult of createdProfiles) {
       const profileData = profileResult.profileData
-      
-      console.log(`[BATCH] Processing created profile: ${profileData.profile_id}`)
       
       // The profile was already created in our database by the create-profile endpoint
       // Just add to our results
@@ -1006,8 +1109,6 @@ async function handleBatchSetup(
         total: batchResults.details.filter(d => d.success).length
       }))
     
-    console.log(`[BATCH] Finished creating profiles. Starting parallel setup for ${jobs.length} phones`)
-    
     // Create parallel processor - no need to limit concurrent phone setups
     const processor = new ParallelBatchProcessor(options, 20) // Back to 20 concurrent - the setup process can handle many phones at once
     const parallelResults = await processor.processBatch(jobs)
@@ -1027,8 +1128,6 @@ async function handleBatchSetup(
         detail.setup_duration = result.duration
       }
     })
-    
-    console.log(`[BATCH] Parallel processing completed: ${parallelResults.successful} successful, ${parallelResults.failed} failed`)
     
     await supabaseAdmin.from('logs').insert({
       level: 'info',
@@ -1122,7 +1221,7 @@ async function waitForTikTokInstallation(profileId: string): Promise<void> {
         return
       }
     } catch (error) {
-      console.error('Error checking TikTok installation:', error)
+      // Removed: console.error('Error checking TikTok installation:', error)
     }
     
     attempts++
@@ -1130,7 +1229,7 @@ async function waitForTikTokInstallation(profileId: string): Promise<void> {
   }
   
   // Don't throw error, continue anyway
-  console.warn(`TikTok not confirmed installed for ${profileId}`)
+  // Removed: console.warn(`TikTok not confirmed installed for ${profileId}`)
 }
 
 async function waitForTaskToStart(taskId: string, isBatchOperation: boolean = false): Promise<void> {
@@ -1139,20 +1238,11 @@ async function waitForTaskToStart(taskId: string, isBatchOperation: boolean = fa
   const maxAttempts = isBatchOperation ? 900 : 300  // 900 * 2s = 30 min, 300 * 2s = 10 min
   const operationType = isBatchOperation ? 'batch' : 'single'
   
-  console.log(`[TASK_WAIT] Waiting for task ${taskId} to start (${operationType} operation, max wait: ${maxAttempts * 2}s)`)
-  
   while (attempts < maxAttempts) {
     try {
       const taskStatus = await geelarkApi.getTaskStatus(taskId)
       
-      // Log progress every 30 seconds
-      if (attempts > 0 && attempts % 15 === 0) {
-        const elapsedMinutes = Math.floor(attempts * 2 / 60)
-        console.log(`[TASK_WAIT] Still waiting for task ${taskId} to start (${elapsedMinutes} minutes elapsed)`)
-      }
-      
       if (taskStatus.status === 'running' || taskStatus.result?.status === 2) {
-        console.log(`[TASK_WAIT] Task ${taskId} started successfully after ${attempts * 2} seconds`)
         return
       }
       if (taskStatus.status === 'failed' || taskStatus.result?.status === 4) {
@@ -1162,7 +1252,7 @@ async function waitForTaskToStart(taskId: string, isBatchOperation: boolean = fa
       if (error instanceof Error && error.message.includes('failed to start')) {
         throw error
       }
-      console.error('Error checking task status:', error)
+      // Removed: console.error('Error checking task status:', error)
     }
     
     attempts++
@@ -1173,7 +1263,7 @@ async function waitForTaskToStart(taskId: string, isBatchOperation: boolean = fa
   const timeoutMessage = `Task ${taskId} did not start within ${maxAttempts * 2} seconds (${operationType} operation)`
   
   if (isBatchOperation) {
-    console.warn(`[TASK_WAIT] ${timeoutMessage}`)
+    // Removed: console.warn(`[TASK_WAIT] ${timeoutMessage}`)
     await supabaseAdmin.from('logs').insert({
       level: 'warning',
       component: 'automation-tiktok-sms-batch',

@@ -87,11 +87,6 @@ export function ProfileOperationalStatus({
           </span>
         )}
       </div>
-      
-      {/* Online indicator */}
-      <div className={`ml-auto h-2 w-2 rounded-full ${
-        statusInfo.isOnline ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-      }`} title={statusInfo.isOnline ? 'Phone online' : 'Phone offline'} />
     </div>
   )
 } 

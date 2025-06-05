@@ -20,8 +20,8 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/proxies/rotate-all",
-      "schedule": "30 0 * * *"
+      "path": "/api/geelark/sync-proxies-from-geelark",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

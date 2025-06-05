@@ -62,18 +62,18 @@ export async function waitForSetupCompletionAndShutdown(
       if (taskIds.length === 0) {
         console.log('[AUTO-STOP] No task IDs in account record, checking tasks table...')
         const { data: activeTasks } = await supabaseAdmin
-          .from('tasks')
-          .select('geelark_task_id')
-          .eq('account_id', accountId)
+        .from('tasks')
+        .select('geelark_task_id')
+        .eq('account_id', accountId)
           .in('status', ['pending', 'running'])
-          .not('geelark_task_id', 'is', null)
-        
+        .not('geelark_task_id', 'is', null)
+      
         if (activeTasks && activeTasks.length > 0) {
           activeTasks.forEach(task => {
-            if (task.geelark_task_id && !taskIds.includes(task.geelark_task_id)) {
-              taskIds.push(task.geelark_task_id)
-            }
-          })
+          if (task.geelark_task_id && !taskIds.includes(task.geelark_task_id)) {
+            taskIds.push(task.geelark_task_id)
+          }
+        })
           console.log(`[AUTO-STOP] Found ${activeTasks.length} task IDs from tasks table`)
         }
       }
@@ -82,15 +82,15 @@ export async function waitForSetupCompletionAndShutdown(
       if (taskIds.length === 0) {
         if (!activeSetupStates.includes(account.status)) {
           console.log(`[AUTO-STOP] No task IDs found and account status is ${account.status} - assuming no active tasks`)
-          allTasksCompleted = true
+        allTasksCompleted = true
         } else {
           console.log(`[AUTO-STOP] No task IDs found but account is still in setup (${account.status}) - waiting...`)
           await new Promise(resolve => setTimeout(resolve, 30000))
           continue
-        }
+      }
       } else {
         console.log(`[AUTO-STOP] Monitoring ${taskIds.length} GeeLark tasks: ${taskIds.join(', ')}`)
-        
+      
         // Query GeeLark for task status - this is the ONLY source of truth for task completion
         const taskStatuses = await geelarkApi.queryTasks(taskIds)
         
@@ -152,7 +152,7 @@ export async function waitForSetupCompletionAndShutdown(
     try {
       await geelarkApi.stopPhones([profileId])
       console.log(`[AUTO-STOP] Successfully stopped phone ${profileId}`)
-      
+        
       await supabaseAdmin.from('logs').insert({
         level: 'info',
         component: 'auto-stop-monitor',

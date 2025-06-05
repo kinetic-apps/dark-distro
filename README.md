@@ -1,139 +1,108 @@
-# SPECTRE - Advanced Cloud Operations Control Center
+# Spectre
 
-A Next.js 14 web application for managing advanced cloud phone operations with GeeLark, SOAX proxies, and DaisySMS integration.
-
-## Architecture
-
-- **Frontend**: Next.js 14 (App Router) with TypeScript
-- **Styling**: Tailwind CSS with Geist Typography (grayscale theme)
-- **Database**: Supabase (PostgreSQL)
-- **Storage**: Supabase Storage
-- **Authentication**: Supabase Auth
-- **Deployment**: Vercel
+A Next.js 14 web application for managing advanced cloud phone operations with GeeLark and DaisySMS integration.
 
 ## Features
 
-### Profile Management
-- Create and manage GeeLark Android phone profiles
-- Automated warm-up sequences
-- Proxy assignment and rotation
-- Real-time device status monitoring
+- **Cloud Phone Management**: Create and manage virtual Android devices via GeeLark
+- **TikTok Automation**: Automated account creation, warm-up, and content posting
+- **SMS Verification**: Integrated DaisySMS for phone number rentals and OTP handling
+- **Content Generation**: AI-powered carousel and video creation
+- **Task Scheduling**: Automated workflows with real-time monitoring
+- **Profile Management**: Bulk operations and status tracking
+- **Proxy Management**: Group-based proxy filtering and assignment
+- **Screenshot Capture**: Real-time device screenshots
+- **Analytics Dashboard**: Performance metrics and system health monitoring
 
-### Proxy Management
-- SOAX sticky pool integration for warm-up
-- Dedicated SIM proxies for operations
-- Health monitoring and automatic rotation
-- IP whitelisting support
+## Tech Stack
 
-### SMS Verification
-- DaisySMS integration for OTP codes
-- Automatic polling for verification codes
-- Support for up to 20 concurrent rentals
-- 72-hour rental periods
+- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes, Supabase
+- **Database**: PostgreSQL (via Supabase)
+- **Authentication**: Supabase Auth with Google OAuth
+- **Cloud Phones**: GeeLark API integration
+- **SMS Service**: DaisySMS API
+- **AI Services**: OpenAI GPT-4, Google Gemini
+- **Deployment**: Vercel
 
-### Content Distribution
-- Automatic asset detection from Supabase Storage
-- Batch campaign management
-- Task queue management
-- Success/failure tracking
-- Agency workflow for creator-based content organization
+## Prerequisites
 
-### Monitoring & Logs
-- Comprehensive logging system
-- Real-time error tracking
-- Export functionality
-- Component-level filtering
-
-## Setup
-
-1. Clone the repository
-2. Copy `.env.example` to `.env.local` and fill in your credentials
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Run database migrations in Supabase
-5. Start the development server:
-   ```bash
-   npm run dev
-   ```
+- Node.js 18+
+- Supabase account
+- GeeLark account
+- DaisySMS account
+- OpenAI API key
+- Google Cloud account (for Gemini)
 
 ## Environment Variables
 
-See `.env.example` for required environment variables:
-- Supabase credentials
-- GeeLark API keys
-- SOAX proxy credentials
-- DaisySMS API key
+Create a `.env.local` file with the following variables:
 
-## API Integrations
-
-### GeeLark
-- Profile creation and management
-- Automation task execution
-- Device status monitoring
-- Proxy configuration
-
-### SOAX
-- Sticky session proxies
-- Dedicated SIM proxies
-- IP rotation (where supported)
-- Health checking
-
-### DaisySMS
-- Phone number rental
-- OTP code retrieval
-- Rental management
-
-## Database Schema
-
-The application uses the following main tables:
-- `accounts` - Cloud profiles and accounts
-- `phones` - GeeLark device information
-- `proxies` - Proxy configurations
-- `sms_rentals` - Phone number rentals
-- `posts` - Content distribution queue
-- `tasks` - GeeLark automation tasks
-- `logs` - System activity logs
-
-## Cron Jobs
-
-Configured in `vercel.json`:
-- Task status polling: Every 2 minutes
-- Nightly proxy rotation: Daily at 00:30
-
-## Deployment
-
-Deploy to Vercel:
 ```bash
-vercel
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# GeeLark
+GEELARK_API_KEY=your_geelark_api_key
+GEELARK_API_BASE_URL=https://api.geelark.com
+
+# DaisySMS
+DAISYSMS_API_KEY=your_daisysms_api_key
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
+# Google Gemini
+GOOGLE_GEMINI_API_KEY=your_gemini_api_key
+
+# Storage
+STORAGE_BUCKET_NAME=your_storage_bucket
 ```
 
-Configure environment variables in Vercel dashboard.
+## Installation
 
-## Usage
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables
+4. Run database migrations
+5. Start development server: `npm run dev`
 
-1. **Create Profiles**: Start by creating new GeeLark profiles
-2. **Warm-up**: Run warm-up automation on new profiles
-3. **Assign Proxies**: Assign dedicated proxies to warmed-up accounts
-4. **Upload Content**: Upload videos to Supabase Storage
-5. **Launch Campaigns**: Distribute content to active profiles
+## Key Features
 
-## Security
+### Profile Management
+- Create and manage TikTok profiles
+- Bulk operations (start/stop phones, warmup, content posting)
+- Real-time status tracking
+- Tag-based organization
 
-- Row Level Security (RLS) enabled on all tables
-- Service role key used only for server-side operations
-- Authentication required for all routes
-- Sensitive data stored as environment variables
+### Proxy System
+- Automatic proxy synchronization from GeeLark
+- Group-based proxy management
+- Configurable allowed groups for phone creation
+- Priority-based proxy assignment
 
-## Typography
+### Content Creation
+- AI-powered carousel generation with multiple variants
+- Video upload and posting
+- Scheduled content distribution
 
-SPECTRE uses the Geist font family with the following weight restrictions:
-- **Thin** (100) - For subtle text elements
-- **Extra Light** (200) - For secondary text
-- **Light** (300) - For captions and metadata
-- **Regular** (400) - For body text
-- **Medium** (500) - For emphasis
-- **Semi Bold** (600) - For headings and important text
+### Automation Workflows
+- SMS-based TikTok account setup
+- Email/password credential-based setup
+- Automated warmup sequences
+- Engagement automation (likes, comments)
 
-**Note**: Bold (700) and Black (900) weights are intentionally excluded from the design system.
+## Scheduled Tasks
+
+- **Task Status Updates**: Every 2 minutes
+- **Warmup Progress**: Every minute
+- **Proxy Sync**: Every 5 minutes
+
+## License
+
+Private - All rights reserved

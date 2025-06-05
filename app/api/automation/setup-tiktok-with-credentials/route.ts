@@ -14,7 +14,6 @@ interface SetupOptions {
   database_proxy_id?: string  // Database proxy ID
   proxy_config?: any  // Manual proxy configuration
   assign_proxy?: boolean  // Auto-assign proxy
-  proxy_type?: string  // Proxy type preference for auto-assign
   group_name?: string
   tags?: string[]
   remark?: string
@@ -65,7 +64,6 @@ export async function POST(request: NextRequest) {
       database_proxy_id: body.database_proxy_id,
       proxy_config: body.proxy_config,
       assign_proxy: body.assign_proxy,
-      proxy_type: body.proxy_type,
       group_name: body.group_name || 'tiktok-credentials-setup',
       tags: body.tags || ['auto-setup', 'credentials'],
       remark: body.remark || 'Automated TikTok setup with credentials',
@@ -202,55 +200,61 @@ export async function POST(request: NextRequest) {
         } else if (options.proxy_config) {
           profileParams.proxy_config = options.proxy_config
         } else if (options.assign_proxy) {
-          const proxyType = options.proxy_type || 'sim'
-          
-          let proxyQuery = supabaseAdmin
-            .from('proxies')
-            .select('*')
-            .is('assigned_account_id', null)
-            .limit(1)
+          // Get allowed proxy groups
+          const { data: allowedGroups } = await supabaseAdmin
+            .from('proxy_group_settings')
+            .select('group_name')
+            .eq('allowed_for_phone_creation', true)
+            .order('priority', { ascending: true })
 
-          if (proxyType !== 'auto') {
-            proxyQuery = proxyQuery.eq('type', proxyType)
-          }
-
-          const { data: availableProxies } = await proxyQuery
-
-          if (availableProxies && availableProxies.length > 0) {
-            const proxy = availableProxies[0]
-            profileParams.proxy_config = {
-              typeId: 1, // SOCKS5
-              server: proxy.host,
-              port: proxy.port,
-              username: proxy.username,
-              password: proxy.password
-            }
+          if (allowedGroups && allowedGroups.length > 0) {
+            const groupNames = allowedGroups.map(g => g.group_name)
             
-            options.database_proxy_id = proxy.id
-          } else {
-            console.log('No database proxies available, checking GeeLark proxies...')
-            
-            try {
-              const geelarkProxiesResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/list-proxies`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-              })
-              
-              if (geelarkProxiesResponse.ok) {
-                const geelarkData = await geelarkProxiesResponse.json()
-                if (geelarkData.proxies && geelarkData.proxies.length > 0) {
-                  profileParams.proxy_id = geelarkData.proxies[0].id
-                  console.log('Using GeeLark proxy as fallback:', geelarkData.proxies[0].id)
-                } else {
-                  throw new Error('No proxies available in database or GeeLark')
-                }
-              } else {
-                throw new Error(`No available ${proxyType} proxies found and GeeLark proxy check failed`)
+            const { data: availableProxies } = await supabaseAdmin
+              .from('proxies')
+              .select('*')
+              .in('group_name', groupNames)
+              .eq('is_active', true)
+              .limit(1)
+
+            if (availableProxies && availableProxies.length > 0) {
+              const proxy = availableProxies[0]
+              profileParams.proxy_config = {
+                typeId: 1, // SOCKS5
+                server: proxy.server,
+                port: proxy.port,
+                username: proxy.username,
+                password: proxy.password
               }
-            } catch (fallbackError) {
-              console.error('Fallback to GeeLark proxy failed:', fallbackError)
-              throw new Error(`No available ${proxyType} proxies found`)
+              
+              options.database_proxy_id = proxy.id
+            } else {
+              console.log('No database proxies available in allowed groups, checking GeeLark proxies...')
+              
+              try {
+                const geelarkProxiesResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/geelark/list-proxies`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                })
+                
+                if (geelarkProxiesResponse.ok) {
+                  const geelarkData = await geelarkProxiesResponse.json()
+                  if (geelarkData.proxies && geelarkData.proxies.length > 0) {
+                    profileParams.proxy_id = geelarkData.proxies[0].id
+                    console.log('Using GeeLark proxy as fallback:', geelarkData.proxies[0].id)
+                  } else {
+                    throw new Error('No proxies available in database or GeeLark')
+                  }
+                } else {
+                  throw new Error('No available proxies found in allowed groups and GeeLark proxy check failed')
+                }
+              } catch (fallbackError) {
+                console.error('Fallback to GeeLark proxy failed:', fallbackError)
+                throw new Error('No available proxies found in allowed groups')
+              }
             }
+          } else {
+            throw new Error('No proxy groups are allowed for phone creation')
           }
         }
 
@@ -275,19 +279,6 @@ export async function POST(request: NextRequest) {
         result.account_id = profileData.account_id
         result.profile_id = profileData.profile_id
         result.profile_name = profileData.profile_name
-
-        // If database proxy was used, update assignment
-        if (options.database_proxy_id && result.account_id) {
-          await supabaseAdmin
-            .from('proxies')
-            .update({ assigned_account_id: result.account_id })
-            .eq('id', options.database_proxy_id)
-
-          await supabaseAdmin
-            .from('accounts')
-            .update({ proxy_id: options.database_proxy_id })
-            .eq('id', result.account_id)
-        }
 
         // Store credential info in account metadata
         await supabaseAdmin

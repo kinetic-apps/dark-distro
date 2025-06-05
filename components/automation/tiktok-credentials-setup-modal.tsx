@@ -25,9 +25,9 @@ export function TikTokCredentialsSetupModal({ onClose, onSuccess }: TikTokCreden
   const [selectedCredentialId, setSelectedCredentialId] = useState<string | undefined>()
   
   // Proxy selection state
-  const [proxySource, setProxySource] = useState<'auto' | 'database' | 'geelark' | 'manual'>('auto')
   const [selectedProxyId, setSelectedProxyId] = useState<string | undefined>()
   const [selectedProxyData, setSelectedProxyData] = useState<any>(null)
+  const [assignProxy, setAssignProxy] = useState(true)
   
   const supabase = createClient()
 
@@ -82,15 +82,10 @@ export function TikTokCredentialsSetupModal({ onClose, onSuccess }: TikTokCreden
       }
 
       // Handle proxy configuration based on source
-      if (proxySource === 'auto') {
+      if (assignProxy) {
         requestBody.assign_proxy = true
-        requestBody.proxy_type = 'sim' // Prefer SIM proxies for TikTok
-      } else if (proxySource === 'database' && selectedProxyId) {
+      } else if (selectedProxyId) {
         requestBody.database_proxy_id = selectedProxyId
-      } else if (proxySource === 'geelark' && selectedProxyId) {
-        requestBody.proxy_id = selectedProxyId
-      } else if (proxySource === 'manual' && selectedProxyData) {
-        requestBody.proxy_config = selectedProxyData
       }
 
       const response = await fetch('/api/automation/setup-tiktok-with-credentials', {
@@ -258,20 +253,29 @@ export function TikTokCredentialsSetupModal({ onClose, onSuccess }: TikTokCreden
 
                 {/* Proxy Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-dark-300 mb-2">
-                    Proxy Configuration
-                  </label>
-                  <ProxySelector
-                    value={selectedProxyId || ''}
-                    onChange={(value, proxyData) => {
-                      setSelectedProxyId(value)
-                      setSelectedProxyData(proxyData)
-                    }}
-                    source={proxySource}
-                    onSourceChange={(source) => setProxySource(source as 'auto' | 'database' | 'geelark' | 'manual')}
-                    showSourceSelector={true}
-                    filterAssigned={true}
-                  />
+                  <div className="flex items-center gap-3 mb-3">
+                    <input
+                      type="checkbox"
+                      id="assign-proxy"
+                      checked={assignProxy}
+                      onChange={(e) => setAssignProxy(e.target.checked)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="assign-proxy" className="text-sm font-medium text-gray-700 dark:text-dark-300">
+                      Auto-assign proxy from allowed groups
+                    </label>
+                  </div>
+                  
+                  {!assignProxy && (
+                    <ProxySelector
+                      value={selectedProxyId || ''}
+                      onChange={(value, proxyData) => {
+                        setSelectedProxyId(value)
+                        setSelectedProxyData(proxyData)
+                      }}
+                      filterByAllowedGroups={true}
+                    />
+                  )}
                 </div>
               </div>
             )}

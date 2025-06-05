@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
           status: statusMap[detail.status] || 'unknown',
           status_code: detail.status
         })) || []
-        
+
         // Only update phones that were explicitly returned by GeeLark with a status
         // Don't assume phones are stopped just because they weren't in the response
         

@@ -85,12 +85,6 @@ export async function POST(request: NextRequest) {
         const profileCount = existingProfiles?.length || 0
 
         if (profileCount > 0) {
-          // Clear proxy assignments first to avoid foreign key constraints
-          await supabaseAdmin
-            .from('proxies')
-            .update({ assigned_account_id: null })
-            .not('assigned_account_id', 'is', null)
-
           // Delete all phone records first (due to foreign key constraints)
           await supabaseAdmin
             .from('phones')
@@ -200,12 +194,6 @@ export async function POST(request: NextRequest) {
 
     for (const profileToDelete of profilesToDelete) {
       try {
-        // Clear proxy assignment first
-        await supabaseAdmin
-          .from('proxies')
-          .update({ assigned_account_id: null })
-          .eq('assigned_account_id', profileToDelete.id)
-
         // Delete related phone records first
         await supabaseAdmin
           .from('phones')
@@ -248,106 +236,17 @@ export async function POST(request: NextRequest) {
         )
 
         // Handle proxy data if present
-        let proxyId = null
+        let proxyInfo = null
         if (profile.proxy) {
-          // console.log(`Processing proxy for profile ${profileId}:`, profile.proxy)
-          
-          // Check if proxy already exists in our database by host and port only
-          const { data: existingProxy, error: proxySearchError } = await supabaseAdmin
-            .from('proxies')
-            .select('id')
-            .eq('host', profile.proxy.server)
-            .eq('port', profile.proxy.port)
-            .single()
-
-          if (proxySearchError && proxySearchError.code !== 'PGRST116') {
-            // PGRST116 means no rows found, which is fine
-            // Any other error should be logged
-            console.error(`Error searching for proxy:`, proxySearchError)
+          // Store proxy info in meta field
+          proxyInfo = {
+            id: profile.proxy.id,
+            scheme: profile.proxy.scheme || 'socks5',
+            server: profile.proxy.server,
+            port: profile.proxy.port,
+            username: profile.proxy.username,
+            password: profile.proxy.password
           }
-
-          if (existingProxy) {
-            proxyId = existingProxy.id
-            // console.log(`Found existing proxy ${proxyId} for profile ${profileId}`)
-            
-            // Update proxy info if needed (but not username as it might be different per session)
-            await supabaseAdmin
-              .from('proxies')
-              .update({
-                password: profile.proxy.password || '',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingProxy.id)
-          } else {
-            // console.log(`Creating new proxy for profile ${profileId}`)
-            
-            // Map GeeLark proxy type to our database types
-            let proxyType = 'sim' // Default to sim for mobile proxies
-            if (profile.proxy.type === 'http' || profile.proxy.type === 'https') {
-              proxyType = 'rotating'
-            } else if (profile.proxy.server.includes('soax') && profile.proxy.password?.includes('mobile')) {
-              proxyType = 'sim' // SOAX mobile proxies
-            }
-            
-            // Try to create new proxy record
-            const { data: newProxy, error: proxyError } = await supabaseAdmin
-              .from('proxies')
-              .insert({
-                label: `GeeLark-${profile.proxy.server}:${profile.proxy.port}`,
-                type: proxyType,
-                host: profile.proxy.server,
-                port: profile.proxy.port,
-                soax_port: profile.proxy.port, // Use same port for soax_port
-                username: profile.proxy.username || '',
-                password: profile.proxy.password || '',
-                health: 'unknown',
-                meta: {
-                  imported_from_geelark: true,
-                  geelark_profile_id: profileId,
-                  geelark_proxy_type: profile.proxy.type, // Store original type
-                  imported_at: new Date().toISOString()
-                }
-              })
-              .select()
-              .single()
-
-            if (!proxyError && newProxy) {
-              proxyId = newProxy.id
-              // console.log(`Created proxy ${proxyId} for profile ${profileId}`)
-              
-              await supabaseAdmin.from('logs').insert({
-                level: 'info',
-                component: 'api-sync-profiles',
-                message: `Created proxy from GeeLark profile: ${profile.proxy.server}:${profile.proxy.port}`,
-                meta: { 
-                  proxy_id: newProxy.id,
-                  geelark_profile_id: profileId,
-                  trace_id: traceId
-                }
-              })
-            } else if (proxyError && proxyError.code === '23505') {
-              // Duplicate key error - proxy was created by another process in the meantime
-              // Try to fetch it again
-              const { data: retryProxy } = await supabaseAdmin
-                .from('proxies')
-                .select('id')
-                .eq('host', profile.proxy.server)
-                .eq('port', profile.proxy.port)
-                .single()
-              
-              if (retryProxy) {
-                proxyId = retryProxy.id
-                // Don't log this as an error, it's a race condition that we handled
-              }
-            } else {
-              // Real error that we couldn't handle
-              console.error(`Failed to create proxy for profile ${profileId}:`, proxyError)
-              // Don't log every single proxy error to avoid flooding logs
-              // Only log if it's not a duplicate key error
-            }
-          }
-        } else {
-          // console.log(`No proxy data for profile ${profileId}`)
         }
 
         if (existingAccount) {
@@ -361,7 +260,9 @@ export async function POST(request: NextRequest) {
               geelark_group: profile.group,
               geelark_remark: profile.remark,
               geelark_equipment_info: profile.equipmentInfo,
-              last_synced_at: new Date().toISOString()
+              last_synced_at: new Date().toISOString(),
+              // Add proxy info if present
+              ...(proxyInfo && { proxy: proxyInfo })
             }
           }
 
@@ -378,17 +279,6 @@ export async function POST(request: NextRequest) {
           
           if (!criticalStatuses.includes(existingAccount.status)) {
             updateData.status = profile.status === 2 ? 'active' : 'new'
-          }
-
-          // Update proxy_id if we have one
-          if (proxyId) {
-            updateData.proxy_id = proxyId
-            
-            // Also update the proxy's assigned_account_id
-            await supabaseAdmin
-              .from('proxies')
-              .update({ assigned_account_id: existingAccount.id })
-              .eq('id', proxyId)
           }
 
           const { error: updateError } = await supabaseAdmin
@@ -428,13 +318,10 @@ export async function POST(request: NextRequest) {
             geelark_group: profile.group,
             geelark_remark: profile.remark,
             geelark_equipment_info: profile.equipmentInfo,
-            imported_at: new Date().toISOString()
+            imported_at: new Date().toISOString(),
+            // Add proxy info if present
+            ...(proxyInfo && { proxy: proxyInfo })
           }
-        }
-
-        // Add proxy_id if we have one
-        if (proxyId) {
-          accountData.proxy_id = proxyId
         }
 
         const { data: account, error: accountError } = await supabaseAdmin
@@ -447,14 +334,6 @@ export async function POST(request: NextRequest) {
           // console.error(`Failed to create account for profile ${profileId}:`, accountError)
           errors++
           continue
-        }
-
-        // Update proxy's assigned_account_id if we have a proxy
-        if (proxyId) {
-          await supabaseAdmin
-            .from('proxies')
-            .update({ assigned_account_id: account.id })
-            .eq('id', proxyId)
         }
 
         // Create phone record

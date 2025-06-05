@@ -6,6 +6,8 @@ import { ProfileBulkActions } from '@/components/profile-bulk-actions'
 import { AssignProxyModal } from '@/components/assign-proxy-modal'
 import { BulkDeleteModal } from '@/components/bulk-delete-modal'
 import { EngagementModal, EngagementConfig } from '@/components/engagement-modal'
+import { FixStuckStatusModal } from '@/components/fix-stuck-status-modal'
+import { BulkProfileEditModal, ProfileEditParams } from '@/components/bulk-profile-edit-modal'
 import { useNotification } from '@/lib/context/notification-context'
 
 interface ProfilesPageWrapperProps {
@@ -17,9 +19,13 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
   const [showProxyModal, setShowProxyModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEngagementModal, setShowEngagementModal] = useState(false)
+  const [showFixStatusModal, setShowFixStatusModal] = useState(false)
+  const [showProfileEditModal, setShowProfileEditModal] = useState(false)
   const [pendingProxyAssignment, setPendingProxyAssignment] = useState<string[]>([])
   const [pendingDeletion, setPendingDeletion] = useState<{ ids: string[], names: string[] }>({ ids: [], names: [] })
   const [pendingEngagement, setPendingEngagement] = useState<string[]>([])
+  const [pendingFixStatus, setPendingFixStatus] = useState<string[]>([])
+  const [pendingProfileEdit, setPendingProfileEdit] = useState<string[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const { notify } = useNotification()
 
@@ -39,6 +45,11 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     } else if (action === 'engage') {
       setPendingEngagement(ids)
       setShowEngagementModal(true)
+    } else if (action === 'fix-status') {
+      handleFixStatus(ids)
+    } else if (action === 'edit-profile') {
+      setPendingProfileEdit(ids)
+      setShowProfileEditModal(true)
     } else {
       setBulkAction({ action, ids })
     }
@@ -183,6 +194,112 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     }
   }
 
+  const handleFixStatus = async (profileIds: string[]) => {
+    setShowFixStatusModal(true)
+    setPendingFixStatus(profileIds)
+  }
+
+  const handleFixStatusConfirm = async (action: string) => {
+    setShowFixStatusModal(false)
+    setIsProcessing(true)
+    
+    try {
+      const response = await fetch('/api/profiles/fix-stuck-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          profileIds: pendingFixStatus,
+          action: action // Use the selected action
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fix status failed')
+      }
+
+      notify('success', data.message)
+
+      // Show errors if any
+      if (data.errors && data.errors.length > 0) {
+        data.errors.slice(0, 3).forEach((error: string) => {
+          notify('error', error)
+        })
+      }
+
+      // Refresh the page after a delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+
+    } catch (error) {
+      console.error('Fix status error:', error)
+      notify('error', error instanceof Error ? error.message : 'Failed to fix status')
+    } finally {
+      setIsProcessing(false)
+      setPendingFixStatus([])
+    }
+  }
+
+  const handleProfileEdit = async (params: ProfileEditParams) => {
+    setShowProfileEditModal(false)
+    setIsProcessing(true)
+    
+    try {
+      // Get GeeLark profile IDs from accounts
+      const selectedProfiles = profiles
+        .filter(p => pendingProfileEdit.includes(p.id))
+        .filter(p => p.geelark_profile_id) // Only profiles with GeeLark IDs
+      
+      if (selectedProfiles.length === 0) {
+        throw new Error('No valid profiles selected. Ensure profiles have GeeLark IDs.')
+      }
+      
+      const response = await fetch('/api/profiles/bulk-edit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileIds: pendingProfileEdit,
+          params
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Profile edit failed')
+      }
+
+      // Show summary
+      notify('success', `Profile edit started: ${data.summary.successful_tasks} successful, ${data.summary.failed_tasks} failed`)
+
+      // Show individual errors if any
+      data.results
+        .filter((r: any) => r.status === 'failed')
+        .slice(0, 3)
+        .forEach((result: any) => {
+          notify('error', `${result.profile_id}: ${result.error || result.message}`)
+        })
+
+      // Refresh after a delay to show results
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+      
+    } catch (error) {
+      console.error('Profile edit error:', error)
+      notify('error', error instanceof Error ? error.message : 'Failed to edit profiles')
+    } finally {
+      setIsProcessing(false)
+      setPendingProfileEdit([])
+    }
+  }
+
   return (
     <>
       <ProfilesTableV2
@@ -232,6 +349,30 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
           onCancel={() => {
             setShowEngagementModal(false)
             setPendingEngagement([])
+          }}
+        />
+      )}
+
+      {showFixStatusModal && (
+        <FixStuckStatusModal
+          profileIds={pendingFixStatus}
+          profileCount={pendingFixStatus.length}
+          onConfirm={handleFixStatusConfirm}
+          onCancel={() => {
+            setShowFixStatusModal(false)
+            setPendingFixStatus([])
+          }}
+        />
+      )}
+
+      {showProfileEditModal && (
+        <BulkProfileEditModal
+          profileIds={pendingProfileEdit}
+          profileCount={pendingProfileEdit.length}
+          onConfirm={handleProfileEdit}
+          onCancel={() => {
+            setShowProfileEditModal(false)
+            setPendingProfileEdit([])
           }}
         />
       )}

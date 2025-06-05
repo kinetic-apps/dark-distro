@@ -23,8 +23,13 @@ export default async function ProfilesPage({
     .from('accounts')
     .select(`
       *,
+      ready_for_actions,
       proxy:proxies!proxy_id(*),
-      phone:phones!fk_account(*),
+      phone:phones!fk_account(
+        *,
+        tags,
+        remark
+      ),
       tasks!fk_account(
         id,
         type,

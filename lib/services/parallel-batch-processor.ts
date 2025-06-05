@@ -45,7 +45,7 @@ export class ParallelBatchProcessor {
     failed: number
     results: PhoneSetupResult[]
   }> {
-    console.log(`[PARALLEL] Starting batch ${this.batchId} with ${jobs.length} phones, max concurrent: ${this.maxConcurrent}`)
+    // Removed: console.log(`[PARALLEL] Starting batch ${this.batchId} with ${jobs.length} phones, max concurrent: ${this.maxConcurrent}`)
     
     // Mark all jobs as part of this batch
     await this.markBatchJobs(jobs)
@@ -121,7 +121,7 @@ export class ParallelBatchProcessor {
     const startTime = Date.now()
     const { profileId, accountId, profileName, index, total } = job
     
-    console.log(`[PARALLEL] Starting phone ${index + 1}/${total} (${profileId})`)
+    // Removed: console.log(`[PARALLEL] Starting phone ${index + 1}/${total} (${profileId})`)
     
     try {
       // Update status to processing
@@ -152,14 +152,14 @@ export class ParallelBatchProcessor {
       await this.updateAccountWithPhone(accountId, phoneNumber, rentalId, loginTaskId, username)
       
       // Step 8: RPA task handles OTP monitoring through proxy endpoints
-      console.log(`[PARALLEL] RPA task will monitor OTP for account ${accountId} through proxy endpoints`)
+      // Removed: console.log(`[PARALLEL] RPA task will monitor OTP for account ${accountId} through proxy endpoints`)
       
       // Start background auto-stop monitoring
       this.startAutoStopMonitoring(accountId, profileId)
       
       const duration = Math.round((Date.now() - startTime) / 1000)
       
-      console.log(`[PARALLEL] Phone ${index + 1}/${total} setup completed in ${duration}s`)
+      // Removed: console.log(`[PARALLEL] Phone ${index + 1}/${total} setup completed in ${duration}s`)
       
       await this.updateBatchStatus(accountId, 'completed')
       
@@ -175,6 +175,7 @@ export class ParallelBatchProcessor {
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
+      // Keep this error log as it's important
       console.error(`[PARALLEL] Phone ${index + 1}/${total} failed: ${errorMessage}`)
       
       await this.updateBatchStatus(accountId, 'failed', errorMessage)
@@ -209,7 +210,7 @@ export class ParallelBatchProcessor {
   }
 
   private async startPhone(profileId: string, accountId: string): Promise<void> {
-    console.log(`[PARALLEL] Starting phone ${profileId}`)
+    // Removed: console.log(`[PARALLEL] Starting phone ${profileId}`)
     
     await supabaseAdmin
       .from('accounts')
@@ -235,7 +236,7 @@ export class ParallelBatchProcessor {
 
 
   private async ensureTikTokInstalled(profileId: string, accountId: string): Promise<void> {
-    console.log(`[PARALLEL] Checking TikTok installation for ${profileId}`)
+    // Removed: console.log(`[PARALLEL] Checking TikTok installation for ${profileId}`)
     
     await supabaseAdmin
       .from('accounts')
@@ -253,20 +254,20 @@ export class ParallelBatchProcessor {
       try {
         const isInstalled = await geelarkApi.isTikTokInstalled(profileId)
         if (isInstalled) {
-          console.log(`[PARALLEL] TikTok confirmed installed on ${profileId}`)
+          // Removed: console.log(`[PARALLEL] TikTok confirmed installed on ${profileId}`)
           return
         }
       } catch (error) {
-        console.error(`Error checking TikTok installation: ${error}`)
+        // Removed: console.error(`Error checking TikTok installation: ${error}`)
       }
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
     
-    console.warn(`[PARALLEL] TikTok installation not confirmed for ${profileId}, continuing anyway`)
+    // Removed: console.warn(`[PARALLEL] TikTok installation not confirmed for ${profileId}, continuing anyway`)
   }
 
   private async createLoginTask(profileId: string, accountId: string): Promise<{ loginTaskId: string, username: string }> {
-    console.log(`[PARALLEL] Creating RPA login task for ${profileId}`)
+    // Removed: console.log(`[PARALLEL] Creating RPA login task for ${profileId}`)
     
     const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', TIKTOK_USERNAME_LENGTH)
     const username = `${TIKTOK_USERNAME_PREFIX}${nanoid()}`
@@ -320,14 +321,14 @@ export class ParallelBatchProcessor {
   }
 
   private async waitForTaskToStart(taskId: string): Promise<void> {
-    console.log(`[PARALLEL] Waiting for task ${taskId} to start`)
+    // Removed: console.log(`[PARALLEL] Waiting for task ${taskId} to start`)
     
     const maxAttempts = 150 // 5 minutes for parallel operations
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const taskStatus = await geelarkApi.getTaskStatus(taskId)
         if (taskStatus.status === 'running' || taskStatus.result?.status === 2) {
-          console.log(`[PARALLEL] Task ${taskId} started`)
+          // Removed: console.log(`[PARALLEL] Task ${taskId} started`)
           return
         }
         if (taskStatus.status === 'failed' || taskStatus.result?.status === 4) {
@@ -345,13 +346,13 @@ export class ParallelBatchProcessor {
   }
 
   private async rentPhoneNumber(accountId: string): Promise<{ rentalId: string, phoneNumber: string }> {
-    console.log(`[PARALLEL] Renting phone number for account ${accountId}`)
+    // Removed: console.log(`[PARALLEL] Renting phone number for account ${accountId}`)
     
     // Retry logic for DaisySMS API errors (they will tell us if we hit limits)
     return retryWithBackoff(async () => {
       const rental = await daisyApi.rentNumber(accountId, this.options.long_term_rental)
       
-      console.log(`[PARALLEL] Rented number ${rental.phone} for account ${accountId}`)
+      // Removed: console.log(`[PARALLEL] Rented number ${rental.phone} for account ${accountId}`)
       
       return {
         rentalId: rental.rental_id,
@@ -393,6 +394,7 @@ export class ParallelBatchProcessor {
     // Start background monitoring without blocking
     waitForSetupCompletionAndShutdown(accountId, profileId)
       .catch(error => {
+        // Keep this error log as it's important
         console.error(`[PARALLEL] Auto-stop monitoring error for ${accountId}:`, error)
       })
   }

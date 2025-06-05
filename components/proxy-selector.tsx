@@ -1,59 +1,41 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { RefreshCw, Loader2, Database, Cloud, AlertCircle } from 'lucide-react'
+import { RefreshCw, Loader2, AlertCircle, Tag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Proxy {
   id: string
-  label?: string
-  type?: string
-  host?: string
-  port?: number
-  username?: string
-  geelark_proxy_id?: string
-  assigned_account_id?: string
-  health?: string
-  // GeeLark proxy fields
-  scheme?: string
-  server?: string
+  geelark_id: string
+  scheme: string
+  server: string
+  port: number
+  username: string | null
+  password: string | null
+  group_name: string | null
+  tags: string[] | null
+  is_active: boolean
 }
 
 interface ProxySelectorProps {
   value: string
   onChange: (value: string, proxyData?: any) => void
-  source: 'auto' | 'database' | 'geelark' | 'manual'
-  onSourceChange?: (source: string) => void
-  showSourceSelector?: boolean
-  filterAssigned?: boolean
+  filterByAllowedGroups?: boolean
   className?: string
 }
 
 export function ProxySelector({
   value,
   onChange,
-  source = 'auto',
-  onSourceChange,
-  showSourceSelector = true,
-  filterAssigned = true,
+  filterByAllowedGroups = false,
   className = ''
 }: ProxySelectorProps) {
   const [loading, setLoading] = useState(false)
-  const [databaseProxies, setDatabaseProxies] = useState<Proxy[]>([])
-  const [geelarkProxies, setGeelarkProxies] = useState<Proxy[]>([])
+  const [proxies, setProxies] = useState<Proxy[]>([])
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    if (source === 'database' || source === 'auto') {
-      fetchDatabaseProxies()
-    }
-    if (source === 'geelark') {
-      fetchGeelarkProxies()
-    }
-  }, [source])
-
-  const fetchDatabaseProxies = async () => {
+  const fetchProxies = async () => {
     setLoading(true)
     setError(null)
     
@@ -61,182 +43,118 @@ export function ProxySelector({
       let query = supabase
         .from('proxies')
         .select('*')
-        .order('created_at', { ascending: false })
+        .eq('is_active', true)
+        .order('group_name', { ascending: true })
+        .order('server', { ascending: true })
+        .order('port', { ascending: true })
 
-      if (filterAssigned) {
-        query = query.is('assigned_account_id', null)
+      // If filtering by allowed groups, join with proxy_group_settings
+      if (filterByAllowedGroups) {
+        // First get allowed groups
+        const { data: allowedGroups, error: groupError } = await supabase
+          .from('proxy_group_settings')
+          .select('group_name')
+          .eq('allowed_for_phone_creation', true)
+        
+        if (groupError) throw groupError
+        
+        if (allowedGroups && allowedGroups.length > 0) {
+          const groupNames = allowedGroups.map(g => g.group_name)
+          query = query.in('group_name', groupNames)
+        }
       }
 
       const { data, error } = await query
 
       if (error) throw error
-      setDatabaseProxies(data || [])
+      setProxies(data || [])
     } catch (err) {
-      console.error('Error fetching database proxies:', err)
-      setError('Failed to fetch database proxies')
+      console.error('Error fetching proxies:', err)
+      setError('Failed to fetch proxies')
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchGeelarkProxies = async () => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const response = await fetch('/api/geelark/list-proxies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch GeeLark proxies')
-      }
-
-      const data = await response.json()
-      setGeelarkProxies(data.proxies || [])
-    } catch (err) {
-      console.error('Error fetching GeeLark proxies:', err)
-      setError('Failed to fetch GeeLark proxies')
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    fetchProxies()
+  }, [filterByAllowedGroups])
 
   const handleRefresh = () => {
-    if (source === 'database' || source === 'auto') {
-      fetchDatabaseProxies()
-    }
-    if (source === 'geelark') {
-      fetchGeelarkProxies()
-    }
+    fetchProxies()
   }
 
   const getProxyDisplay = (proxy: Proxy) => {
-    if (proxy.label) {
-      return proxy.label
+    const parts = []
+    
+    if (proxy.group_name) {
+      parts.push(`[${proxy.group_name}]`)
     }
     
-    const host = proxy.host || proxy.server || 'Unknown'
-    const port = proxy.port || 'Unknown'
-    const type = proxy.type || proxy.scheme || 'proxy'
+    parts.push(`${proxy.scheme}://${proxy.server}:${proxy.port}`)
     
-    return `${type}://${host}:${port}`
-  }
-
-  const getProxyHealth = (proxy: Proxy) => {
-    if (!proxy.health || proxy.health === 'unknown') return null
-    
-    const healthColors = {
-      good: 'text-green-600 dark:text-green-400',
-      slow: 'text-yellow-600 dark:text-yellow-400',
-      blocked: 'text-red-600 dark:text-red-400',
-      unknown: 'text-gray-600 dark:text-gray-400'
+    if (proxy.username) {
+      parts.push(`(${proxy.username})`)
     }
     
-    return (
-      <span className={`text-xs ${healthColors[proxy.health as keyof typeof healthColors]}`}>
-        {proxy.health}
-      </span>
-    )
+    return parts.join(' ')
   }
 
-  const proxies = source === 'geelark' ? geelarkProxies : databaseProxies
+  const getGroupColor = (groupName: string | null) => {
+    if (!groupName) return ''
+    
+    const colorMap: Record<string, string> = {
+      'residential': 'text-blue-600 dark:text-blue-400',
+      'mobile': 'text-green-600 dark:text-green-400',
+      'datacenter': 'text-purple-600 dark:text-purple-400',
+      'premium': 'text-yellow-600 dark:text-yellow-400',
+      'standard': 'text-gray-600 dark:text-gray-400'
+    }
+    
+    return colorMap[groupName.toLowerCase()] || 'text-indigo-600 dark:text-indigo-400'
+  }
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {showSourceSelector && (
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-dark-300">
-            Proxy Source:
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="label">
+            Select Proxy
+            {filterByAllowedGroups && (
+              <span className="text-xs text-gray-500 dark:text-dark-400 ml-2">
+                (Filtered by allowed groups)
+              </span>
+            )}
           </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => onSourceChange?.('auto')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                source === 'auto'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'bg-gray-100 text-gray-700 dark:bg-dark-800 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-700'
-              }`}
-            >
-              Auto
-            </button>
-            <button
-              type="button"
-              onClick={() => onSourceChange?.('database')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
-                source === 'database'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'bg-gray-100 text-gray-700 dark:bg-dark-800 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-700'
-              }`}
-            >
-              <Database className="h-3 w-3" />
-              Database
-            </button>
-            <button
-              type="button"
-              onClick={() => onSourceChange?.('geelark')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
-                source === 'geelark'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'bg-gray-100 text-gray-700 dark:bg-dark-800 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-700'
-              }`}
-            >
-              <Cloud className="h-3 w-3" />
-              GeeLark
-            </button>
-            <button
-              type="button"
-              onClick={() => onSourceChange?.('manual')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                source === 'manual'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'bg-gray-100 text-gray-700 dark:bg-dark-800 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-700'
-              }`}
-            >
-              Manual
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
-      )}
 
-      {source !== 'manual' && source !== 'auto' && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="label">
-              Select {source === 'geelark' ? 'GeeLark' : 'Database'} Proxy
-            </label>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={loading}
-              className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-            >
-              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+        {error && (
+          <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md text-sm mb-2">
+            <AlertCircle className="h-4 w-4" />
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-md text-sm">
-              <AlertCircle className="h-4 w-4" />
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-              <span className="ml-2 text-sm text-gray-500">Loading proxies...</span>
-            </div>
-          ) : (
+        {loading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-500">Loading proxies...</span>
+          </div>
+        ) : (
+          <>
             <select
               value={value}
               onChange={(e) => {
-                const selectedProxy = proxies.find(p => 
-                  source === 'geelark' ? p.id === e.target.value : p.id === e.target.value
-                )
+                const selectedProxy = proxies.find(p => p.id === e.target.value)
                 onChange(e.target.value, selectedProxy)
               }}
               className="select w-full"
@@ -246,41 +164,53 @@ export function ProxySelector({
               {proxies.map((proxy) => (
                 <option key={proxy.id} value={proxy.id}>
                   {getProxyDisplay(proxy)}
-                  {proxy.username && ` (${proxy.username})`}
-                  {proxy.type && ` - ${proxy.type}`}
-                  {proxy.assigned_account_id && ' [Assigned]'}
                 </option>
               ))}
             </select>
-          )}
 
-          {proxies.length === 0 && !loading && !error && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-dark-400">
-              {source === 'geelark' 
-                ? 'No proxies found in GeeLark. Add proxies in GeeLark first.'
-                : filterAssigned 
-                  ? 'No available proxies found. All proxies are assigned.'
-                  : 'No proxies found in database.'}
-            </p>
-          )}
+            {/* Show selected proxy details */}
+            {value && proxies.length > 0 && (
+              <div className="mt-2 p-2 bg-gray-50 dark:bg-dark-800 rounded-md">
+                {(() => {
+                  const selectedProxy = proxies.find(p => p.id === value)
+                  if (!selectedProxy) return null
+                  
+                  return (
+                    <div className="text-xs space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500 dark:text-dark-400">GeeLark ID:</span>
+                        <span className="font-mono">{selectedProxy.geelark_id}</span>
+                      </div>
+                      {selectedProxy.group_name && (
+                        <div className="flex items-center gap-2">
+                          <Tag className="h-3 w-3 text-gray-500 dark:text-dark-400" />
+                          <span className={`font-medium ${getGroupColor(selectedProxy.group_name)}`}>
+                            {selectedProxy.group_name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+          </>
+        )}
 
-          {source === 'database' && proxies.length > 0 && (
-            <div className="mt-2 text-xs text-gray-500 dark:text-dark-400 space-y-1">
-              <p>Available: {proxies.filter(p => !p.assigned_account_id).length}</p>
-              <p>Total: {proxies.length}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {source === 'auto' && (
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-          <p className="text-sm text-blue-700 dark:text-blue-400">
-            Auto mode will automatically select an available proxy from your database.
-            Priority: Unassigned SIM proxies → Sticky proxies → Rotating proxies
+        {proxies.length === 0 && !loading && !error && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-dark-400">
+            {filterByAllowedGroups 
+              ? 'No proxies found in allowed groups. Configure proxy groups in the Proxies tab.'
+              : 'No active proxies found. Sync proxies from GeeLark first.'}
           </p>
-        </div>
-      )}
+        )}
+
+        {proxies.length > 0 && !loading && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-dark-400">
+            {proxies.length} {proxies.length === 1 ? 'proxy' : 'proxies'} available
+          </p>
+        )}
+      </div>
     </div>
   )
 } 

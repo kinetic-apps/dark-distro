@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
           // Always update the geelark_status in meta
           const updatedMeta = {
             ...task.meta,
-            geelark_status: taskStatus.result?.geelark_status || taskStatus.status === 'completed' ? 3 : 
+            geelark_status: taskStatus.result?.geelark_status || (taskStatus.status === 'completed' ? 3 : 
                            taskStatus.status === 'failed' ? 4 : 
                            taskStatus.status === 'cancelled' ? 7 : 
-                           taskStatus.status === 'running' ? 2 : 1,
+                           taskStatus.status === 'running' ? 2 : 1),
             result: taskStatus.result
           }
 
@@ -67,6 +67,38 @@ export async function GET(request: NextRequest) {
               })
             }
 
+            // Handle login completion
+            if (task.type === 'login' && taskStatus.status === 'completed') {
+              // Get the current account status
+              const { data: account } = await supabaseAdmin
+                .from('accounts')
+                .select('status')
+                .eq('id', task.account_id)
+                .single()
+
+              // Only update if account is still in pending_verification status
+              if (account?.status === 'pending_verification') {
+                await supabaseAdmin
+                  .from('accounts')
+                  .update({
+                    status: 'active',
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', task.account_id)
+
+                await supabaseAdmin.from('logs').insert({
+                  level: 'info',
+                  component: 'task-poller',
+                  account_id: task.account_id,
+                  message: 'Login completed successfully - account activated',
+                  meta: { 
+                    task_id: task.geelark_task_id,
+                    previous_status: 'pending_verification'
+                  }
+                })
+              }
+            }
+
             // Handle post completion
             if (task.type === 'post' && taskStatus.status === 'completed') {
               const tiktokPostId = taskStatus.result?.post_id || null
@@ -104,6 +136,27 @@ export async function GET(request: NextRequest) {
                   .eq('geelark_task_id', task.geelark_task_id)
               }
 
+              // Handle login task failures
+              if (task.type === 'login') {
+                // Get the current account status
+                const { data: account } = await supabaseAdmin
+                  .from('accounts')
+                  .select('status')
+                  .eq('id', task.account_id)
+                  .single()
+
+                // Only update if account is still in pending_verification status
+                if (account?.status === 'pending_verification') {
+                  await supabaseAdmin
+                    .from('accounts')
+                    .update({
+                      status: 'error',
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', task.account_id)
+                }
+              }
+
               await supabaseAdmin.from('logs').insert({
                 level: 'error',
                 component: 'task-poller',
@@ -111,7 +164,9 @@ export async function GET(request: NextRequest) {
                 message: `${task.type} task failed`,
                 meta: { 
                   task_id: task.geelark_task_id,
-                  error: taskStatus.result?.error
+                  error: taskStatus.result?.error,
+                  fail_code: taskStatus.result?.failCode,
+                  fail_desc: taskStatus.result?.failDesc
                 }
               })
 

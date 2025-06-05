@@ -27,7 +27,6 @@ export default function NewProfilePage() {
     androidVersion: '13',
     assignProxy: true,
     proxySource: 'auto', // 'auto', 'geelark', 'manual', 'dynamic'
-    proxyType: 'sticky',
     // GeeLark proxy selection
     geelarkProxyId: '',
     // Manual proxy configuration
@@ -121,7 +120,6 @@ export default function NewProfilePage() {
         if (formData.proxySource === 'auto') {
           // Use automatic proxy assignment from local database
           requestBody.assign_proxy = true
-          requestBody.proxy_type = formData.proxyType
         } else if (formData.proxySource === 'geelark' && formData.geelarkProxyId) {
           // Use GeeLark proxy by ID
           requestBody.proxy_id = formData.geelarkProxyId
@@ -429,21 +427,9 @@ export default function NewProfilePage() {
 
                 {/* Auto-assign proxy options */}
                 {formData.proxySource === 'auto' && (
-                  <div>
-                    <label htmlFor="proxyType" className="label">
-                      Proxy Type
-                    </label>
-                    <select
-                      id="proxyType"
-                      value={formData.proxyType}
-                      onChange={(e) => setFormData({ ...formData, proxyType: e.target.value })}
-                      className="select w-full"
-                    >
-                      <option value="sticky">Sticky Pool (for warm-up)</option>
-                      <option value="sim">Dedicated SIM (for posting)</option>
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-dark-400">
-                      Sticky proxies are recommended for new profiles during warm-up
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      A proxy will be automatically assigned from the allowed proxy groups configured in the system.
                     </p>
                   </div>
                 )}

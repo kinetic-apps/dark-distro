@@ -50,7 +50,6 @@ interface DashboardStats {
   totalProxies: number
   healthyProxies: number
   assignedProxies: number
-  proxyRotationsToday: number
   
   // SMS Stats
   activeRentals: number
@@ -120,7 +119,7 @@ async function getComprehensiveStats(): Promise<DashboardStats> {
       .gte('created_at', weekStart.toISOString()),
     
     // Proxy stats
-    supabase.from('proxies').select('health, assigned_account_id'),
+    supabase.from('proxies').select('is_active, group_name'),
     
     // SMS rentals
     supabase.from('sms_rentals')
@@ -159,7 +158,7 @@ async function getComprehensiveStats(): Promise<DashboardStats> {
     supabase.from('logs')
       .select('level, meta')
       .gte('timestamp', new Date(Date.now() - 3600000).toISOString())
-      .in('component', ['geelark-api', 'soax-api', 'daisy-api'])
+      .in('component', ['geelark-api', 'daisy-api'])
   ])
 
   // Process task durations
@@ -174,8 +173,8 @@ async function getComprehensiveStats(): Promise<DashboardStats> {
   // Process proxy health
   const proxyStats = proxies.data?.reduce((acc, proxy) => {
     acc.total++
-    if (proxy.health === 'good') acc.healthy++
-    if (proxy.assigned_account_id) acc.assigned++
+    if (proxy.is_active) acc.healthy++
+    if (proxy.group_name) acc.assigned++
     return acc
   }, { total: 0, healthy: 0, assigned: 0 }) || { total: 0, healthy: 0, assigned: 0 }
 
@@ -251,7 +250,6 @@ async function getComprehensiveStats(): Promise<DashboardStats> {
     totalProxies: proxyStats.total,
     healthyProxies: proxyStats.healthy,
     assignedProxies: proxyStats.assigned,
-    proxyRotationsToday: 0, // Would need to track this separately
     
     // SMS Stats
     activeRentals: rentals.data?.filter(r => r.status === 'waiting' || r.status === 'received').length || 0,

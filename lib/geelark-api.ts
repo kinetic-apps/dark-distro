@@ -1,7 +1,7 @@
-import { supabaseAdmin } from './supabase/admin'
 import { createHash } from 'crypto'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
-const API_BASE_URL = (process.env.GEELARK_API_BASE_URL || 'https://openapi.geelark.com').replace(/\/$/, '')
+const API_BASE_URL = process.env.GEELARK_API_BASE_URL || 'https://openapi.geelark.com'
 const API_KEY = process.env.GEELARK_API_KEY || ''
 const APP_ID = process.env.GEELARK_APP_ID || ''
 
@@ -68,60 +68,67 @@ interface ProfileStatus {
 
 export class GeeLarkAPI {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`
-    
-    // Generate required headers for signature verification - matching working implementation
-    const timestamp = new Date().getTime().toString()
+    const timestamp = Date.now().toString()
     const traceId = generateUUID()
     const nonce = traceId.substring(0, 6)
-    
-    // Generate signature: SHA256(appId + traceId + ts + nonce + apiKey)
-    const signString = APP_ID + traceId + timestamp + nonce + API_KEY
-    const sign = createHash('sha256').update(signString).digest('hex').toUpperCase()
-    
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          'appId': APP_ID,
-          'traceId': traceId,
-          'ts': timestamp,
-          'nonce': nonce,
-          'sign': sign,
-          ...options.headers,
-        },
-      })
+    const sign = createHash('sha256')
+      .update(APP_ID + traceId + timestamp + nonce + API_KEY)
+      .digest('hex')
+      .toUpperCase()
 
-      const responseText = await response.text()
-      let data: GeeLarkResponse<T>
-      
-      try {
-        data = JSON.parse(responseText) as GeeLarkResponse<T>
-      } catch (parseError) {
-        console.error('Failed to parse GeeLark response:', responseText)
-        throw new Error(`Invalid JSON response from GeeLark API: ${responseText}`)
-      }
+    const headers = {
+      'Content-Type': 'application/json',
+      'appId': APP_ID,
+      'traceId': traceId,
+      'ts': timestamp,
+      'nonce': nonce,
+      'sign': sign,
+      ...options.headers
+    }
 
-      if (!response.ok) {
-        console.error('GeeLark API HTTP error:', response.status, response.statusText, data)
-        throw new Error(`GeeLark API error: ${response.status} ${response.statusText} - ${data?.msg || 'Unknown error'}`)
-      }
-      
-      if (data.code !== 0) {
-        console.error('GeeLark API error response:', data)
-        throw new Error(`GeeLark API error: ${data.msg} (code: ${data.code})`)
-      }
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers
+    })
 
-      return data.data
-    } catch (error) {
+    const data = await response.json() as GeeLarkResponse<T>
+
+    if (data.code !== 0) {
+      // Log error to Supabase
       await supabaseAdmin.from('logs').insert({
         level: 'error',
         component: 'geelark-api',
-        message: `API request failed: ${error}`,
-        meta: { endpoint, error: String(error), url }
+        message: `GeeLark API error: ${data.msg}`,
+        meta: { 
+          endpoint, 
+          code: data.code, 
+          msg: data.msg,
+          trace_id: traceId
+        }
       })
-      throw error
+      
+      throw new Error(`GeeLark API error: ${data.msg} (code: ${data.code})`)
+    }
+
+    return data.data
+  }
+
+  getHeaders(): Record<string, string> {
+    const timestamp = Date.now().toString()
+    const traceId = generateUUID()
+    const nonce = traceId.substring(0, 6)
+    const sign = createHash('sha256')
+      .update(APP_ID + traceId + timestamp + nonce + API_KEY)
+      .digest('hex')
+      .toUpperCase()
+
+    return {
+      'Content-Type': 'application/json',
+      'appId': APP_ID,
+      'traceId': traceId,
+      'ts': timestamp,
+      'nonce': nonce,
+      'sign': sign
     }
   }
 
@@ -347,56 +354,62 @@ export class GeeLarkAPI {
 
   // Phone Management
   async startPhones(phoneIds: string[]): Promise<any> {
-    console.log(`[GeeLark] Starting phones: ${phoneIds.join(', ')}`)
-    
-    try {
-      const response = await this.request<{
-        successDetails?: Array<{ id: string; status: number }>
-        failDetails?: Array<{ id: string; code: number; msg: string }>
-      }>('/open/v1/phone/start', {
-        method: 'POST',
-        body: JSON.stringify({
-          ids: phoneIds
-        })
+    const data = await this.request<any>('/open/v1/phone/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        ids: phoneIds
       })
-      
-      console.log(`[GeeLark] Start phones response:`, JSON.stringify(response, null, 2))
-      
-      // Log success/failure details
-      if (response.successDetails) {
-        console.log(`[GeeLark] Successfully started ${response.successDetails.length} phones`)
-      }
-      if (response.failDetails) {
-        console.log(`[GeeLark] Failed to start ${response.failDetails.length} phones:`, response.failDetails)
-      }
-      
+    })
+
+    // Log successful starts
+    if (data.successDetails && data.successDetails.length > 0) {
       await supabaseAdmin.from('logs').insert({
         level: 'info',
         component: 'geelark-api',
-        message: 'Start phones API call',
-        meta: {
-          phone_ids: phoneIds,
-          response: response,
-          success_count: response.successDetails?.length || 0,
-          fail_count: response.failDetails?.length || 0
+        message: 'Phones started successfully',
+        meta: { 
+          phone_ids: data.successDetails.map((d: any) => d.id),
+          urls: data.successDetails.map((d: any) => ({ id: d.id, url: d.url }))
         }
       })
-      
-      return response
-    } catch (error) {
-      console.error(`[GeeLark] Failed to start phones ${phoneIds.join(', ')}:`, error)
-      
+    }
+
+    // Log any failures
+    if (data.failDetails && data.failDetails.length > 0) {
       await supabaseAdmin.from('logs').insert({
         level: 'error',
         component: 'geelark-api',
-        message: 'Start phones API call failed',
-        meta: {
-          phone_ids: phoneIds,
-          error: error instanceof Error ? error.message : String(error)
+        message: 'Some phones failed to start',
+        meta: { 
+          failures: data.failDetails.map((d: any) => ({ 
+            id: d.id, 
+            code: d.code, 
+            msg: d.msg 
+          }))
         }
       })
+    }
+
+    return data
+  }
+
+  async waitForPhoneReady(phoneId: string): Promise<void> {
+    console.log(`[GeeLark] Waiting for phone ${phoneId} to be ready...`)
+    
+    while (true) {
+      const statusData = await this.getPhoneStatus([phoneId])
       
-      throw error
+      if (statusData.successDetails && statusData.successDetails.length > 0) {
+        const phone = statusData.successDetails[0]
+        if (phone.status === 0) {
+          // Phone is started and ready
+          console.log(`[GeeLark] Phone ${phoneId} is ready`)
+          return
+        }
+      }
+      
+      // Wait 3 seconds before checking again
+      await new Promise(resolve => setTimeout(resolve, 3000))
     }
   }
 
@@ -663,42 +676,209 @@ export class GeeLarkAPI {
     return taskId
   }
 
+  async uploadFileFromUrl(sourceUrl: string, fileType: 'png' | 'jpg' | 'jpeg' | 'webp'): Promise<string> {
+    try {
+      // Get upload URL from Geelark
+      const { uploadUrl, resourceUrl } = await this.getUploadUrl(fileType)
+
+      // Fetch the file from source URL
+      const response = await fetch(sourceUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file from ${sourceUrl}`)
+      }
+
+      const fileBuffer = await response.arrayBuffer()
+
+      // Upload to Geelark's storage - NO EXTRA HEADERS!
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: fileBuffer
+        // DO NOT add any headers - Geelark documentation specifically says no extra headers
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload file to Geelark: ${uploadResponse.status}`)
+      }
+
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'geelark-api',
+        message: 'File uploaded to Geelark',
+        meta: { sourceUrl, resourceUrl }
+      })
+
+      return resourceUrl
+    } catch (error) {
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'geelark-api',
+        message: 'Failed to upload file to Geelark',
+        meta: { sourceUrl, error: String(error) }
+      })
+      throw error
+    }
+  }
+
+  async uploadVideoFromUrl(sourceUrl: string): Promise<string> {
+    try {
+      // Determine file type from URL
+      const fileExtension = sourceUrl.split('.').pop()?.toLowerCase()
+      const supportedTypes = ['mp4', 'webm', 'mov']
+      const fileType = supportedTypes.includes(fileExtension || '') ? fileExtension : 'mp4'
+
+      // Get upload URL from Geelark
+      const { uploadUrl, resourceUrl } = await this.getUploadUrl(fileType as any)
+
+      // Fetch the file from source URL
+      const response = await fetch(sourceUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch video from ${sourceUrl}`)
+      }
+
+      const fileBuffer = await response.arrayBuffer()
+
+      // Upload to Geelark's storage - NO EXTRA HEADERS!
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: fileBuffer
+        // DO NOT add any headers - Geelark documentation specifically says no extra headers
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Failed to upload video to Geelark: ${uploadResponse.status}`)
+      }
+
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'geelark-api',
+        message: 'Video uploaded to Geelark',
+        meta: { sourceUrl, resourceUrl, fileType }
+      })
+
+      return resourceUrl
+    } catch (error) {
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'geelark-api',
+        message: 'Failed to upload video to Geelark',
+        meta: { sourceUrl, error: String(error) }
+      })
+      throw error
+    }
+  }
+
+  async uploadCarouselImages(imageUrls: string[]): Promise<string[]> {
+    const uploadedUrls: string[] = []
+    
+    for (const imageUrl of imageUrls) {
+      try {
+        // Determine file type from URL
+        const fileExtension = imageUrl.split('.').pop()?.toLowerCase()
+        const supportedTypes = ['png', 'jpg', 'jpeg', 'webp']
+        const fileType = supportedTypes.includes(fileExtension || '') ? fileExtension : 'jpg'
+        
+        const geelarkUrl = await this.uploadFileFromUrl(imageUrl, fileType as any)
+        uploadedUrls.push(geelarkUrl)
+      } catch (error) {
+        console.error(`Failed to upload carousel image ${imageUrl}:`, error)
+        // Continue with other images even if one fails
+      }
+    }
+
+    if (uploadedUrls.length === 0) {
+      throw new Error('Failed to upload any carousel images')
+    }
+
+    return uploadedUrls
+  }
+
   async postTikTokCarousel(profileId: string, accountId: string, content: {
     images: string[]
     caption: string
     hashtags?: string[]
     music?: string
   }): Promise<string> {
-    const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
-      method: 'POST',
-      body: JSON.stringify({
+    let phoneStarted = false
+    
+    try {
+      // Step 1: Start the phone
+      console.log('[GeeLark] Starting phone for carousel post...')
+      await this.startPhones([profileId])
+      await this.waitForPhoneReady(profileId)
+      phoneStarted = true
+      console.log('[GeeLark] Phone started and ready')
+
+      // Step 2: Upload images to Geelark temporary storage first
+      console.log('[GeeLark] Uploading carousel images to Geelark temporary storage...')
+      const geelarkImageUrls = await this.uploadCarouselImages(content.images)
+      console.log(`[GeeLark] Uploaded ${geelarkImageUrls.length} images to Geelark`)
+
+      // Step 3: Upload each image to the phone's Downloads folder
+      console.log('[GeeLark] Uploading images to phone Downloads folder...')
+      for (let i = 0; i < geelarkImageUrls.length; i++) {
+        const uploadTaskId = await this.uploadFileToPhone(profileId, geelarkImageUrls[i])
+        await this.waitForUpload(uploadTaskId)
+        console.log(`[GeeLark] Image ${i + 1}/${geelarkImageUrls.length} uploaded to phone`)
+      }
+
+      // Step 4: Create the carousel posting task
+      const scheduleAt = Math.floor(Date.now() / 1000) + 60
+
+      const requestBody = {
         planName: `carousel_${accountId}_${Date.now()}`,
         taskType: 3, // Publish image set
         list: [{
-          scheduleAt: Math.floor(Date.now() / 1000),
+          scheduleAt: scheduleAt,
           envId: profileId,
-          images: content.images,
+          images: geelarkImageUrls, // Array of image URLs as per documentation
           videoDesc: content.caption + (content.hashtags ? ' ' + content.hashtags.join(' ') : ''),
           videoTitle: content.caption.substring(0, 50),
-          maxTryTimes: 1,
-          timeoutMin: 30
+          maxTryTimes: 3,
+          timeoutMin: 50,
+          sameVideoVolume: 50,
+          sourceVideoVolume: 50
         }]
+      }
+
+      console.log('[GeeLark] Creating carousel post task...')
+      const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
+        method: 'POST',
+        body: JSON.stringify(requestBody)
       })
-    })
 
-    const taskId = data.taskIds[0]
+      const taskId = data.taskIds[0]
+      console.log('[GeeLark] Carousel post task created with ID:', taskId)
 
-    await supabaseAdmin.from('tasks').insert({
-      type: 'post',
-      task_type: 'post',  // Required field
-      geelark_task_id: taskId,
-      account_id: accountId,
-      status: 'running',
-      started_at: new Date().toISOString(),
-      meta: { type: 'carousel', images_count: content.images.length }
-    })
+      await supabaseAdmin.from('tasks').insert({
+        type: 'post',
+        task_type: 'post',
+        geelark_task_id: taskId,
+        account_id: accountId,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        meta: { 
+          type: 'carousel', 
+          images_count: content.images.length,
+          original_images: content.images,
+          geelark_images: geelarkImageUrls,
+          scheduled_at: new Date(scheduleAt * 1000).toISOString(),
+          phone_started: true
+        }
+      })
 
-    return taskId
+      return taskId
+      
+    } catch (error) {
+      // If phone was started but task failed, we should stop it
+      if (phoneStarted) {
+        try {
+          await this.stopPhones([profileId])
+        } catch (stopError) {
+          console.error('[GeeLark] Failed to stop phone after error:', stopError)
+        }
+      }
+      throw error
+    }
   }
 
   async postTikTokVideo(profileId: string, accountId: string, content: {
@@ -707,35 +887,83 @@ export class GeeLarkAPI {
     hashtags?: string[]
     music?: string
   }): Promise<string> {
-    const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
-      method: 'POST',
-      body: JSON.stringify({
+    let phoneStarted = false
+    
+    try {
+      // Step 1: Start the phone
+      console.log('[GeeLark] Starting phone for video post...')
+      await this.startPhones([profileId])
+      await this.waitForPhoneReady(profileId)
+      phoneStarted = true
+      console.log('[GeeLark] Phone started and ready')
+
+      // Step 2: Upload video to Geelark temporary storage first
+      console.log('[GeeLark] Uploading video to Geelark temporary storage...')
+      const geelarkVideoUrl = await this.uploadVideoFromUrl(content.video_url)
+      console.log('[GeeLark] Video uploaded to Geelark:', geelarkVideoUrl)
+
+      // Step 3: Upload the video to the phone's Downloads folder
+      console.log('[GeeLark] Uploading video to phone Downloads folder...')
+      const uploadTaskId = await this.uploadFileToPhone(profileId, geelarkVideoUrl)
+      await this.waitForUpload(uploadTaskId)
+      console.log('[GeeLark] Video uploaded to phone successfully')
+
+      // Step 4: Create the video posting task
+      const scheduleAt = Math.floor(Date.now() / 1000) + 60
+
+      const requestBody = {
         planName: `video_${accountId}_${Date.now()}`,
         taskType: 1, // Publish video
         list: [{
-          scheduleAt: Math.floor(Date.now() / 1000),
+          scheduleAt: scheduleAt,
           envId: profileId,
-          video: content.video_url,
+          video: geelarkVideoUrl, // Use the Geelark URL
           videoDesc: content.caption + (content.hashtags ? ' ' + content.hashtags.join(' ') : ''),
-          maxTryTimes: 1,
-          timeoutMin: 30
+          maxTryTimes: 3,
+          timeoutMin: 60,
+          sameVideoVolume: 50,
+          sourceVideoVolume: 50
         }]
+      }
+
+      console.log('[GeeLark] Creating video post task...')
+      const data = await this.request<{ taskIds: string[] }>('/open/v1/task/add', {
+        method: 'POST',
+        body: JSON.stringify(requestBody)
       })
-    })
 
-    const taskId = data.taskIds[0]
+      const taskId = data.taskIds[0]
+      console.log('[GeeLark] Video post task created with ID:', taskId)
 
-    await supabaseAdmin.from('tasks').insert({
-      type: 'post',
-      task_type: 'post',  // Required field
-      geelark_task_id: taskId,
-      account_id: accountId,
-      status: 'running',
-      started_at: new Date().toISOString(),
-      meta: { type: 'video' }
-    })
+      await supabaseAdmin.from('tasks').insert({
+        type: 'post',
+        task_type: 'post',
+        geelark_task_id: taskId,
+        account_id: accountId,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        meta: { 
+          type: 'video',
+          original_video: content.video_url,
+          geelark_video: geelarkVideoUrl,
+          scheduled_at: new Date(scheduleAt * 1000).toISOString(),
+          phone_started: true
+        }
+      })
 
-    return taskId
+      return taskId
+      
+    } catch (error) {
+      // If phone was started but task failed, we should stop it
+      if (phoneStarted) {
+        try {
+          await this.stopPhones([profileId])
+        } catch (stopError) {
+          console.error('[GeeLark] Failed to stop phone after error:', stopError)
+        }
+      }
+      throw error
+    }
   }
 
   async editTikTokProfile(profileId: string, profile: {
@@ -744,23 +972,79 @@ export class GeeLarkAPI {
     bio?: string
     site?: string
   }): Promise<{ taskId: string }> {
-    const data = await this.request<{ taskId: string }>('/open/v1/rpa/task/tiktokEdit', {
-      method: 'POST',
-      body: JSON.stringify({
-        scheduleAt: Math.floor(Date.now() / 1000),
+    let phoneStarted = false
+    let geelarkAvatarUrl: string | undefined
+    
+    try {
+      // Step 1: Start the phone
+      console.log('[GeeLark] Starting phone for profile edit...')
+      await this.startPhones([profileId])
+      await this.waitForPhoneReady(profileId)
+      phoneStarted = true
+      console.log('[GeeLark] Phone started and ready')
+
+      // Step 2: If avatar is provided, upload it
+      if (profile.avatar) {
+        // Upload to Geelark temporary storage first
+        console.log('[GeeLark] Uploading avatar to Geelark temporary storage...')
+        const fileExtension = profile.avatar.split('.').pop()?.toLowerCase()
+        const supportedTypes = ['png', 'jpg', 'jpeg', 'webp']
+        const fileType = supportedTypes.includes(fileExtension || '') ? fileExtension : 'jpg'
+        
+        geelarkAvatarUrl = await this.uploadFileFromUrl(profile.avatar, fileType as any)
+        console.log('[GeeLark] Avatar uploaded to Geelark:', geelarkAvatarUrl)
+
+        // Upload to phone's Downloads folder
+        console.log('[GeeLark] Uploading avatar to phone Downloads folder...')
+        const uploadTaskId = await this.uploadFileToPhone(profileId, geelarkAvatarUrl)
+        await this.waitForUpload(uploadTaskId)
+        console.log('[GeeLark] Avatar uploaded to phone successfully')
+      }
+
+      // Step 3: Create the profile edit task
+      const requestBody = {
+        name: `profile_edit_${Date.now()}`,
+        remark: `Edit profile: ${profile.nickName || 'update'}`,
+        scheduleAt: Math.floor(Date.now() / 1000) + 60, // Schedule 1 minute from now
         id: profileId,
-        ...profile
+        ...(profile.nickName && { nickName: profile.nickName }),
+        ...(profile.bio && { bio: profile.bio }),
+        ...(profile.site && { site: profile.site }),
+        ...(geelarkAvatarUrl && { avatar: geelarkAvatarUrl })
+      }
+
+      console.log('[GeeLark] Creating profile edit task...')
+      const data = await this.request<{ taskId: string }>('/open/v1/rpa/task/tiktokEdit', {
+        method: 'POST',
+        body: JSON.stringify(requestBody)
       })
-    })
 
-    await supabaseAdmin.from('logs').insert({
-      level: 'info',
-      component: 'geelark-api',
-      message: 'TikTok profile edit initiated',
-      meta: { profile_id: profileId, task_id: data.taskId, changes: profile }
-    })
+      await supabaseAdmin.from('logs').insert({
+        level: 'info',
+        component: 'geelark-api',
+        message: 'TikTok profile edit initiated',
+        meta: { 
+          profile_id: profileId, 
+          task_id: data.taskId, 
+          changes: profile,
+          geelark_avatar: geelarkAvatarUrl,
+          phone_started: true
+        }
+      })
 
-    return data
+      return data
+      
+    } catch (error) {
+      // If phone was started but task failed, we should stop it
+      if (phoneStarted) {
+        try {
+          await this.stopPhones([profileId])
+        } catch (stopError) {
+          console.error('[GeeLark] Failed to stop phone after error:', stopError)
+        }
+      }
+      throw error
+    }
   }
 
   async cancelTasks(taskIds: string[]): Promise<any> {
@@ -874,15 +1158,31 @@ export class GeeLarkAPI {
 
   // Profile Management
   async getProfileList(): Promise<any[]> {
-    const response = await this.request<any>('/open/v1/phone/list', {
+    try {
+      const response = await this.request<any>('/open/v1/phone/list', {
+        method: 'POST',
+        body: JSON.stringify({
+          page: 1,
+          pageSize: 100
+        })
+      })
+      
+      return response.data?.items || []
+    } catch (error) {
+      console.error('Failed to get profile list:', error)
+      return []
+    }
+  }
+
+  async getPhoneList(phoneIds: string[]): Promise<any> {
+    return await this.request('/open/v1/phone/list', {
       method: 'POST',
       body: JSON.stringify({
+        ids: phoneIds,
         page: 1,
         pageSize: 100
       })
     })
-    
-    return response.items || []
   }
 
   // ADB Management
@@ -1149,6 +1449,189 @@ export class GeeLarkAPI {
     )
 
     return data
+  }
+
+  // File Upload Management
+  async getUploadUrl(fileType: 'mp4' | 'webm' | 'mov' | 'png' | 'jpg' | 'jpeg' | 'webp'): Promise<{
+    uploadUrl: string
+    resourceUrl: string
+  }> {
+    const data = await this.request<{
+      uploadUrl: string
+      resourceUrl: string
+    }>('/open/v1/upload/getUrl', {
+      method: 'POST',
+      body: JSON.stringify({ fileType })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Upload URL generated',
+      meta: { fileType, resourceUrl: data.resourceUrl }
+    })
+
+    return data
+  }
+
+  async uploadFileToPhone(phoneId: string, fileUrl: string): Promise<string> {
+    const data = await this.request<{ taskId: string }>('/open/v1/phone/uploadFile', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: phoneId,
+        fileUrl: fileUrl
+      })
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'File upload to phone initiated',
+      meta: { phone_id: phoneId, file_url: fileUrl, task_id: data.taskId }
+    })
+
+    return data.taskId
+  }
+
+  async checkUploadStatus(taskId: string): Promise<number> {
+    const data = await this.request<{ status: number }>('/open/v1/phone/uploadFile/result', {
+      method: 'POST',
+      body: JSON.stringify({
+        taskId: taskId
+      })
+    })
+
+    // Status: 0: Failed to retrieve; 1: Uploading; 2: Upload successful; 3: Upload failed
+    return data.status
+  }
+
+  async waitForUpload(taskId: string): Promise<void> {
+    console.log(`[GeeLark] Waiting for upload ${taskId} to complete...`)
+    
+    while (true) {
+      const status = await this.checkUploadStatus(taskId)
+      
+      if (status === 2) {
+        // Upload successful
+        console.log(`[GeeLark] Upload ${taskId} completed successfully`)
+        return
+      } else if (status === 3 || status === 0) {
+        // Upload failed or failed to retrieve
+        throw new Error(`File upload failed with status: ${status}`)
+      }
+      
+      // Still uploading, wait 2 seconds before checking again
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  }
+
+  async executeTaskWithFullWorkflow(
+    phoneId: string,
+    taskCreator: () => Promise<string>,
+    options?: {
+      waitForCompletion?: boolean
+    }
+  ): Promise<string> {
+    let phoneStarted = false
+    let taskId: string | undefined
+    
+    try {
+      // Start the phone
+      console.log('[GeeLark] Starting phone for task execution...')
+      await this.startPhones([phoneId])
+      await this.waitForPhoneReady(phoneId)
+      phoneStarted = true
+      console.log('[GeeLark] Phone started and ready')
+
+      // Execute the task creator
+      taskId = await taskCreator()
+      
+      // If requested, wait for task completion
+      if (options?.waitForCompletion && taskId) {
+        await this.waitForTaskCompletion(taskId, phoneId)
+      }
+      
+      return taskId
+      
+    } catch (error) {
+      // If phone was started but task failed, stop it
+      if (phoneStarted && !options?.waitForCompletion) {
+        try {
+          await this.stopPhones([phoneId])
+        } catch (stopError) {
+          console.error('[GeeLark] Failed to stop phone after error:', stopError)
+        }
+      }
+      throw error
+    }
+  }
+
+  async waitForTaskCompletion(taskId: string, phoneId: string): Promise<void> {
+    console.log(`[GeeLark] Waiting for task ${taskId} to complete...`)
+    
+    try {
+      while (true) {
+        const tasks = await this.queryTasks([taskId])
+        
+        if (tasks.items && tasks.items.length > 0) {
+          const task = tasks.items[0]
+          
+          if (task.status === 3) {
+            // Task completed successfully
+            console.log('[GeeLark] Task completed successfully')
+            return
+          } else if (task.status === 4 || task.status === 7) {
+            // Task failed or cancelled
+            throw new Error(`Task failed with status ${task.status}: ${task.failDesc || 'Unknown error'}`)
+          }
+        }
+        
+        // Still running, wait 5 seconds before checking again
+        await new Promise(resolve => setTimeout(resolve, 5000))
+      }
+    } finally {
+      // Always try to stop the phone
+      try {
+        console.log('[GeeLark] Stopping phone after task...')
+        await this.stopPhones([phoneId])
+        console.log('[GeeLark] Phone stopped successfully')
+      } catch (error) {
+        console.error('[GeeLark] Failed to stop phone:', error)
+      }
+    }
+  }
+
+  async updatePhoneDetails(phoneId: string, details: {
+    name?: string
+    remark?: string
+    tagIDs?: string[]
+    tagsName?: string[]
+  }): Promise<void> {
+    // Build request body – GeeLark only documents tagIDs, but if tagsName is provided we include it as well.
+    const body: Record<string, any> = {
+      id: phoneId,
+    }
+    if (details.name !== undefined) body.name = details.name
+    if (details.remark !== undefined) body.remark = details.remark
+    if (details.tagIDs !== undefined) body.tagIDs = details.tagIDs
+    if (details.tagsName !== undefined) body.tagsName = details.tagsName
+
+    console.log('[GeeLark] updatePhoneDetails payload:', JSON.stringify(body, null, 2))
+
+    await this.request('/open/v1/phone/detail/update', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Phone details updated',
+      meta: {
+        phone_id: phoneId,
+        fields_updated: Object.keys(details)
+      }
+    })
   }
 }
 

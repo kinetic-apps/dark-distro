@@ -103,54 +103,45 @@ export interface Database {
       proxies: {
         Row: {
           id: string
-          label: string
-          type: 'sticky' | 'rotating' | 'sim'
-          host: string
+          geelark_id: string
+          scheme: string
+          server: string
           port: number
           username: string | null
           password: string | null
-          session_id: string | null
-          current_ip: string | null
-          last_rotated: string
-          health: 'good' | 'slow' | 'blocked' | 'unknown'
-          assigned_account_id: string | null
+          group_name: string | null
+          tags: string[] | null
+          is_active: boolean
           created_at: string
           updated_at: string
-          meta: Json
         }
         Insert: {
           id?: string
-          label: string
-          type: 'sticky' | 'rotating' | 'sim'
-          host: string
+          geelark_id: string
+          scheme: string
+          server: string
           port: number
           username?: string | null
           password?: string | null
-          session_id?: string | null
-          current_ip?: string | null
-          last_rotated?: string
-          health?: 'good' | 'slow' | 'blocked' | 'unknown'
-          assigned_account_id?: string | null
+          group_name?: string | null
+          tags?: string[] | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
-          meta?: Json
         }
         Update: {
           id?: string
-          label?: string
-          type?: 'sticky' | 'rotating' | 'sim'
-          host?: string
+          geelark_id?: string
+          scheme?: string
+          server?: string
           port?: number
           username?: string | null
           password?: string | null
-          session_id?: string | null
-          current_ip?: string | null
-          last_rotated?: string
-          health?: 'good' | 'slow' | 'blocked' | 'unknown'
-          assigned_account_id?: string | null
+          group_name?: string | null
+          tags?: string[] | null
+          is_active?: boolean
           created_at?: string
           updated_at?: string
-          meta?: Json
         }
       }
       sms_rentals: {

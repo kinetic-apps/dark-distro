@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         .select(`
           id,
           status,
-          proxy:proxies!proxy_id(id, health),
+          proxy:proxies!proxy_id(id, server, port, group_name, is_active),
           phone:phones!accounts_phone_account_id_fkey(profile_id, status)
         `)
         .limit(5)
