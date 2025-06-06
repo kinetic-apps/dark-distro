@@ -2,6 +2,7 @@ import { createHash } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { waitForPhoneReady } from '@/lib/utils/geelark-phone-status'
 import { monitorPostCompletionAndStop } from '@/lib/utils/post-completion-monitor'
+import { monitorWarmupCompletion } from '@/lib/utils/warmup-monitor'
 
 /**
  * SYSTEM TIMEOUT VALUES:
@@ -415,8 +416,6 @@ export class GeeLarkAPI {
     return data
   }
 
-
-
   async stopPhones(phoneIds: string[]): Promise<any> {
     return await this.request('/open/v1/phone/stop', {
       method: 'POST',
@@ -651,19 +650,48 @@ export class GeeLarkAPI {
 
     const taskId = data.taskIds[0]
 
+    // Store comprehensive configuration in task meta
+    const taskMeta = {
+      duration_minutes: options?.duration_minutes || 30,
+      action: options?.action || 'browse video',
+      keywords: options?.keywords || [],
+      profile_id: profileId,
+      warmup_config: {
+        planned_duration: options?.duration_minutes || 30,
+        strategy: options?.action || 'browse video',
+        search_terms: options?.keywords || [],
+        created_at: new Date().toISOString()
+      }
+    }
+
+    // Store the task in our database
     await supabaseAdmin.from('tasks').insert({
-      type: 'warmup',
-      task_type: 'warmup',  // Required field
       geelark_task_id: taskId,
-      account_id: accountId,  // Use account_id instead of profile_id
+      account_id: accountId,
+      type: 'warmup',
       status: 'running',
       started_at: new Date().toISOString(),
       meta: {
+        warmup_config: {
+          planned_duration: options?.duration_minutes || 30,
+          strategy: options?.action || 'browse video',
+          search_terms: options?.keywords || []
+        },
         duration_minutes: options?.duration_minutes || 30,
         action: options?.action || 'browse video',
-        profile_id: profileId  // Store profile_id in meta
+        keywords: options?.keywords || []
       }
     })
+
+    // Reset warmup progress and update account status when starting new warmup
+    await supabaseAdmin
+      .from('accounts')
+      .update({
+        warmup_progress: 0,
+        status: 'warming_up',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', accountId)
 
     await supabaseAdmin.from('logs').insert({
       level: 'info',
@@ -673,8 +701,14 @@ export class GeeLarkAPI {
         profile_id: profileId,
         task_id: taskId,
         duration: options?.duration_minutes || 30,
-        action: options?.action || 'browse video'
+        action: options?.action || 'browse video',
+        keywords: options?.keywords || []
       }
+    })
+
+    // Start monitoring warmup completion and auto-stop phone (non-blocking)
+    monitorWarmupCompletion(accountId, profileId, taskId).catch(error => {
+      console.error('[GeeLark] Error in warmup completion monitor:', error)
     })
 
     return taskId
@@ -1807,6 +1841,38 @@ export class GeeLarkAPI {
       meta: {
         phone_id: phoneId,
         fields_updated: Object.keys(details)
+      }
+    })
+  }
+
+  async updatePhoneProxy(phoneId: string, proxyConfig: {
+    typeId: number
+    server: string
+    port: number
+    username?: string
+    password?: string
+  }): Promise<void> {
+    const body = {
+      id: phoneId,
+      proxyConfig: proxyConfig
+    }
+
+    console.log('[GeeLark] updatePhoneProxy payload:', JSON.stringify(body, null, 2))
+
+    await this.request('/open/v1/phone/detail/update', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    })
+
+    await supabaseAdmin.from('logs').insert({
+      level: 'info',
+      component: 'geelark-api',
+      message: 'Phone proxy updated',
+      meta: {
+        phone_id: phoneId,
+        proxy_server: proxyConfig.server,
+        proxy_port: proxyConfig.port,
+        proxy_type: proxyConfig.typeId
       }
     })
   }

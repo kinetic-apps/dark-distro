@@ -36,6 +36,7 @@ import { ProfileStatus } from '@/components/profile-status'
 import { ScreenshotViewer } from '@/components/screenshot-viewer'
 import { ProfileDetailClient } from './profile-detail-client'
 import { ProxySectionClient } from './proxy-section-client'
+import { WarmupHistory } from '@/components/warmup-history'
 
 export default async function ProfileDetailPage({
   params,
@@ -149,11 +150,15 @@ export default async function ProfileDetailPage({
             </div>
           </div>
 
-          {/* Quick Stats */}
+          {/* Quick Stats - Updated to use new warmup statistics */}
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">{profile.warmup_progress}%</p>
-              <p className="text-xs text-gray-500 dark:text-dark-400">Warmup Progress</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">{profile.warmup_count || 0}</p>
+              <p className="text-xs text-gray-500 dark:text-dark-400">Warmup Sessions</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">{Math.round((profile.total_warmup_duration_minutes || 0) / 60)}h</p>
+              <p className="text-xs text-gray-500 dark:text-dark-400">Warmup Duration</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">{stats.totalPosts}</p>
@@ -163,10 +168,6 @@ export default async function ProfileDetailPage({
               <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">{stats.successRate}%</p>
               <p className="text-xs text-gray-500 dark:text-dark-400">Success Rate</p>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-semibold text-gray-900 dark:text-dark-100">{stats.uptime}d</p>
-              <p className="text-xs text-gray-500 dark:text-dark-400">Uptime</p>
-            </div>
           </div>
         </div>
 
@@ -175,24 +176,29 @@ export default async function ProfileDetailPage({
             {/* Actions Card - Using Client Component */}
             <ProfileDetailClient profile={profile} />
 
+            {/* Warmup History Section - New comprehensive warmup tracking */}
+            <WarmupHistory accountId={profile.id} />
+
             {/* Profile Information */}
             <div className="bg-white dark:bg-dark-850 rounded-lg border border-gray-200 dark:border-dark-700 p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-100 mb-4">Profile Information</h2>
               
               <div className="space-y-4">
-                {/* Warmup Progress Bar */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-dark-300">Warmup Progress</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-dark-100">{profile.warmup_progress}%</span>
+                {/* Current Warmup Progress (only show if actively warming up) */}
+                {(profile.status === 'warming_up' || hasActiveWarmup) && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700 dark:text-dark-300">Current Warmup Progress</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-dark-100">{profile.warmup_progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${profile.warmup_progress}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${profile.warmup_progress}%` }}
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -231,10 +237,10 @@ export default async function ProfileDetailPage({
                   <div>
                     <dt className="text-sm font-medium text-gray-500 dark:text-dark-400">Warmup Status</dt>
                     <dd className="mt-1 text-sm text-gray-900 dark:text-dark-100">
-                      {profile.warmup_done ? (
+                      {profile.warmup_count > 0 ? (
                         <span className="flex items-center gap-2 text-green-600 dark:text-green-400">
                           <CheckCircle className="h-4 w-4" />
-                          Completed
+                          {profile.warmup_count} sessions completed
                         </span>
                       ) : (profile.status === 'warming_up' || hasActiveWarmup) ? (
                         <span className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">

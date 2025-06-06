@@ -16,7 +16,8 @@ import {
   Heart,
   Crown,
   Edit,
-  Tag
+  Tag,
+  Wifi
 } from 'lucide-react'
 import { ProfileOperationalStatus } from '@/components/profile-operational-status'
 import { ScreenshotViewer } from '@/components/screenshot-viewer'
@@ -59,6 +60,8 @@ interface Profile {
   }>
   tags?: string[]
   remark?: string | null
+  warmup_count?: number
+  total_warmup_duration_minutes?: number
 }
 
 interface ProfilesTableV2Props {
@@ -380,6 +383,13 @@ export function ProfilesTableV2({ profiles, onBulkAction }: ProfilesTableV2Props
                 Edit
               </button>
               <button
+                onClick={() => onBulkAction('change-proxy', selectedProfiles)}
+                className="btn-secondary btn-sm flex items-center gap-1"
+              >
+                <Wifi className="h-3 w-3" />
+                Change Proxy
+              </button>
+              <button
                 onClick={() => onBulkAction('fix-status', selectedProfiles)}
                 className="btn-secondary btn-sm"
               >
@@ -541,17 +551,22 @@ export function ProfilesTableV2({ profiles, onBulkAction }: ProfilesTableV2Props
                               <div className="mt-1 text-sm text-gray-900 dark:text-gray-100">{formatRelativeTime(profile.created_at)}</div>
                             </div>
                             <div>
-                              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Warmup Progress</div>
+                              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Warmup Stats</div>
                               <div className="mt-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 bg-gray-200 dark:bg-dark-700 rounded-full h-2">
-                                    <div 
-                                      className="bg-green-500 h-2 rounded-full transition-all"
-                                      style={{ width: `${profile.warmup_progress}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-sm text-gray-900 dark:text-gray-100">{profile.warmup_progress}%</span>
+                                <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-100">
+                                  <span>{profile.warmup_count || 0}x</span>
+                                  <span className="text-gray-400">•</span>
+                                  <span>{Math.round((profile.total_warmup_duration_minutes || 0) / 60)}h</span>
+                                  {statusInfo.status === 'warming_up' && statusInfo.progress && statusInfo.progress > 0 && (
+                                    <>
+                                      <span className="text-gray-400">•</span>
+                                      <span className="text-yellow-600 dark:text-yellow-400">{statusInfo.progress}% active</span>
+                                    </>
+                                  )}
                                 </div>
+                                {profile.warmup_count === 0 && statusInfo.status !== 'warming_up' && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">Never warmed up</div>
+                                )}
                               </div>
                             </div>
                             <div>

@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation'
 import { formatRelativeTime } from '@/lib/utils'
 import { StorageService, StorageAsset } from '@/lib/services/storage-service'
 import AssetSelectorModal from '@/components/asset-selector-modal'
+import VideoThumbnail from '@/components/ui/video-thumbnail'
 import { createClient } from '@/lib/supabase/client'
 import BulkPostModal from '@/components/bulk-post-modal'
 import BulkPostStatusTracker from '@/components/bulk-post-status-tracker'
@@ -421,9 +422,13 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
                     {/* Asset Preview */}
                     <div className="w-20 h-20 bg-gray-200 dark:bg-dark-700 rounded-lg overflow-hidden flex-shrink-0">
                       {assignment.asset.type === 'video' ? (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Video className="h-8 w-8 text-gray-400" />
-                        </div>
+                        <VideoThumbnail
+                          videoUrl={assignment.asset.url}
+                          className="w-full h-full"
+                          width={80}
+                          height={80}
+                          showPlayIcon={false}
+                        />
                       ) : assignment.asset.type === 'carousel' && assignment.asset.children?.[0] ? (
                         <img 
                           src={assignment.asset.children[0].thumbnailUrl || assignment.asset.children[0].url}

@@ -135,10 +135,37 @@ export function getProfileStatus(profile: any): ProfileStatusInfo {
 
   // Check warmup status
   if (profile.status === 'warming_up' || activeTaskTypes.includes('warmup')) {
+    // Calculate real-time progress for the active warmup task
+    let warmupProgress = 0
+    const activeWarmupTask = activeTasks.find((t: any) => t.type === 'warmup')
+    
+    if (activeWarmupTask && activeWarmupTask.started_at) {
+      const startTime = new Date(activeWarmupTask.started_at).getTime()
+      const currentTime = Date.now()
+      const elapsedMinutes = (currentTime - startTime) / (1000 * 60)
+      
+      // Get planned duration from task meta, ensuring proper number conversion
+      let plannedDuration = 30 // default
+      
+      if (activeWarmupTask.meta?.duration_minutes) {
+        plannedDuration = parseInt(activeWarmupTask.meta.duration_minutes, 10)
+      } else if (activeWarmupTask.meta?.warmup_config?.planned_duration) {
+        plannedDuration = parseInt(activeWarmupTask.meta.warmup_config.planned_duration, 10)
+      }
+      
+      // Ensure we have a valid number
+      if (isNaN(plannedDuration) || plannedDuration <= 0) {
+        plannedDuration = 30
+      }
+      
+      // Calculate progress, cap at 99% until task actually completes
+      warmupProgress = Math.min(99, Math.floor((elapsedMinutes / plannedDuration) * 100))
+    }
+    
     return {
       status: 'warming_up',
       message: `Warming up account...`,
-      progress: profile.warmup_progress || 0,
+      progress: warmupProgress,
       isOnline: isPhoneOnline,
       canPerformActions: false
     }

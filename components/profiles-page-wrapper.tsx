@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ProfilesTableV2 } from '@/components/tables/profiles-table-v2'
 import { ProfileBulkActions } from '@/components/profile-bulk-actions'
 import { AssignProxyModal } from '@/components/assign-proxy-modal'
+import { BulkProxyAssignmentModal } from '@/components/bulk-proxy-assignment-modal'
 import { BulkDeleteModal } from '@/components/bulk-delete-modal'
 import { EngagementModal, EngagementConfig } from '@/components/engagement-modal'
 import { FixStuckStatusModal } from '@/components/fix-stuck-status-modal'
@@ -17,11 +18,13 @@ interface ProfilesPageWrapperProps {
 export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
   const [bulkAction, setBulkAction] = useState<{ action: string; ids: string[] } | null>(null)
   const [showProxyModal, setShowProxyModal] = useState(false)
+  const [showBulkProxyModal, setShowBulkProxyModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEngagementModal, setShowEngagementModal] = useState(false)
   const [showFixStatusModal, setShowFixStatusModal] = useState(false)
   const [showProfileEditModal, setShowProfileEditModal] = useState(false)
   const [pendingProxyAssignment, setPendingProxyAssignment] = useState<string[]>([])
+  const [pendingBulkProxyAssignment, setPendingBulkProxyAssignment] = useState<{ ids: string[], names: string[] }>({ ids: [], names: [] })
   const [pendingDeletion, setPendingDeletion] = useState<{ ids: string[], names: string[] }>({ ids: [], names: [] })
   const [pendingEngagement, setPendingEngagement] = useState<string[]>([])
   const [pendingFixStatus, setPendingFixStatus] = useState<string[]>([])
@@ -35,6 +38,13 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     if (action === 'assign-proxy') {
       setPendingProxyAssignment(ids)
       setShowProxyModal(true)
+    } else if (action === 'change-proxy') {
+      // Get profile names for the bulk proxy assignment modal
+      const selectedProfiles = profiles.filter(p => ids.includes(p.id))
+      const profileNames = selectedProfiles.map(p => p.tiktok_username || 'Unnamed Profile')
+      
+      setPendingBulkProxyAssignment({ ids, names: profileNames })
+      setShowBulkProxyModal(true)
     } else if (action === 'delete' || action === 'delete-from-geelark') {
       // Get profile names for the confirmation modal
       const selectedProfiles = profiles.filter(p => ids.includes(p.id))
@@ -90,6 +100,52 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     } finally {
       setIsProcessing(false)
       setPendingProxyAssignment([])
+    }
+  }
+
+  const handleBulkProxyAssignment = async (selectedGroups: string[]) => {
+    setShowBulkProxyModal(false)
+    setIsProcessing(true)
+    
+    try {
+      const response = await fetch('/api/profiles/assign-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          profileIds: pendingBulkProxyAssignment.ids,
+          selectedGroups 
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Assignment failed')
+      }
+
+      // Show summary
+      notify('success', `Proxy assignment completed: ${data.summary.successful} successful, ${data.summary.failed} failed`)
+
+      // Show individual errors if any
+      if (data.errors && data.errors.length > 0) {
+        data.errors.slice(0, 3).forEach((error: any) => {
+          notify('error', `${error.profileName}: ${error.error}`)
+        })
+      }
+
+      // Refresh the page after a delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+
+    } catch (error) {
+      console.error('Bulk proxy assignment error:', error)
+      notify('error', error instanceof Error ? error.message : 'Failed to assign proxies')
+    } finally {
+      setIsProcessing(false)
+      setPendingBulkProxyAssignment({ ids: [], names: [] })
     }
   }
 
@@ -325,6 +381,18 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
           onCancel={() => {
             setShowProxyModal(false)
             setPendingProxyAssignment([])
+          }}
+        />
+      )}
+
+      {showBulkProxyModal && (
+        <BulkProxyAssignmentModal
+          profileIds={pendingBulkProxyAssignment.ids}
+          profileNames={pendingBulkProxyAssignment.names}
+          onConfirm={handleBulkProxyAssignment}
+          onCancel={() => {
+            setShowBulkProxyModal(false)
+            setPendingBulkProxyAssignment({ ids: [], names: [] })
           }}
         />
       )}

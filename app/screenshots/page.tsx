@@ -51,6 +51,13 @@ interface TaskInfo {
   progress?: number
   started_at?: string
   created_at: string
+  meta?: {
+    warmup_config?: {
+      planned_duration?: number
+    }
+    duration_minutes?: number
+    [key: string]: any
+  }
 }
 
 interface ScreenshotData {
@@ -130,7 +137,8 @@ export default function ScreenshotsPage() {
         setup_step,
         progress,
         started_at,
-        created_at
+        created_at,
+        meta
       `)
       .in('account_id', accountIds)
       .in('status', ['running', 'pending'])
@@ -310,6 +318,29 @@ export default function ScreenshotsPage() {
     return () => clearInterval(interval)
   }, [autoRefresh, screenshots])
 
+  // Calculate warmup progress for running tasks
+  const calculateWarmupProgress = (task: TaskInfo) => {
+    if (task.type !== 'warmup' || task.status !== 'running' || !task.started_at) {
+      return 0
+    }
+
+    const startTime = new Date(task.started_at).getTime()
+    const currentTime = Date.now()
+    const elapsedMinutes = (currentTime - startTime) / (1000 * 60)
+    
+    // Extract planned duration from task meta (same logic as warmup history API)
+    let plannedDuration = 30 // Default fallback
+    if (task.meta?.warmup_config?.planned_duration) {
+      plannedDuration = task.meta.warmup_config.planned_duration
+    } else if (task.meta?.duration_minutes) {
+      plannedDuration = task.meta.duration_minutes
+    }
+    
+    const progress = Math.min(99, Math.floor((elapsedMinutes / plannedDuration) * 100))
+    
+    return progress
+  }
+
   // Get activity display text
   const getActivityDisplay = (screenshot: ScreenshotData) => {
     if (screenshot.currentTask) {
@@ -322,7 +353,7 @@ export default function ScreenshotsPage() {
         }
         return { text: 'TikTok Login', icon: Activity, color: 'text-blue-600 dark:text-blue-400' }
       } else if (task.type === 'warmup') {
-        const progress = task.progress || 0
+        const progress = calculateWarmupProgress(task)
         return { text: `Warming Up (${progress}%)`, icon: Activity, color: 'text-blue-600 dark:text-blue-400' }
       } else if (task.type === 'post') {
         return { text: 'Posting Content', icon: Activity, color: 'text-blue-600 dark:text-blue-400' }
@@ -363,7 +394,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-[0.2]',
           gridCols: 'grid-cols-4 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-20',
-          gap: 'gap-0.5',
+          gap: 'gap-0',
           compact: true,
           percentage: 20
         }
@@ -371,7 +402,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-[0.35]',
           gridCols: 'grid-cols-3 sm:grid-cols-6 md:grid-cols-10 lg:grid-cols-14 xl:grid-cols-16',
-          gap: 'gap-0.5',
+          gap: 'gap-0',
           compact: true,
           percentage: 35
         }
@@ -379,7 +410,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-[0.5]',
           gridCols: 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12',
-          gap: 'gap-1',
+          gap: 'gap-0.5',
           compact: true,
           percentage: 50
         }
@@ -387,7 +418,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-[0.65]',
           gridCols: 'grid-cols-1 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10',
-          gap: 'gap-1.5',
+          gap: 'gap-0.5',
           compact: true,
           percentage: 65
         }
@@ -395,7 +426,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-75',
           gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8',
-          gap: 'gap-2',
+          gap: 'gap-1',
           compact: true,
           percentage: 75
         }
@@ -403,7 +434,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-[0.85]',
           gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
-          gap: 'gap-3',
+          gap: 'gap-1',
           compact: false,
           percentage: 85
         }
@@ -411,7 +442,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-100',
           gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
-          gap: 'gap-4',
+          gap: 'gap-2',
           compact: false,
           percentage: 100
         }
@@ -419,7 +450,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-100',
           gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3',
-          gap: 'gap-6',
+          gap: 'gap-3',
           compact: false,
           percentage: 100
         }
@@ -427,7 +458,7 @@ export default function ScreenshotsPage() {
         return {
           scale: 'scale-100',
           gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
-          gap: 'gap-4',
+          gap: 'gap-2',
           compact: false,
           percentage: 100
         }
@@ -557,24 +588,24 @@ export default function ScreenshotsPage() {
               >
                 {zoomConfig.compact ? (
                   // Compact header for smaller zoom levels
-                  <div className="p-2 border-b border-gray-200 dark:border-dark-700">
+                  <div className="p-1 border-b border-gray-200 dark:border-dark-700">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-sm text-gray-900 dark:text-dark-100 truncate">
+                      <h3 className="font-medium text-xs text-gray-900 dark:text-dark-100 truncate">
                         {screenshot.username}
                       </h3>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                      <span className={`inline-flex items-center px-1 py-0.5 rounded text-xs font-medium ${
                         screenshot.phoneStatus === 'started' 
                           ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                           : 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                       }`}>
-                        <Power className="h-2.5 w-2.5 mr-1" />
-                        {screenshot.phoneStatus === 'started' ? 'On' : 'Starting'}
+                        <Power className="h-2 w-2 mr-0.5" />
+                        {screenshot.phoneStatus === 'started' ? 'On' : 'Start'}
                       </span>
                     </div>
                     
                     {/* Simplified activity indicator */}
-                    <div className="flex items-center gap-1 mt-1">
-                      <activityInfo.icon className={`h-3 w-3 ${activityInfo.color}`} />
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      <activityInfo.icon className={`h-2.5 w-2.5 ${activityInfo.color}`} />
                       <span className={`text-xs ${activityInfo.color} truncate`}>
                         {activityInfo.text}
                       </span>

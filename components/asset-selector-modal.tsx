@@ -14,6 +14,7 @@ import {
   Loader2,
   FolderOpen
 } from 'lucide-react'
+import VideoThumbnail from '@/components/ui/video-thumbnail'
 import { formatBytes } from '@/lib/utils'
 
 interface AssetSelectorModalProps {
@@ -247,9 +248,13 @@ export default function AssetSelectorModal({
                   {/* Asset preview */}
                   <div className="aspect-square bg-gray-100 dark:bg-dark-800 relative">
                     {asset.type === 'video' ? (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Play className="h-12 w-12 text-gray-400 dark:text-dark-500" />
-                      </div>
+                      <VideoThumbnail
+                        videoUrl={asset.url}
+                        className="w-full h-full"
+                        width={200}
+                        height={200}
+                        showPlayIcon={true}
+                      />
                     ) : asset.type === 'carousel' && asset.children?.[0] ? (
                       <img
                         src={asset.children[0].thumbnailUrl || asset.children[0].url}

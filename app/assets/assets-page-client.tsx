@@ -30,6 +30,7 @@ import { StorageService, StorageAsset } from '@/lib/services/storage-service'
 import { formatBytes, formatRelativeTime } from '@/lib/utils'
 import AssetSelectorModal from '@/components/asset-selector-modal'
 import EnhancedUploadModal from '@/components/enhanced-upload-modal'
+import VideoThumbnail from '@/components/ui/video-thumbnail'
 import { createClient } from '@/lib/supabase/client'
 
 type AssetFolder = 'ready' | 'used' | 'archived'
@@ -258,7 +259,7 @@ export default function AssetsPageClient() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-100">Overview</h2>
             <button
               onClick={() => setShowAnalytics(!showAnalytics)}
-              className={`btn-secondary text-sm ${showAnalytics ? 'bg-gray-900 text-white dark:bg-dark-100' : ''}`}
+              className={`btn-secondary text-sm ${showAnalytics ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900' : ''}`}
             >
               <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
               {showAnalytics ? 'Hide' : 'Show'} Analytics
@@ -360,7 +361,7 @@ export default function AssetsPageClient() {
                 onClick={() => setSelectedFolder(folder)}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
                   selectedFolder === folder
-                    ? 'bg-gray-900 text-white dark:bg-dark-100'
+                    ? 'bg-gray-900 text-white dark:bg-dark-100 dark:text-dark-900'
                     : 'text-gray-600 hover:bg-gray-100 dark:text-dark-400 dark:hover:bg-dark-800'
                 }`}
               >
@@ -405,7 +406,7 @@ export default function AssetsPageClient() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search assets..."
-                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-gray-900 dark:focus:ring-dark-100 dark:bg-dark-800"
+                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:ring-2 focus:ring-gray-900 dark:focus:ring-dark-100 dark:bg-dark-800 dark:text-dark-100"
               />
             </div>
           </div>
@@ -436,26 +437,40 @@ export default function AssetsPageClient() {
               >
                 <div className="aspect-[9/16] bg-gray-100 dark:bg-dark-800 rounded-t-lg overflow-hidden relative">
                   {asset.type === 'video' ? (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Video className="h-12 w-12 text-gray-400" />
-                    </div>
+                    <VideoThumbnail
+                      videoUrl={asset.url}
+                      className="w-full h-full"
+                      width={300}
+                      height={533} // 9:16 aspect ratio
+                      showPlayIcon={true}
+                      onClick={() => setShowPreview(asset)}
+                    />
                   ) : asset.type === 'carousel' && asset.children?.[0] ? (
                     <img
                       src={asset.children[0].thumbnailUrl || asset.children[0].url}
                       alt={asset.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => setShowPreview(asset)}
                     />
                   ) : asset.type === 'image' ? (
                     <img
                       src={asset.thumbnailUrl || asset.url}
                       alt={asset.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => setShowPreview(asset)}
                     />
                   ) : null}
                   
                   {asset.type === 'carousel' && asset.children && (
                     <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
                       {asset.children.length} slides
+                    </div>
+                  )}
+                  
+                  {asset.type === 'video' && (
+                    <div className="absolute top-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                      <Video className="h-3 w-3" />
+                      Video
                     </div>
                   )}
                 </div>
@@ -554,7 +569,37 @@ export default function AssetsPageClient() {
                         <div className="w-6" />
                       )}
                       
-                      {getAssetIcon(asset)}
+                      {/* Thumbnail preview */}
+                      <div className="w-16 h-16 bg-gray-100 dark:bg-dark-800 rounded-lg overflow-hidden flex-shrink-0">
+                        {asset.type === 'video' ? (
+                          <VideoThumbnail
+                            videoUrl={asset.url}
+                            className="w-full h-full"
+                            width={64}
+                            height={64}
+                            showPlayIcon={false}
+                            onClick={() => setShowPreview(asset)}
+                          />
+                        ) : asset.type === 'carousel' && asset.children?.[0] ? (
+                          <img
+                            src={asset.children[0].thumbnailUrl || asset.children[0].url}
+                            alt={asset.name}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => setShowPreview(asset)}
+                          />
+                        ) : asset.type === 'image' ? (
+                          <img
+                            src={asset.thumbnailUrl || asset.url}
+                            alt={asset.name}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => setShowPreview(asset)}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            {getAssetIcon(asset)}
+                          </div>
+                        )}
+                      </div>
                       
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 dark:text-dark-100">
