@@ -45,6 +45,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate video URL format
+    try {
+      const url = new URL(video_url)
+      console.log('[Video Post] Video URL validated:', url.hostname, url.pathname)
+    } catch (urlError) {
+      const errorMsg = 'Invalid video URL format'
+      await supabaseAdmin.from('logs').insert({
+        level: 'error',
+        component: 'api-post-video',
+        account_id,
+        message: errorMsg,
+        meta: { 
+          validation_error: true,
+          video_url,
+          error: String(urlError)
+        }
+      })
+      return NextResponse.json(
+        { error: errorMsg },
+        { status: 400 }
+      )
+    }
+
     // Fetch account with profile
     const { data: account, error } = await supabaseAdmin
       .from('accounts')
@@ -98,6 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if TikTok is installed
+    console.log('[Video Post] Checking TikTok installation for profile:', profileId)
     const isTikTokInstalled = await geelarkApi.isTikTokInstalled(profileId)
     if (!isTikTokInstalled) {
       const errorMsg = 'TikTok is not installed on this profile'
@@ -118,6 +142,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Post video
+    console.log('[Video Post] Starting video post for account:', account_id)
+    console.log('[Video Post] Video URL:', video_url)
+    
     const taskId = await geelarkApi.postTikTokVideo(profileId, account_id, {
       video_url,
       caption: caption || '',

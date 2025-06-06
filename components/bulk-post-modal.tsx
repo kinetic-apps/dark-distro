@@ -10,9 +10,10 @@ import { StorageAsset } from '@/lib/services/storage-service'
 interface BulkPostModalProps {
   isOpen: boolean
   onClose: () => void
+  onPostsLaunched?: (phoneIds: string[], assetType: string) => void
 }
 
-export default function BulkPostModal({ isOpen, onClose }: BulkPostModalProps) {
+export default function BulkPostModal({ isOpen, onClose, onPostsLaunched }: BulkPostModalProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<string[]>([])
   const [selectedAsset, setSelectedAsset] = useState<StorageAsset | null>(null)
@@ -155,7 +156,11 @@ export default function BulkPostModal({ isOpen, onClose }: BulkPostModalProps) {
         }
       }
 
-      notify('success', `Bulk post completed: ${successCount} successful, ${failCount} failed`)
+      notify('success', `Bulk post launched: ${successCount + failCount} posts initiated`)
+      
+      // Trigger the status tracker with phone IDs and asset type
+      const phoneIds = profiles.map(p => p.id)
+      onPostsLaunched?.(phoneIds, selectedAsset.type)
       
       if (successCount > 0) {
         onClose()

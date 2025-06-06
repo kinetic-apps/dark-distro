@@ -24,6 +24,7 @@ import { StorageService, StorageAsset } from '@/lib/services/storage-service'
 import AssetSelectorModal from '@/components/asset-selector-modal'
 import { createClient } from '@/lib/supabase/client'
 import BulkPostModal from '@/components/bulk-post-modal'
+import BulkPostStatusTracker from '@/components/bulk-post-status-tracker'
 
 interface CloudPhone {
   id: string
@@ -79,6 +80,9 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'ready'>('ready')
   const [assetStats, setAssetStats] = useState({ ready: 0, used: 0, archived: 0, totalSize: 0 })
+  const [showBulkStatusTracker, setShowBulkStatusTracker] = useState(false)
+  const [postingPhones, setPostingPhones] = useState<Set<string>>(new Set())
+  const [phonePostingStatus, setPhonePostingStatus] = useState<Record<string, { type: string; status: string; isBulk?: boolean }>>({})
   
   const router = useRouter()
   const supabase = createClient()
@@ -128,9 +132,28 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
     
     for (const assignment of postAssignments) {
       try {
+        // Mark phone as posting
+        setPostingPhones(prev => new Set([...prev, assignment.phone.id]))
+        setPhonePostingStatus(prev => ({
+          ...prev,
+          [assignment.phone.id]: {
+            type: assignment.asset.type,
+            status: 'starting'
+          }
+        }))
+
         let response
         
         if (assignment.asset.type === 'video') {
+          // Update status to posting
+          setPhonePostingStatus(prev => ({
+            ...prev,
+            [assignment.phone.id]: {
+              type: 'video',
+              status: 'posting'
+            }
+          }))
+
           // Post video
           response = await fetch('/api/geelark/post-video', {
             method: 'POST',
@@ -143,6 +166,15 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
             })
           })
         } else if (assignment.asset.type === 'carousel') {
+          // Update status to posting
+          setPhonePostingStatus(prev => ({
+            ...prev,
+            [assignment.phone.id]: {
+              type: 'carousel',
+              status: 'posting'
+            }
+          }))
+
           // Post carousel
           const images = assignment.asset.children?.map(child => child.url) || []
           response = await fetch('/api/geelark/post-carousel', {
@@ -159,6 +191,15 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
         
         if (response?.ok) {
           const data = await response.json()
+          
+          // Update status to processing
+          setPhonePostingStatus(prev => ({
+            ...prev,
+            [assignment.phone.id]: {
+              type: assignment.asset.type,
+              status: 'processing'
+            }
+          }))
           
           // Track the post
           await storageService.trackUsage(
@@ -178,9 +219,28 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
           results.push({ success: true, assignment })
         } else {
           const error = await response?.json()
+          
+          // Update status to failed
+          setPhonePostingStatus(prev => ({
+            ...prev,
+            [assignment.phone.id]: {
+              type: assignment.asset.type,
+              status: 'failed'
+            }
+          }))
+          
           results.push({ success: false, assignment, error: error?.error })
         }
       } catch (error) {
+        // Update status to failed
+        setPhonePostingStatus(prev => ({
+          ...prev,
+          [assignment.phone.id]: {
+            type: assignment.asset.type,
+            status: 'failed'
+          }
+        }))
+        
         results.push({ success: false, assignment, error: String(error) })
       }
     }
@@ -192,6 +252,12 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
     
     setPostAssignments(failedAssignments)
     setIsPosting(false)
+    
+    // Clear posting status after a delay to show final status
+    setTimeout(() => {
+      setPostingPhones(new Set())
+      setPhonePostingStatus({})
+    }, 5000) // Clear after 5 seconds
     
     // Refresh stats and page
     loadAssetStats()
@@ -228,6 +294,40 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
     if (phone.status === 'active') return <CheckCircle className="h-4 w-4" />
     if (phone.status === 'warming_up') return <RefreshCw className="h-4 w-4 animate-spin" />
     return <AlertCircle className="h-4 w-4" />
+  }
+
+  const getPostingStatusDisplay = (phoneId: string) => {
+    const status = phonePostingStatus[phoneId]
+    if (!status) return null
+
+    const statusMessages = {
+      starting: status.isBulk ? 'Starting (bulk)...' : 'Starting phone...',
+      posting: status.isBulk 
+        ? (status.type === 'video' ? 'Bulk posting video...' : 'Bulk posting carousel...')
+        : (status.type === 'video' ? 'Posting video...' : 'Posting carousel...'),
+      processing: status.isBulk ? 'Processing (bulk)...' : 'Processing...',
+      failed: status.isBulk ? 'Bulk post failed' : 'Post failed'
+    }
+
+    const statusColors = {
+      starting: 'text-blue-600 dark:text-blue-400',
+      posting: 'text-yellow-600 dark:text-yellow-400',
+      processing: 'text-green-600 dark:text-green-400',
+      failed: 'text-red-600 dark:text-red-400'
+    }
+
+    const statusIcons = {
+      starting: <RefreshCw className="h-4 w-4 animate-spin" />,
+      posting: status.type === 'video' ? <Video className="h-4 w-4" /> : <Layers className="h-4 w-4" />,
+      processing: <RefreshCw className="h-4 w-4 animate-spin" />,
+      failed: <X className="h-4 w-4" />
+    }
+
+    return {
+      message: statusMessages[status.status as keyof typeof statusMessages],
+      color: statusColors[status.status as keyof typeof statusColors],
+      icon: statusIcons[status.status as keyof typeof statusIcons]
+    }
   }
 
   return (
@@ -270,6 +370,13 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
               className="btn-secondary"
             >
               Manage Assets
+            </button>
+            <button 
+              onClick={() => setShowBulkStatusTracker(true)}
+              className="btn-secondary"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Status
             </button>
             <button 
               onClick={() => setShowBulkPostLauncher(true)}
@@ -439,17 +546,41 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
                     </p>
                   )}
                   
-                  <button
-                    onClick={() => {
-                      setSelectedPhone(phone)
-                      setShowAssetSelector(true)
-                    }}
-                    disabled={!phone.ready_for_actions}
-                    className="w-full btn-primary text-sm"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />
-                    Assign Asset
-                  </button>
+                  {postingPhones.has(phone.id) ? (
+                    // Show posting status
+                    (() => {
+                      const statusDisplay = getPostingStatusDisplay(phone.id)
+                      const status = phonePostingStatus[phone.id]
+                      return statusDisplay ? (
+                        <div className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg ${
+                          status?.isBulk 
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
+                            : 'bg-gray-50 dark:bg-dark-800'
+                        } ${statusDisplay.color}`}>
+                          {statusDisplay.icon}
+                          <span className="text-sm font-medium">
+                            {statusDisplay.message}
+                          </span>
+                          {status?.isBulk && (
+                            <Users className="h-3 w-3 text-blue-500" />
+                          )}
+                        </div>
+                      ) : null
+                    })()
+                  ) : (
+                    // Show assign asset button
+                    <button
+                      onClick={() => {
+                        setSelectedPhone(phone)
+                        setShowAssetSelector(true)
+                      }}
+                      disabled={!phone.ready_for_actions}
+                      className="w-full btn-primary text-sm"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                      Assign Asset
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -540,7 +671,44 @@ export default function PostsPageClient({ cloudPhones, recentPosts }: PostsPageC
       {/* Bulk Post Launcher Modal */}
       <BulkPostModal 
         isOpen={showBulkPostLauncher} 
-        onClose={() => setShowBulkPostLauncher(false)} 
+        onClose={() => setShowBulkPostLauncher(false)}
+        onPostsLaunched={(phoneIds: string[], assetType: string) => {
+          setShowBulkStatusTracker(true)
+          // Mark phones as posting from bulk operation
+          phoneIds.forEach(phoneId => {
+            setPostingPhones(prev => new Set([...prev, phoneId]))
+                       setPhonePostingStatus(prev => ({
+             ...prev,
+             [phoneId]: {
+               type: assetType,
+               status: 'posting',
+               isBulk: true
+             }
+           }))
+          })
+          
+          // Clear bulk posting status after delay
+          setTimeout(() => {
+            phoneIds.forEach(phoneId => {
+              setPostingPhones(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(phoneId)
+                return newSet
+              })
+              setPhonePostingStatus(prev => {
+                const newStatus = { ...prev }
+                delete newStatus[phoneId]
+                return newStatus
+              })
+            })
+          }, 10000) // Clear after 10 seconds for bulk posts
+        }}
+      />
+
+      {/* Bulk Post Status Tracker */}
+      <BulkPostStatusTracker
+        isVisible={showBulkStatusTracker}
+        onClose={() => setShowBulkStatusTracker(false)}
       />
     </>
   )

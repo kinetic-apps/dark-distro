@@ -278,18 +278,28 @@ export async function POST(request: NextRequest) {
 
       console.log(`[API] Updating task ${task.id}: GeeLark status ${task.status} -> ${status}`)
 
+      // Store complete GeeLark response in meta
+      const updatedMeta = {
+        geelark_status: task.status,
+        geelark_task_type: task.taskType,
+        plan_name: task.planName,
+        serial_name: task.serialName,
+        env_id: task.envId,
+        schedule_at: task.scheduleAt,
+        fail_code: task.failCode,
+        fail_desc: task.failDesc,
+        cost: task.cost,
+        cost_seconds: task.cost,
+        last_sync: new Date().toISOString()
+      }
+
       const { data, error } = await supabaseAdmin
         .from('tasks')
         .update({
           status,
           completed_at: status === 'completed' || status === 'failed' || status === 'cancelled' ? new Date().toISOString() : null,
           error_message: task.failDesc || null,
-          meta: {
-            geelark_status: task.status,
-            fail_code: task.failCode,
-            fail_desc: task.failDesc,
-            cost_seconds: task.cost
-          },
+          meta: updatedMeta,
           updated_at: new Date().toISOString()
         })
         .eq('geelark_task_id', task.id)
@@ -299,6 +309,67 @@ export async function POST(request: NextRequest) {
         console.error(`[API] Failed to update task ${task.id}:`, error)
       } else {
         console.log(`[API] Successfully updated task ${task.id}`)
+        
+        // Handle specific task completions
+        if (status === 'completed' && data && data[0]) {
+          const taskData = data[0]
+          
+          // Handle warmup completion
+          if (taskData.type === 'warmup') {
+            await supabaseAdmin
+              .from('accounts')
+              .update({
+                warmup_done: true,
+                warmup_progress: 100,
+                status: 'active'
+              })
+              .eq('id', taskData.account_id)
+          }
+          
+          // Handle login completion
+          if (taskData.type === 'login' || taskData.type === 'sms_login') {
+            await supabaseAdmin
+              .from('accounts')
+              .update({
+                status: 'active',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', taskData.account_id)
+          }
+          
+          // Handle post completion
+          if (taskData.type === 'post') {
+            await supabaseAdmin
+              .from('posts')
+              .update({
+                status: 'posted',
+                posted_at: new Date().toISOString()
+              })
+              .eq('geelark_task_id', task.id)
+          }
+        }
+        
+        // Handle failures
+        if (status === 'failed' && data && data[0]) {
+          const taskData = data[0]
+          
+          if (taskData.type === 'post') {
+            await supabaseAdmin
+              .from('posts')
+              .update({
+                status: 'failed',
+                error: task.failDesc || 'Unknown error'
+              })
+              .eq('geelark_task_id', task.id)
+          }
+          
+          // Increment error count on account
+          await supabaseAdmin.rpc('increment', {
+            table_name: 'accounts',
+            row_id: taskData.account_id,
+            column_name: 'error_count'
+          })
+        }
       }
 
       return { task_id: task.id, status, error }

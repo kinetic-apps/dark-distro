@@ -191,43 +191,24 @@
     },
     {
       "config": {
-        "headers": [
+        "children": [
           {
-            "name": "action",
-            "value": "get_phone_and_check_otp"
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 12000,
+              "timeoutMin": 8000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
           },
           {
-            "name": "account_id",
-            "value": "${accountId}"
-          }
-        ],
-        "remark": "req daisy data",
-        "type": "get",
-        "url": "https://spectre-studio.app/api/geelark/daisysms-proxy",
-        "variableMap": [
-          {
-            "value": "$",
-            "variable": "phoneData"
-          }
-        ]
-      },
-      "name": "Make a network request",
-      "type": "getNetworkRequest"
-    },
-    {
-      "config": {
-        "timeout": 5000,
-        "timeoutMax": 30000,
-        "timeoutMin": 1000,
-        "timeoutType": "fixedValue"
-      },
-      "name": "Waiting time",
-      "type": "waitTime"
-    },
-    {
-      "config": {
-        "apposition": "and",
-        "children": [
+            "config": {
+              "content": "Attempting to get phone data"
+            },
+            "name": "Log retry attempt",
+            "type": "log"
+          },
           {
             "config": {
               "headers": [
@@ -252,25 +233,62 @@
             },
             "name": "Make a network request",
             "type": "getNetworkRequest"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 5000,
+              "timeoutMin": 2000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait between retries",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "rule": "(?<=\"phone_number\":\")\\d+",
+              "useVariable": "phoneData",
+              "variable": "phoneNumberTest"
+            },
+            "name": "Test if phone number exists",
+            "type": "getExtractionData"
+          },
+          {
+            "config": {
+              "apposition": "and",
+              "children": [
+                {
+                  "config": {
+                    "content": "Phone data retrieved successfully"
+                  },
+                  "name": "Log success",
+                  "type": "log"
+                },
+                {
+                  "config": {},
+                  "name": "Break loop",
+                  "type": "breakLoop"
+                }
+              ],
+              "conditionList": [
+                {
+                  "probability": 50,
+                  "relation": "exist",
+                  "useVariable": "phoneNumberTest"
+                }
+              ]
+            },
+            "name": "Break if successful",
+            "type": "ifElse"
           }
         ],
-        "conditionList": [
-          {
-            "probability": 50,
-            "relation": "notExist",
-            "useVariable": "phoneData"
-          }
-        ]
+        "maxTimes": 10,
+        "minTimes": 1,
+        "serialType": "fixedValue",
+        "times": "3"
       },
-      "name": "IF condition",
-      "type": "ifElse"
-    },
-    {
-      "config": {
-        "content": "${phoneData}"
-      },
-      "name": "History",
-      "type": "log"
+      "name": "Retry getting phone data",
+      "type": "forTimes"
     },
     {
       "config": {
@@ -364,38 +382,104 @@
     },
     {
       "config": {
-        "headers": [
+        "children": [
           {
-            "name": "action",
-            "value": "get_phone_and_check_otp"
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 12000,
+              "timeoutMin": 8000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
           },
           {
-            "name": "account_id",
-            "value": "${accountId}"
+            "config": {
+              "content": "Checking for OTP"
+            },
+            "name": "Log OTP check",
+            "type": "log"
+          },
+          {
+            "config": {
+              "headers": [
+                {
+                  "name": "action",
+                  "value": "get_phone_and_check_otp"
+                },
+                {
+                  "name": "account_id",
+                  "value": "${accountId}"
+                }
+              ],
+              "remark": "otp data",
+              "type": "get",
+              "url": "https://spectre-studio.app/api/geelark/daisysms-proxy",
+              "variableMap": [
+                {
+                  "value": "$",
+                  "variable": "otpData"
+                }
+              ]
+            },
+            "name": "Make a network request",
+            "type": "getNetworkRequest"
+          },
+          {
+            "config": {
+              "timeout": 5000,
+              "timeoutMax": 8000,
+              "timeoutMin": 3000,
+              "timeoutType": "randomInterval"
+            },
+            "name": "Wait between OTP checks",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "rule": "\"otp_code\":\"(\\d{4,8})\"",
+              "useVariable": "otpData",
+              "variable": "otpCodeTest"
+            },
+            "name": "Test if OTP exists",
+            "type": "getExtractionData"
+          },
+          {
+            "config": {
+              "apposition": "and",
+              "children": [
+                {
+                  "config": {
+                    "content": "OTP code found: ${otpCodeTest}"
+                  },
+                  "name": "Log OTP found",
+                  "type": "log"
+                },
+                {
+                  "config": {},
+                  "name": "Break loop",
+                  "type": "breakLoop"
+                }
+              ],
+              "conditionList": [
+                {
+                  "probability": 50,
+                  "relation": "exist",
+                  "useVariable": "otpCodeTest"
+                }
+              ]
+            },
+            "name": "Break if OTP found",
+            "type": "ifElse"
           }
         ],
-        "remark": "otp data",
-        "type": "get",
-        "url": "https://spectre-studio.app/api/geelark/daisysms-proxy",
-        "variableMap": [
-          {
-            "value": "$",
-            "variable": "otpData"
-          }
-        ]
+        "maxTimes": 30,
+        "minTimes": 1,
+        "serialType": "fixedValue",
+        "times": "3"
       },
-      "name": "Make a network request",
-      "type": "getNetworkRequest"
-    },
-    {
-      "config": {
-        "timeout": 8000,
-        "timeoutMax": 30000,
-        "timeoutMin": 1000,
-        "timeoutType": "fixedValue"
-      },
-      "name": "Waiting time",
-      "type": "waitTime"
+      "name": "Retry getting OTP",
+      "type": "forTimes"
     },
     {
       "config": {
@@ -537,8 +621,8 @@
               "_a": 100,
               "_b": 300,
               "direction": "bottom",
-              "distanceMax": "900",
-              "distanceMin": "600",
+              "distanceMax": "1100",
+              "distanceMin": "800",
               "isSection": false,
               "position": [
                 260,
@@ -622,7 +706,7 @@
               "filterType": "equal",
               "filters": [
                 {
-                  "content": "Let’s go",
+                  "content": "Let's go",
                   "type": "text"
                 }
               ],
@@ -993,7 +1077,7 @@
               "filterType": "equal",
               "filters": [
                 {
-                  "content": "Next",
+                  "content": "Continue",
                   "type": "text"
                 }
               ],
@@ -1034,6 +1118,199 @@
         "filterType": "equal",
         "filters": [
           {
+            "content": "Create nickname",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "nicknameexists"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "content": "${password}${username}"
+            },
+            "name": "History",
+            "type": "log"
+          },
+          {
+            "config": {
+              "content": [
+                "${username}"
+              ],
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "android.widget.EditText",
+                  "type": "class"
+                }
+              ],
+              "hiddenChildren": false,
+              "inputType": "taskOrder",
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue"
+            },
+            "name": "Enter content",
+            "type": "inputContent"
+          },
+          {
+            "config": {
+              "timeout": 3000,
+              "timeoutMax": 30000,
+              "timeoutMin": 1000,
+              "timeoutType": "fixedValue"
+            },
+            "name": "Waiting time",
+            "type": "waitTime"
+          },
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Continue",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "nicknameexists"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "contain",
+        "filters": [
+          {
+            "content": "interests",
+            "type": "text"
+          }
+        ],
+        "hiddenChildren": false,
+        "searchTime": 3000,
+        "serial": 1,
+        "serialType": "fixedValue",
+        "variable": "interests"
+      },
+      "name": "Wait for element to appear",
+      "type": "waitEle"
+    },
+    {
+      "config": {
+        "apposition": "and",
+        "children": [
+          {
+            "config": {
+              "filterType": "equal",
+              "filters": [
+                {
+                  "content": "Skip",
+                  "type": "text"
+                }
+              ],
+              "hiddenChildren": false,
+              "randomDistance": 0,
+              "searchTime": 3000,
+              "serial": 1,
+              "serialType": "fixedValue",
+              "useOffset": false
+            },
+            "name": "Click element",
+            "type": "click"
+          }
+        ],
+        "conditionList": [
+          {
+            "probability": 50,
+            "relation": "exist",
+            "useVariable": "interests"
+          }
+        ]
+      },
+      "name": "IF condition",
+      "type": "ifElse"
+    },
+    {
+      "config": {
+        "timeout": 3000,
+        "timeoutMax": 30000,
+        "timeoutMin": 1000,
+        "timeoutType": "fixedValue"
+      },
+      "name": "Waiting time",
+      "type": "waitTime"
+    },
+    {
+      "config": {
+        "filterType": "equal",
+        "filters": [
+          {
             "content": "Start watching",
             "type": "text"
           }
@@ -1047,16 +1324,6 @@
       },
       "name": "Click element",
       "type": "click"
-    },
-    {
-      "config": {
-        "timeout": 3000,
-        "timeoutMax": 30000,
-        "timeoutMin": 1000,
-        "timeoutType": "fixedValue"
-      },
-      "name": "Waiting time",
-      "type": "waitTime"
     },
     {
       "config": {

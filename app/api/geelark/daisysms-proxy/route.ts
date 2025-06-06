@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
+    // Check both query params and headers (GeeLark sends headers)
     let action = searchParams.get('action') || request.headers.get('action') || request.headers.get('x-action')
     let rentalId = searchParams.get('rental_id') || request.headers.get('rental_id') || request.headers.get('x-rental-id')
     let accountId = searchParams.get('account_id') || request.headers.get('account_id') || request.headers.get('x-account-id')

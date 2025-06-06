@@ -1,5 +1,27 @@
 import { createHash } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { waitForPhoneReady } from '@/lib/utils/geelark-phone-status'
+import { monitorPostCompletionAndStop } from '@/lib/utils/post-completion-monitor'
+
+/**
+ * SYSTEM TIMEOUT VALUES:
+ * 
+ * Phone Lifecycle Timeouts:
+ * - Phone ready waiting: 10 minutes (300 attempts × 2s)
+ * - Post completion monitoring: 60 minutes (video/carousel posting)
+ * - Engagement task monitoring: 30 minutes (likes, comments, follows)
+ * - Setup completion monitoring: 30 minutes (phone setup operations)
+ * - SMS setup process: 30 minutes (entire SMS workflow)
+ * 
+ * File Transfer Timeouts:
+ * - Image download: 30 seconds
+ * - Video download: 60 seconds  
+ * - Image upload: 30 seconds
+ * - Video upload: 30s + 1s per MB (dynamic based on file size)
+ * 
+ * The 60-minute post monitoring timeout is the longest arbitrary timeout in the system.
+ * All timeouts include automatic phone stopping as a safety measure.
+ */
 
 const API_BASE_URL = process.env.GEELARK_API_BASE_URL || 'https://openapi.geelark.com'
 const API_KEY = process.env.GEELARK_API_KEY || ''
@@ -393,25 +415,7 @@ export class GeeLarkAPI {
     return data
   }
 
-  async waitForPhoneReady(phoneId: string): Promise<void> {
-    console.log(`[GeeLark] Waiting for phone ${phoneId} to be ready...`)
-    
-    while (true) {
-      const statusData = await this.getPhoneStatus([phoneId])
-      
-      if (statusData.successDetails && statusData.successDetails.length > 0) {
-        const phone = statusData.successDetails[0]
-        if (phone.status === 0) {
-          // Phone is started and ready
-          console.log(`[GeeLark] Phone ${phoneId} is ready`)
-          return
-        }
-      }
-      
-      // Wait 3 seconds before checking again
-      await new Promise(resolve => setTimeout(resolve, 3000))
-    }
-  }
+
 
   async stopPhones(phoneIds: string[]): Promise<any> {
     return await this.request('/open/v1/phone/stop', {
@@ -681,33 +685,99 @@ export class GeeLarkAPI {
       // Get upload URL from Geelark
       const { uploadUrl, resourceUrl } = await this.getUploadUrl(fileType)
 
-      // Fetch the file from source URL
-      const response = await fetch(sourceUrl)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file from ${sourceUrl}`)
+      // Fetch the file from source URL with timeout
+      const controller = new AbortController()
+      const downloadTimeout = setTimeout(() => controller.abort(), 30000) // 30 second timeout for download
+      
+      try {
+        const response = await fetch(sourceUrl, { signal: controller.signal })
+        clearTimeout(downloadTimeout)
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file from ${sourceUrl}: ${response.status}`)
+        }
+
+        const fileBuffer = await response.arrayBuffer()
+        
+        // Check file size
+        const fileSizeMB = fileBuffer.byteLength / (1024 * 1024)
+        console.log(`[GeeLark] Image file size: ${fileSizeMB.toFixed(2)} MB`)
+        
+        if (fileSizeMB > 20) {
+          throw new Error(`Image file too large: ${fileSizeMB.toFixed(2)} MB (max 20 MB)`)
+        }
+
+        // Upload to Geelark's storage with retry logic
+        let uploadAttempts = 0
+        const maxUploadAttempts = 3
+        let lastError: Error | null = null
+
+        while (uploadAttempts < maxUploadAttempts) {
+          uploadAttempts++
+          console.log(`[GeeLark] Upload attempt ${uploadAttempts}/${maxUploadAttempts}`)
+          
+          const uploadController = new AbortController()
+          const uploadTimeoutMs = 30000 // 30 second timeout for images
+          const uploadTimeout = setTimeout(() => uploadController.abort(), uploadTimeoutMs)
+          
+          try {
+            const uploadResponse = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: fileBuffer,
+              signal: uploadController.signal
+              // DO NOT add any headers - Geelark documentation specifically says no extra headers
+            })
+            clearTimeout(uploadTimeout)
+
+            if (!uploadResponse.ok) {
+              throw new Error(`Failed to upload file to Geelark: ${uploadResponse.status}`)
+            }
+
+            // Success - log and return
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'geelark-api',
+              message: 'File uploaded to Geelark',
+              meta: { 
+                sourceUrl, 
+                resourceUrl, 
+                fileType,
+                fileSizeMB: fileSizeMB.toFixed(2),
+                attempts: uploadAttempts
+              }
+            })
+
+            return resourceUrl
+          } catch (uploadError) {
+            lastError = uploadError as Error
+            clearTimeout(uploadTimeout)
+            
+            if (uploadError instanceof Error && uploadError.name === 'AbortError') {
+              console.error(`[GeeLark] Upload timeout on attempt ${uploadAttempts}`)
+              lastError = new Error(`Upload timeout after ${uploadTimeoutMs / 1000} seconds`)
+            } else {
+              console.error(`[GeeLark] Upload error on attempt ${uploadAttempts}:`, uploadError)
+            }
+            
+            // Wait before retry (exponential backoff)
+            if (uploadAttempts < maxUploadAttempts) {
+              const waitTime = uploadAttempts * 2000 // 2s, 4s
+              console.log(`[GeeLark] Waiting ${waitTime}ms before retry...`)
+              await new Promise(resolve => setTimeout(resolve, waitTime))
+            }
+          }
+        }
+
+        // All attempts failed
+        throw new Error(`Failed to upload file after ${maxUploadAttempts} attempts: ${lastError?.message || 'Unknown error'}`)
+        
+      } catch (downloadError) {
+        clearTimeout(downloadTimeout)
+        if (downloadError instanceof Error && downloadError.name === 'AbortError') {
+          throw new Error('File download timeout after 30 seconds')
+        }
+        throw downloadError
       }
-
-      const fileBuffer = await response.arrayBuffer()
-
-      // Upload to Geelark's storage - NO EXTRA HEADERS!
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: fileBuffer
-        // DO NOT add any headers - Geelark documentation specifically says no extra headers
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error(`Failed to upload file to Geelark: ${uploadResponse.status}`)
-      }
-
-      await supabaseAdmin.from('logs').insert({
-        level: 'info',
-        component: 'geelark-api',
-        message: 'File uploaded to Geelark',
-        meta: { sourceUrl, resourceUrl }
-      })
-
-      return resourceUrl
     } catch (error) {
       await supabaseAdmin.from('logs').insert({
         level: 'error',
@@ -729,33 +799,100 @@ export class GeeLarkAPI {
       // Get upload URL from Geelark
       const { uploadUrl, resourceUrl } = await this.getUploadUrl(fileType as any)
 
-      // Fetch the file from source URL
-      const response = await fetch(sourceUrl)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch video from ${sourceUrl}`)
+      // Fetch the file from source URL with timeout
+      const controller = new AbortController()
+      const downloadTimeout = setTimeout(() => controller.abort(), 60000) // 60 second timeout for download
+      
+      try {
+        const response = await fetch(sourceUrl, { signal: controller.signal })
+        clearTimeout(downloadTimeout)
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch video from ${sourceUrl}: ${response.status}`)
+        }
+
+        const fileBuffer = await response.arrayBuffer()
+        
+        // Check file size
+        const fileSizeMB = fileBuffer.byteLength / (1024 * 1024)
+        console.log(`[GeeLark] Video file size: ${fileSizeMB.toFixed(2)} MB`)
+        
+        if (fileSizeMB > 100) {
+          throw new Error(`Video file too large: ${fileSizeMB.toFixed(2)} MB (max 100 MB)`)
+        }
+
+        // Upload to Geelark's storage with retry logic
+        let uploadAttempts = 0
+        const maxUploadAttempts = 3
+        let lastError: Error | null = null
+
+        while (uploadAttempts < maxUploadAttempts) {
+          uploadAttempts++
+          console.log(`[GeeLark] Upload attempt ${uploadAttempts}/${maxUploadAttempts}`)
+          
+          const uploadController = new AbortController()
+          // Increase timeout based on file size (minimum 30 seconds, +1 second per MB)
+          const uploadTimeoutMs = Math.max(30000, 30000 + (fileSizeMB * 1000))
+          const uploadTimeout = setTimeout(() => uploadController.abort(), uploadTimeoutMs)
+          
+          try {
+            const uploadResponse = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: fileBuffer,
+              signal: uploadController.signal
+              // DO NOT add any headers - Geelark documentation specifically says no extra headers
+            })
+            clearTimeout(uploadTimeout)
+
+            if (!uploadResponse.ok) {
+              throw new Error(`Failed to upload video to Geelark: ${uploadResponse.status}`)
+            }
+
+            // Success - log and return
+            await supabaseAdmin.from('logs').insert({
+              level: 'info',
+              component: 'geelark-api',
+              message: 'Video uploaded to Geelark',
+              meta: { 
+                sourceUrl, 
+                resourceUrl, 
+                fileType,
+                fileSizeMB: fileSizeMB.toFixed(2),
+                attempts: uploadAttempts
+              }
+            })
+
+            return resourceUrl
+          } catch (uploadError) {
+            lastError = uploadError as Error
+            clearTimeout(uploadTimeout)
+            
+            if (uploadError instanceof Error && uploadError.name === 'AbortError') {
+              console.error(`[GeeLark] Upload timeout on attempt ${uploadAttempts}`)
+              lastError = new Error(`Upload timeout after ${uploadTimeoutMs / 1000} seconds`)
+            } else {
+              console.error(`[GeeLark] Upload error on attempt ${uploadAttempts}:`, uploadError)
+            }
+            
+            // Wait before retry (exponential backoff)
+            if (uploadAttempts < maxUploadAttempts) {
+              const waitTime = uploadAttempts * 2000 // 2s, 4s
+              console.log(`[GeeLark] Waiting ${waitTime}ms before retry...`)
+              await new Promise(resolve => setTimeout(resolve, waitTime))
+            }
+          }
+        }
+
+        // All attempts failed
+        throw new Error(`Failed to upload video after ${maxUploadAttempts} attempts: ${lastError?.message || 'Unknown error'}`)
+        
+      } catch (downloadError) {
+        clearTimeout(downloadTimeout)
+        if (downloadError instanceof Error && downloadError.name === 'AbortError') {
+          throw new Error('Video download timeout after 60 seconds')
+        }
+        throw downloadError
       }
-
-      const fileBuffer = await response.arrayBuffer()
-
-      // Upload to Geelark's storage - NO EXTRA HEADERS!
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: fileBuffer
-        // DO NOT add any headers - Geelark documentation specifically says no extra headers
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error(`Failed to upload video to Geelark: ${uploadResponse.status}`)
-      }
-
-      await supabaseAdmin.from('logs').insert({
-        level: 'info',
-        component: 'geelark-api',
-        message: 'Video uploaded to Geelark',
-        meta: { sourceUrl, resourceUrl, fileType }
-      })
-
-      return resourceUrl
     } catch (error) {
       await supabaseAdmin.from('logs').insert({
         level: 'error',
@@ -804,8 +941,14 @@ export class GeeLarkAPI {
       // Step 1: Start the phone
       console.log('[GeeLark] Starting phone for carousel post...')
       await this.startPhones([profileId])
-      await this.waitForPhoneReady(profileId)
       phoneStarted = true
+      
+      // Wait for phone to be ready using the proper utility
+      await waitForPhoneReady(profileId, {
+        maxAttempts: 300, // 10 minutes max (300 * 2s)
+        logProgress: true,
+        logPrefix: '[Carousel Post] '
+      })
       console.log('[GeeLark] Phone started and ready')
 
       // Step 2: Upload images to Geelark temporary storage first
@@ -866,6 +1009,11 @@ export class GeeLarkAPI {
         }
       })
 
+      // Start monitoring task completion and auto-stop phone (non-blocking)
+      monitorPostCompletionAndStop(accountId, profileId, taskId, 'carousel').catch(error => {
+        console.error('[GeeLark] Error in post completion monitor:', error)
+      })
+
       return taskId
       
     } catch (error) {
@@ -893,8 +1041,14 @@ export class GeeLarkAPI {
       // Step 1: Start the phone
       console.log('[GeeLark] Starting phone for video post...')
       await this.startPhones([profileId])
-      await this.waitForPhoneReady(profileId)
       phoneStarted = true
+      
+      // Wait for phone to be ready using the proper utility
+      await waitForPhoneReady(profileId, {
+        maxAttempts: 300, // 10 minutes max (300 * 2s)
+        logProgress: true,
+        logPrefix: '[Video Post] '
+      })
       console.log('[GeeLark] Phone started and ready')
 
       // Step 2: Upload video to Geelark temporary storage first
@@ -951,6 +1105,11 @@ export class GeeLarkAPI {
         }
       })
 
+      // Start monitoring task completion and auto-stop phone (non-blocking)
+      monitorPostCompletionAndStop(accountId, profileId, taskId, 'video').catch(error => {
+        console.error('[GeeLark] Error in post completion monitor:', error)
+      })
+
       return taskId
       
     } catch (error) {
@@ -979,8 +1138,14 @@ export class GeeLarkAPI {
       // Step 1: Start the phone
       console.log('[GeeLark] Starting phone for profile edit...')
       await this.startPhones([profileId])
-      await this.waitForPhoneReady(profileId)
       phoneStarted = true
+      
+      // Wait for phone to be ready using the proper utility
+      await waitForPhoneReady(profileId, {
+        maxAttempts: 300, // 10 minutes max (300 * 2s)
+        logProgress: true,
+        logPrefix: '[Profile Edit] '
+      })
       console.log('[GeeLark] Phone started and ready')
 
       // Step 2: If avatar is provided, upload it
@@ -1030,6 +1195,12 @@ export class GeeLarkAPI {
           geelark_avatar: geelarkAvatarUrl,
           phone_started: true
         }
+      })
+
+      // Start monitoring task completion and auto-stop phone (non-blocking)
+      // Note: Profile edit tasks don't have an accountId, so we'll use profileId as fallback
+      monitorPostCompletionAndStop(profileId, profileId, data.taskId, 'profile_edit').catch(error => {
+        console.error('[GeeLark] Error in profile edit completion monitor:', error)
       })
 
       return data
@@ -1539,8 +1710,14 @@ export class GeeLarkAPI {
       // Start the phone
       console.log('[GeeLark] Starting phone for task execution...')
       await this.startPhones([phoneId])
-      await this.waitForPhoneReady(phoneId)
       phoneStarted = true
+      
+      // Wait for phone to be ready using the proper utility
+      await waitForPhoneReady(phoneId, {
+        maxAttempts: 300, // 10 minutes max (300 * 2s)
+        logProgress: true,
+        logPrefix: '[Task Execution] '
+      })
       console.log('[GeeLark] Phone started and ready')
 
       // Execute the task creator
