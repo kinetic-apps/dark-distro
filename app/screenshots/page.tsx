@@ -11,7 +11,10 @@ import {
   AlertCircle,
   Clock,
   Smartphone,
-  WifiOff
+  WifiOff,
+  Plus,
+  Minus,
+  ZoomIn
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatRelativeTime } from '@/lib/utils'
@@ -69,6 +72,7 @@ export default function ScreenshotsPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(7) // Scale from 1 (20%) to 8 (100%)
 
   // Fetch accounts with phone status
   const fetchPhones = async () => {
@@ -352,6 +356,94 @@ export default function ScreenshotsPage() {
 
   const onlinePhoneCount = Object.keys(screenshots).length
 
+  // Generate scale and grid classes based on zoom level
+  const getZoomConfig = () => {
+    switch (zoomLevel) {
+      case 1: // 20% - Maximum density
+        return {
+          scale: 'scale-[0.2]',
+          gridCols: 'grid-cols-4 sm:grid-cols-8 md:grid-cols-12 lg:grid-cols-16 xl:grid-cols-20',
+          gap: 'gap-0.5',
+          compact: true,
+          percentage: 20
+        }
+      case 2: // 35% - Very high density
+        return {
+          scale: 'scale-[0.35]',
+          gridCols: 'grid-cols-3 sm:grid-cols-6 md:grid-cols-10 lg:grid-cols-14 xl:grid-cols-16',
+          gap: 'gap-0.5',
+          compact: true,
+          percentage: 35
+        }
+      case 3: // 50% - High density
+        return {
+          scale: 'scale-[0.5]',
+          gridCols: 'grid-cols-2 sm:grid-cols-4 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12',
+          gap: 'gap-1',
+          compact: true,
+          percentage: 50
+        }
+      case 4: // 65% - Medium-high density
+        return {
+          scale: 'scale-[0.65]',
+          gridCols: 'grid-cols-1 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10',
+          gap: 'gap-1.5',
+          compact: true,
+          percentage: 65
+        }
+      case 5: // 75% - Medium density
+        return {
+          scale: 'scale-75',
+          gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8',
+          gap: 'gap-2',
+          compact: true,
+          percentage: 75
+        }
+      case 6: // 85% - Medium-low density
+        return {
+          scale: 'scale-[0.85]',
+          gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
+          gap: 'gap-3',
+          compact: false,
+          percentage: 85
+        }
+      case 7: // 100% - Standard size (default)
+        return {
+          scale: 'scale-100',
+          gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
+          gap: 'gap-4',
+          compact: false,
+          percentage: 100
+        }
+      case 8: // 100% - Large spacing
+        return {
+          scale: 'scale-100',
+          gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3',
+          gap: 'gap-6',
+          compact: false,
+          percentage: 100
+        }
+      default:
+        return {
+          scale: 'scale-100',
+          gridCols: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
+          gap: 'gap-4',
+          compact: false,
+          percentage: 100
+        }
+    }
+  }
+
+  const zoomConfig = getZoomConfig()
+
+  const handleZoomIn = () => {
+    if (zoomLevel < 8) setZoomLevel(zoomLevel + 1)
+  }
+
+  const handleZoomOut = () => {
+    if (zoomLevel > 1) setZoomLevel(zoomLevel - 1)
+  }
+
   return (
     <div className="space-y-6">
       <div className="page-header">
@@ -366,6 +458,46 @@ export default function ScreenshotsPage() {
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600 dark:text-dark-400">
               <span className="font-medium">{onlinePhoneCount}</span> phones online
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-dark-800 rounded-lg">
+              <button
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 1}
+                className="p-1 rounded text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed dark:text-dark-400 dark:hover:text-dark-100"
+                title="Zoom out"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+              
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((level) => (
+                  <div
+                    key={level}
+                    className={`w-1 h-1 rounded-full transition-colors cursor-pointer hover:scale-150 ${
+                      level <= zoomLevel
+                        ? 'bg-gray-900 dark:bg-dark-100'
+                        : 'bg-gray-400 dark:bg-dark-600'
+                    }`}
+                    onClick={() => setZoomLevel(level)}
+                    title={`${getZoomConfig().percentage}%`}
+                  />
+                ))}
+              </div>
+              
+              <button
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 8}
+                className="p-1 rounded text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed dark:text-dark-400 dark:hover:text-dark-100"
+                title="Zoom in"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+
+              <span className="text-xs text-gray-600 dark:text-dark-400 ml-1">
+                {zoomConfig.percentage}%
+              </span>
             </div>
 
             <button
@@ -413,51 +545,80 @@ export default function ScreenshotsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+        <div className={`grid ${zoomConfig.gridCols} ${zoomConfig.gap}`}>
           {Object.entries(screenshots).map(([profileId, screenshot]) => {
             const activityInfo = getActivityDisplay(screenshot)
             
             return (
               <div
                 key={profileId}
-                className="card overflow-hidden group"
+                className={`card overflow-hidden group transform transition-transform origin-top-left ${zoomConfig.scale}`}
+                style={{ transformOrigin: 'center' }}
               >
-                <div className="p-4 border-b border-gray-200 dark:border-dark-700">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 dark:text-dark-100 truncate">
+                {zoomConfig.compact ? (
+                  // Compact header for smaller zoom levels
+                  <div className="p-2 border-b border-gray-200 dark:border-dark-700">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium text-sm text-gray-900 dark:text-dark-100 truncate">
                         {screenshot.username}
                       </h3>
-                      <p className="text-xs text-gray-500 dark:text-dark-400">
-                        {profileId.slice(-8)}
-                      </p>
-                    </div>
-                    <div className="ml-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
                         screenshot.phoneStatus === 'started' 
                           ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                           : 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                       }`}>
-                        <Power className="h-3 w-3 mr-1" />
-                        {screenshot.phoneStatus === 'started' ? 'Online' : 'Starting'}
+                        <Power className="h-2.5 w-2.5 mr-1" />
+                        {screenshot.phoneStatus === 'started' ? 'On' : 'Starting'}
+                      </span>
+                    </div>
+                    
+                    {/* Simplified activity indicator */}
+                    <div className="flex items-center gap-1 mt-1">
+                      <activityInfo.icon className={`h-3 w-3 ${activityInfo.color}`} />
+                      <span className={`text-xs ${activityInfo.color} truncate`}>
+                        {activityInfo.text}
                       </span>
                     </div>
                   </div>
+                ) : (
+                  // Full header for larger zoom levels
+                  <div className="p-4 border-b border-gray-200 dark:border-dark-700">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 dark:text-dark-100 truncate">
+                          {screenshot.username}
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-dark-400">
+                          {profileId.slice(-8)}
+                        </p>
+                      </div>
+                      <div className="ml-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                          screenshot.phoneStatus === 'started' 
+                            ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        }`}>
+                          <Power className="h-3 w-3 mr-1" />
+                          {screenshot.phoneStatus === 'started' ? 'Online' : 'Starting'}
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Activity Status */}
-                  <div className="flex items-center gap-2">
-                    <activityInfo.icon className={`h-4 w-4 ${activityInfo.color}`} />
-                    <span className={`text-sm font-medium ${activityInfo.color}`}>
-                      {activityInfo.text}
-                    </span>
+                    {/* Activity Status */}
+                    <div className="flex items-center gap-2">
+                      <activityInfo.icon className={`h-4 w-4 ${activityInfo.color}`} />
+                      <span className={`text-sm font-medium ${activityInfo.color}`}>
+                        {activityInfo.text}
+                      </span>
+                    </div>
+
+                    {screenshot.lastUpdated && (
+                      <p className="text-xs text-gray-500 dark:text-dark-400 mt-2">
+                        Updated: {screenshot.lastUpdated.toLocaleTimeString()}
+                      </p>
+                    )}
                   </div>
-
-                  {screenshot.lastUpdated && (
-                    <p className="text-xs text-gray-500 dark:text-dark-400 mt-2">
-                      Updated: {screenshot.lastUpdated.toLocaleTimeString()}
-                    </p>
-                  )}
-                </div>
+                )}
 
                 <div className="relative aspect-[9/16] bg-gray-100 dark:bg-dark-900">
                   {screenshot.status === 'loading' ? (

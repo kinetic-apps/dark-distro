@@ -37,7 +37,10 @@ interface Profile {
   created_at: string
   updated_at: string
   ready_for_actions?: boolean
-  meta?: any
+  meta?: {
+    geelark_serial_no?: string
+    [key: string]: any
+  }
   current_setup_step?: string
   setup_progress?: number
   phone?: {
@@ -464,7 +467,7 @@ export function ProfilesTableV2({ profiles, onBulkAction }: ProfilesTableV2Props
                               {profile.tiktok_username || 'Unnamed Profile'}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-dark-400 font-mono">
-                              {profile.geelark_profile_id ? `ID: ${profile.geelark_profile_id.slice(-8)}` : 'No GeeLark ID'}
+                              {profile.meta?.geelark_serial_no ? `ID: ${profile.meta.geelark_serial_no}` : 'No Serial'}
                             </div>
                           </div>
                         </Link>
