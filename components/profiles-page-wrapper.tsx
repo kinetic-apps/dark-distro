@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ProfilesTableV2 } from '@/components/tables/profiles-table-v2'
 import { ProfileBulkActions } from '@/components/profile-bulk-actions'
 import { AssignProxyModal } from '@/components/assign-proxy-modal'
@@ -10,6 +10,8 @@ import { EngagementModal, EngagementConfig } from '@/components/engagement-modal
 import { FixStuckStatusModal } from '@/components/fix-stuck-status-modal'
 import { BulkProfileEditModal, ProfileEditParams } from '@/components/bulk-profile-edit-modal'
 import { useNotification } from '@/lib/context/notification-context'
+import { ProfileFilterBar } from '@/components/profile-filter-bar'
+import { ProfileSearch } from '@/components/profile-search'
 
 interface ProfilesPageWrapperProps {
   profiles: any[]
@@ -31,6 +33,11 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
   const [pendingProfileEdit, setPendingProfileEdit] = useState<string[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const { notify } = useNotification()
+  
+  // Filter state
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([])
+  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([])
+  const [filteredProfiles, setFilteredProfiles] = useState(profiles)
 
   const handleBulkAction = (action: string, ids: string[]) => {
     console.log('Bulk action triggered:', action, ids)
@@ -356,11 +363,45 @@ export function ProfilesPageWrapper({ profiles }: ProfilesPageWrapperProps) {
     }
   }
 
+  const handleFilterChange = useCallback((filterIds: string[]) => {
+    setSelectedFilters(filterIds)
+  }, [])
+
+  const handleProfilesSelect = useCallback((profileIds: string[]) => {
+    setSelectedProfiles(profileIds)
+  }, [])
+
+  const handleProfilesFilter = useCallback((filtered: any[]) => {
+    setFilteredProfiles(filtered)
+  }, [])
+
   return (
     <>
+      {/* Search and Filters */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          {/* Search Bar - Fixed width */}
+          <div className="w-full sm:w-auto">
+            <ProfileSearch />
+          </div>
+          
+          {/* Filter Bar Container - Takes remaining space */}
+          <div className="flex-1 min-w-0">
+            <ProfileFilterBar 
+              profiles={profiles}
+              selectedFilters={selectedFilters}
+              onFilterChange={handleFilterChange}
+              onProfilesSelect={handleProfilesSelect}
+              onProfilesFilter={handleProfilesFilter}
+            />
+          </div>
+        </div>
+      </div>
+
       <ProfilesTableV2
-        profiles={profiles}
+        profiles={filteredProfiles}
         onBulkAction={handleBulkAction}
+        preSelectedProfiles={selectedProfiles}
       />
       
       {bulkAction && bulkAction.action !== 'proxy-assigned' && (

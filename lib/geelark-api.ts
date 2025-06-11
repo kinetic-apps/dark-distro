@@ -968,22 +968,26 @@ export class GeeLarkAPI {
     caption: string
     hashtags?: string[]
     music?: string
-  }): Promise<string> {
+  }, options?: { skipPhoneStart?: boolean }): Promise<string> {
     let phoneStarted = false
     
     try {
-      // Step 1: Start the phone
-      console.log('[GeeLark] Starting phone for carousel post...')
-      await this.startPhones([profileId])
-      phoneStarted = true
-      
-      // Wait for phone to be ready using the proper utility
-      await waitForPhoneReady(profileId, {
-        maxAttempts: 300, // 10 minutes max (300 * 2s)
-        logProgress: true,
-        logPrefix: '[Carousel Post] '
-      })
-      console.log('[GeeLark] Phone started and ready')
+      // Step 1: Start the phone (unless skipped for bulk operations)
+      if (!options?.skipPhoneStart) {
+        console.log('[GeeLark] Starting phone for carousel post...')
+        await this.startPhones([profileId])
+        phoneStarted = true
+        
+        // Wait for phone to be ready using the proper utility
+        await waitForPhoneReady(profileId, {
+          maxAttempts: 300, // 10 minutes max (300 * 2s)
+          logProgress: true,
+          logPrefix: '[Carousel Post] '
+        })
+        console.log('[GeeLark] Phone started and ready')
+      } else {
+        console.log('[GeeLark] Skipping phone start (bulk operation)')
+      }
 
       // Step 2: Upload images to Geelark temporary storage first
       console.log('[GeeLark] Uploading carousel images to Geelark temporary storage...')
@@ -1039,20 +1043,23 @@ export class GeeLarkAPI {
           original_images: content.images,
           geelark_images: geelarkImageUrls,
           scheduled_at: new Date(scheduleAt * 1000).toISOString(),
-          phone_started: true
+          phone_started: !options?.skipPhoneStart
         }
       })
 
       // Start monitoring task completion and auto-stop phone (non-blocking)
-      monitorPostCompletionAndStop(accountId, profileId, taskId, 'carousel').catch(error => {
-        console.error('[GeeLark] Error in post completion monitor:', error)
-      })
+      // Only monitor if we started the phone
+      if (!options?.skipPhoneStart) {
+        monitorPostCompletionAndStop(accountId, profileId, taskId, 'carousel').catch(error => {
+          console.error('[GeeLark] Error in post completion monitor:', error)
+        })
+      }
 
       return taskId
       
     } catch (error) {
       // If phone was started but task failed, we should stop it
-      if (phoneStarted) {
+      if (phoneStarted && !options?.skipPhoneStart) {
         try {
           await this.stopPhones([profileId])
         } catch (stopError) {
@@ -1068,22 +1075,26 @@ export class GeeLarkAPI {
     caption: string
     hashtags?: string[]
     music?: string
-  }): Promise<string> {
+  }, options?: { skipPhoneStart?: boolean }): Promise<string> {
     let phoneStarted = false
     
     try {
-      // Step 1: Start the phone
-      console.log('[GeeLark] Starting phone for video post...')
-      await this.startPhones([profileId])
-      phoneStarted = true
-      
-      // Wait for phone to be ready using the proper utility
-      await waitForPhoneReady(profileId, {
-        maxAttempts: 300, // 10 minutes max (300 * 2s)
-        logProgress: true,
-        logPrefix: '[Video Post] '
-      })
-      console.log('[GeeLark] Phone started and ready')
+      // Step 1: Start the phone (unless skipped for bulk operations)
+      if (!options?.skipPhoneStart) {
+        console.log('[GeeLark] Starting phone for video post...')
+        await this.startPhones([profileId])
+        phoneStarted = true
+        
+        // Wait for phone to be ready using the proper utility
+        await waitForPhoneReady(profileId, {
+          maxAttempts: 300, // 10 minutes max (300 * 2s)
+          logProgress: true,
+          logPrefix: '[Video Post] '
+        })
+        console.log('[GeeLark] Phone started and ready')
+      } else {
+        console.log('[GeeLark] Skipping phone start (bulk operation)')
+      }
 
       // Step 2: Upload video to Geelark temporary storage first
       console.log('[GeeLark] Uploading video to Geelark temporary storage...')
@@ -1135,20 +1146,23 @@ export class GeeLarkAPI {
           original_video: content.video_url,
           geelark_video: geelarkVideoUrl,
           scheduled_at: new Date(scheduleAt * 1000).toISOString(),
-          phone_started: true
+          phone_started: !options?.skipPhoneStart
         }
       })
 
       // Start monitoring task completion and auto-stop phone (non-blocking)
-      monitorPostCompletionAndStop(accountId, profileId, taskId, 'video').catch(error => {
-        console.error('[GeeLark] Error in post completion monitor:', error)
-      })
+      // Only monitor if we started the phone
+      if (!options?.skipPhoneStart) {
+        monitorPostCompletionAndStop(accountId, profileId, taskId, 'video').catch(error => {
+          console.error('[GeeLark] Error in post completion monitor:', error)
+        })
+      }
 
       return taskId
       
     } catch (error) {
       // If phone was started but task failed, we should stop it
-      if (phoneStarted) {
+      if (phoneStarted && !options?.skipPhoneStart) {
         try {
           await this.stopPhones([profileId])
         } catch (stopError) {

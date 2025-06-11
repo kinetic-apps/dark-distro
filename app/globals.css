@@ -197,6 +197,44 @@ body {
     font-family: 'Geist';
     letter-spacing: 0.1em;
   }
+
+  /* Custom Scrollbar Styles for Filter Bar */
+  .filter-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175) transparent;
+  }
+
+  .filter-scrollbar::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .filter-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+  }
+
+  .filter-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(156 163 175);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .filter-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128);
+  }
+
+  .dark .filter-scrollbar {
+    scrollbar-color: rgb(75 85 99) transparent;
+  }
+
+  .dark .filter-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgb(75 85 99);
+  }
+
+  .dark .filter-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(107 114 128);
+  }
   
   .heading-primary {
     @apply font-semibold text-gray-900 dark:text-dark-100;

@@ -67,6 +67,7 @@ interface Profile {
 interface ProfilesTableV2Props {
   profiles: Profile[]
   onBulkAction: (action: string, ids: string[]) => void
+  preSelectedProfiles?: string[]
 }
 
 function RemarkCell({ remark, accountId }: { remark: string | null; accountId: string }) {
@@ -125,8 +126,7 @@ function RemarkCell({ remark, accountId }: { remark: string | null; accountId: s
   )
 }
 
-export function ProfilesTableV2({ profiles, onBulkAction }: ProfilesTableV2Props) {
-  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([])
+export function ProfilesTableV2({ profiles, onBulkAction, preSelectedProfiles = [] }: ProfilesTableV2Props) {
   const [expandedRows, setExpandedRows] = useState<string[]>([])
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [bulkAction, setBulkAction] = useState<'delete' | 'edit' | null>(null)
@@ -151,20 +151,17 @@ export function ProfilesTableV2({ profiles, onBulkAction }: ProfilesTableV2Props
 
   const router = useRouter()
 
+  // Use preSelectedProfiles directly
+  const selectedProfiles = preSelectedProfiles
+
   const toggleSelection = (id: string) => {
-    setSelectedProfiles(prev => 
-      prev.includes(id) 
-        ? prev.filter(i => i !== id)
-        : [...prev, id]
-    )
+    // Selection is controlled by parent component
+    console.log('Selection is controlled by parent component')
   }
 
   const toggleAll = () => {
-    setSelectedProfiles(prev => 
-      prev.length === profiles.length 
-        ? []
-        : profiles.map(p => p.id)
-    )
+    // Selection is controlled by parent component
+    console.log('Selection is controlled by parent component')
   }
 
   const toggleRowExpansion = (id: string) => {

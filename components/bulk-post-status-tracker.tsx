@@ -1,269 +1,333 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { X, CheckCircle, AlertCircle, Clock, RefreshCw, Smartphone, Layers, Video } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, XCircle, Clock, RefreshCw, X, TrendingUp } from 'lucide-react'
+import { formatRelativeTime } from '@/lib/utils'
 
 interface BulkPostStatusTrackerProps {
   isVisible: boolean
   onClose: () => void
-  bulkSessionId?: string
 }
 
-interface BulkPostStats {
-  launched: number
-  succeeded: number
-  failed: number
-  pending: number
-  processing: number
+interface PostStatus {
+  id: string
+  account_id: string
+  type: string
+  status: string
+  created_at: string
+  posted_at: string | null
+  task_id: string | null
+  caption: string | null
+  meta: any
+  account: {
+    tiktok_username: string | null
+    geelark_profile_id: string | null
+    meta: any
+  } | null
 }
 
-export default function BulkPostStatusTracker({ 
-  isVisible, 
-  onClose, 
-  bulkSessionId 
-}: BulkPostStatusTrackerProps) {
-  const [stats, setStats] = useState<BulkPostStats>({
-    launched: 0,
-    succeeded: 0,
-    failed: 0,
-    pending: 0,
-    processing: 0
-  })
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+interface LogEntry {
+  timestamp: string
+  level: string
+  message: string
+  meta: any
+}
+
+export default function BulkPostStatusTracker({ isVisible, onClose }: BulkPostStatusTrackerProps) {
+  const [posts, setPosts] = useState<PostStatus[]>([])
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(true)
   
   const supabase = createClient()
 
-  const fetchStats = async () => {
-    if (!isVisible) return
-    
-    setIsRefreshing(true)
-    try {
-      // Get posts from the last 10 minutes to capture recent bulk operations
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      
-      const { data: posts, error } = await supabase
-        .from('posts')
-        .select('status, created_at')
-        .gte('created_at', tenMinutesAgo)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching bulk post stats:', error)
-        return
-      }
-
-      if (!posts || posts.length === 0) {
-        setStats({
-          launched: 0,
-          succeeded: 0,
-          failed: 0,
-          pending: 0,
-          processing: 0
-        })
-        return
-      }
-
-      // Calculate stats
-      const newStats = {
-        launched: posts.length,
-        succeeded: posts.filter(p => p.status === 'posted').length,
-        failed: posts.filter(p => p.status === 'failed').length,
-        pending: posts.filter(p => p.status === 'queued' || p.status === 'pending').length,
-        processing: posts.filter(p => p.status === 'processing').length
-      }
-
-      setStats(newStats)
-      setLastUpdated(new Date())
-    } catch (error) {
-      console.error('Error fetching bulk post stats:', error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
   useEffect(() => {
     if (isVisible) {
-      // Initial fetch
-      fetchStats()
-      
-      // Set up polling every 3 seconds
-      const interval = setInterval(fetchStats, 3000)
-      
-      return () => clearInterval(interval)
+      loadData()
+      const interval = autoRefresh ? setInterval(loadData, 5000) : null
+      return () => {
+        if (interval) clearInterval(interval)
+      }
     }
-  }, [isVisible])
+  }, [isVisible, autoRefresh])
 
-  const getSuccessRate = () => {
-    if (stats.launched === 0) return 0
-    return Math.round((stats.succeeded / stats.launched) * 100)
+  const loadData = async () => {
+    await Promise.all([loadPosts(), loadLogs()])
   }
 
-  const getFailureRate = () => {
-    if (stats.launched === 0) return 0
-    return Math.round((stats.failed / stats.launched) * 100)
+  const loadPosts = async () => {
+    const { data } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        account:accounts!fk_account(
+          tiktok_username,
+          geelark_profile_id,
+          meta
+        )
+      `)
+      .not('meta', 'is', null)
+      .neq('meta->bulk_post', null)
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (data) {
+      // Filter for posts that actually have bulk_post = true in meta
+      const bulkPosts = data.filter(post => post.meta?.bulk_post === true)
+      setPosts(bulkPosts)
+    }
+    setIsLoading(false)
   }
 
-  const isComplete = () => {
-    return stats.pending === 0 && stats.processing === 0 && stats.launched > 0
+  const loadLogs = async () => {
+    const { data } = await supabase
+      .from('logs')
+      .select('timestamp, level, message, meta')
+      .eq('component', 'api-bulk-post')
+      .gte('timestamp', new Date(Date.now() - 30 * 60 * 1000).toISOString()) // Last 30 minutes
+      .order('timestamp', { ascending: false })
+      .limit(20)
+
+    if (data) {
+      setLogs(data)
+    }
   }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'posted':
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case 'failed':
+        return <AlertCircle className="h-4 w-4 text-red-500" />
+      case 'processing':
+      case 'pending':
+        return <RefreshCw className="h-4 w-4 text-yellow-500 animate-spin" />
+      default:
+        return <Clock className="h-4 w-4 text-gray-400" />
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'posted':
+        return 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/20'
+      case 'failed':
+        return 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20'
+      case 'processing':
+      case 'pending':
+        return 'text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-900/20'
+      default:
+        return 'text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-900/20'
+    }
+  }
+
+  // Group posts by batch
+  const groupedPosts = posts.reduce((acc, post) => {
+    const batchKey = `${post.created_at.substring(0, 16)}_${post.meta?.batch_total || 'unknown'}`
+    if (!acc[batchKey]) {
+      acc[batchKey] = {
+        posts: [],
+        total: post.meta?.batch_total || 0,
+        timestamp: post.created_at
+      }
+    }
+    acc[batchKey].posts.push(post)
+    return acc
+  }, {} as Record<string, { posts: PostStatus[]; total: number; timestamp: string }>)
+
+  // Sort posts within each batch by position
+  Object.values(groupedPosts).forEach(batch => {
+    batch.posts.sort((a, b) => {
+      const posA = a.meta?.batch_position || 999
+      const posB = b.meta?.batch_position || 999
+      return posA - posB
+    })
+  })
 
   if (!isVisible) return null
 
   return (
-    <div className="fixed top-4 right-4 z-50 w-80 bg-white dark:bg-dark-850 border border-gray-200 dark:border-dark-700 rounded-lg shadow-lg">
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-500" />
-            <h3 className="font-semibold text-gray-900 dark:text-dark-100">
-              Bulk Post Status
-            </h3>
-            {isRefreshing && (
-              <RefreshCw className="h-4 w-4 text-gray-400 animate-spin" />
-            )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-dark-850 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-dark-700">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-dark-100">
+                Bulk Post Status
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-dark-400 mt-1">
+                Monitor cascading bulk post progress
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-dark-600"
+                />
+                <span className="text-gray-600 dark:text-dark-400">Auto-refresh</span>
+              </label>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-dark-200 transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="space-y-3">
-          {/* Launched */}
-          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-800 rounded-lg">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-sm font-medium text-gray-700 dark:text-dark-300">
-                Launched
-              </span>
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+          {isLoading ? (
+            <div className="p-12 text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+              <p className="mt-2 text-gray-500 dark:text-dark-400">Loading posts...</p>
             </div>
-            <span className="text-lg font-bold text-gray-900 dark:text-dark-100">
-              {stats.launched}
-            </span>
-          </div>
-
-          {/* Succeeded */}
-          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                Succeeded
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-lg font-bold text-green-600 dark:text-green-400">
-                {stats.succeeded}
-              </span>
-              {stats.launched > 0 && (
-                <div className="text-xs text-green-600 dark:text-green-500">
-                  {getSuccessRate()}%
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Failed */}
-          <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-red-500" />
-              <span className="text-sm font-medium text-red-700 dark:text-red-400">
-                Failed
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-lg font-bold text-red-600 dark:text-red-400">
-                {stats.failed}
-              </span>
-              {stats.launched > 0 && (
-                <div className="text-xs text-red-600 dark:text-red-500">
-                  {getFailureRate()}%
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Processing */}
-          {stats.processing > 0 && (
-            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <div className="flex items-center gap-2">
-                <RefreshCw className="h-4 w-4 text-yellow-500 animate-spin" />
-                <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                  Processing
-                </span>
-              </div>
-              <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
-                {stats.processing}
-              </span>
-            </div>
-          )}
-
-          {/* Pending */}
-          {stats.pending > 0 && (
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-dark-800 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 dark:text-dark-300">
-                  Pending
-                </span>
-              </div>
-              <span className="text-lg font-bold text-gray-600 dark:text-dark-400">
-                {stats.pending}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Progress Bar */}
-        {stats.launched > 0 && (
-          <div className="mt-4">
-            <div className="flex justify-between text-xs text-gray-600 dark:text-dark-400 mb-1">
-              <span>Progress</span>
-              <span>{stats.succeeded + stats.failed} / {stats.launched}</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
-              <div className="flex h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-green-500 transition-all duration-300"
-                  style={{ width: `${(stats.succeeded / stats.launched) * 100}%` }}
-                ></div>
-                <div 
-                  className="bg-red-500 transition-all duration-300"
-                  style={{ width: `${(stats.failed / stats.launched) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Status Message */}
-        <div className="mt-4 text-center">
-          {isComplete() ? (
-            <div className="text-sm text-green-600 dark:text-green-400 font-medium">
-              ✅ Bulk operation complete
-            </div>
-          ) : stats.launched > 0 ? (
-            <div className="text-sm text-blue-600 dark:text-blue-400">
-              🔄 Bulk operation in progress...
+          ) : Object.keys(groupedPosts).length === 0 ? (
+            <div className="p-12 text-center">
+              <Layers className="h-12 w-12 mx-auto text-gray-300 dark:text-dark-600" />
+              <p className="mt-2 text-gray-500 dark:text-dark-400">No bulk posts found</p>
             </div>
           ) : (
-            <div className="text-sm text-gray-500 dark:text-dark-400">
-              No recent bulk operations
+            <div className="p-6 space-y-6">
+              {/* Bulk Post Batches */}
+              {Object.entries(groupedPosts).map(([batchKey, batch]) => {
+                const completedCount = batch.posts.filter(p => p.status === 'posted' || p.status === 'failed').length
+                const successCount = batch.posts.filter(p => p.status === 'posted').length
+                const failCount = batch.posts.filter(p => p.status === 'failed').length
+                const isComplete = completedCount === batch.posts.length
+
+                return (
+                  <div key={batchKey} className="card">
+                    <div className="p-4 border-b border-gray-200 dark:border-dark-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium text-gray-900 dark:text-dark-100">
+                            Bulk Post Batch
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-dark-400">
+                            Started {formatRelativeTime(batch.timestamp)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-green-600 dark:text-green-400">
+                            {successCount} succeeded
+                          </span>
+                          <span className="text-red-600 dark:text-red-400">
+                            {failCount} failed
+                          </span>
+                          <span className="text-gray-500 dark:text-dark-400">
+                            {completedCount}/{batch.total} complete
+                          </span>
+                        </div>
+                      </div>
+                      {!isComplete && (
+                        <div className="mt-3">
+                          <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${(completedCount / batch.total) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="divide-y divide-gray-200 dark:divide-dark-700">
+                      {batch.posts.map((post) => (
+                        <div key={post.id} className="p-4 hover:bg-gray-50 dark:hover:bg-dark-800 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 dark:text-dark-400 font-mono">
+                                  #{post.meta?.serial_no || '?'}
+                                </span>
+                                <Smartphone className="h-4 w-4 text-gray-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-dark-100">
+                                  {post.account?.tiktok_username || post.account?.geelark_profile_id || 'Unknown'}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {post.type === 'video' ? (
+                                    <Video className="h-3 w-3 text-purple-500" />
+                                  ) : (
+                                    <Layers className="h-3 w-3 text-blue-500" />
+                                  )}
+                                  <p className="text-xs text-gray-500 dark:text-dark-400">
+                                    {post.caption ? post.caption.substring(0, 50) + '...' : 'No caption'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(post.status)}`}>
+                                {getStatusIcon(post.status)}
+                                {post.status}
+                              </span>
+                              {post.meta?.batch_position && (
+                                <span className="text-xs text-gray-400 dark:text-dark-500">
+                                  Position {post.meta.batch_position}/{post.meta.batch_total}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Bulk Post Activity Logs */}
+              {logs.length > 0 && (
+                <div className="card">
+                  <div className="p-4 border-b border-gray-200 dark:border-dark-700">
+                    <h3 className="font-medium text-gray-900 dark:text-dark-100">
+                      Bulk Post Activity
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-dark-400">
+                      Recent bulk post operations
+                    </p>
+                  </div>
+                  <div className="divide-y divide-gray-200 dark:divide-dark-700 max-h-64 overflow-y-auto">
+                    {logs.map((log, index) => (
+                      <div key={index} className="p-3 text-sm">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className={`font-medium ${
+                              log.level === 'error' ? 'text-red-600 dark:text-red-400' : 
+                              log.level === 'warning' ? 'text-yellow-600 dark:text-yellow-400' : 
+                              'text-gray-900 dark:text-dark-100'
+                            }`}>
+                              {log.message}
+                            </p>
+                            {log.meta && (
+                              <p className="text-xs text-gray-500 dark:text-dark-400 mt-1">
+                                {log.meta.account_count && `${log.meta.account_count} accounts • `}
+                                {log.meta.position && `Position ${log.meta.position}/${log.meta.total} • `}
+                                {log.meta.serial_no && `Serial #${log.meta.serial_no} • `}
+                                {log.meta.success_count !== undefined && `${log.meta.success_count} succeeded • `}
+                                {log.meta.fail_count !== undefined && `${log.meta.fail_count} failed`}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-400 dark:text-dark-500 ml-2">
+                            {formatRelativeTime(log.timestamp)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {/* Last Updated */}
-        {lastUpdated && (
-          <div className="mt-2 text-xs text-gray-400 dark:text-dark-500 text-center">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </div>
-        )}
       </div>
     </div>
   )

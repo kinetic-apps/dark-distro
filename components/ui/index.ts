@@ -1,3 +1,7 @@
 export { default as Select } from './Select'
 export type { SelectOption, SelectProps } from './Select'
-export { default as ThemeToggle } from './ThemeToggle' 
+export { default as ThemeToggle } from './ThemeToggle'
+export { Badge } from './badge'
+export type { BadgeProps } from './badge'
+export { Button } from './button'
+export type { ButtonProps } from './button' 

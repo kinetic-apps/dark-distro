@@ -8,6 +8,9 @@
     },
     "app/api/automation/setup-tiktok-with-credentials/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/geelark/bulk-post/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [

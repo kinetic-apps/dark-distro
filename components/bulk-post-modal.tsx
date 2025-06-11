@@ -113,56 +113,34 @@ export default function BulkPostModal({ isOpen, onClose, onPostsLaunched }: Bulk
         .filter(tag => tag.length > 0)
         .map(tag => tag.startsWith('#') ? tag : `#${tag}`)
 
-      // Create posts
-      let successCount = 0
-      let failCount = 0
+      // Use the new bulk post endpoint
+      const response = await fetch('/api/geelark/bulk-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_ids: profiles.map(p => p.id),
+          asset_type: selectedAsset.type,
+          video_url: selectedAsset.type === 'video' ? selectedAsset.url : undefined,
+          images: selectedAsset.type === 'carousel' ? selectedAsset.children?.map(child => child.url) : undefined,
+          caption: caption || '',
+          hashtags: hashtagsArray
+        })
+      })
 
-      for (const profile of profiles) {
-        try {
-          let response
-          
-          if (selectedAsset.type === 'video') {
-            response = await fetch('/api/geelark/post-video', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                account_id: profile.id,
-                video_url: selectedAsset.url,
-                caption: caption || '',
-                hashtags: hashtagsArray
-              })
-            })
-          } else if (selectedAsset.type === 'carousel') {
-            const images = selectedAsset.children?.map(child => child.url) || []
-            response = await fetch('/api/geelark/post-carousel', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                account_id: profile.id,
-                images,
-                caption: caption || '',
-                hashtags: hashtagsArray
-              })
-            })
-          }
-
-          if (response?.ok) {
-            successCount++
-          } else {
-            failCount++
-          }
-        } catch (error) {
-          failCount++
-        }
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create bulk posts')
       }
 
-      notify('success', `Bulk post launched: ${successCount + failCount} posts initiated`)
+      const result = await response.json()
+      
+      notify('success', result.message || `Bulk post launched: ${result.success_count} succeeded, ${result.fail_count} failed`)
       
       // Trigger the status tracker with phone IDs and asset type
       const phoneIds = profiles.map(p => p.id)
       onPostsLaunched?.(phoneIds, selectedAsset.type)
       
-      if (successCount > 0) {
+      if (result.success_count > 0) {
         onClose()
       }
     } catch (error) {
